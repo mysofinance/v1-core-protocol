@@ -30,7 +30,8 @@ contract Test {
     uint128 totalWeights;
     uint256[LEVELS_PER_SLOT] lpSlots;
     mapping(uint256 => LpInfo) slotIdxToLpInfo;
-    mapping(uint128 => LoanInfo) loanIdxToLoanInfo;
+    mapping(uint256 => LoanInfo) loanIdxToLoanInfo;
+    mapping(address => uint256) lpToMaxLoanIdxClaimed;
 
     constructor(uint128 _maxBorrowablePerColl, uint8[LEVELS_PER_SLOT-1] memory _levelWeights, uint24 _initMinLpAmount) {
         require(_maxBorrowablePerColl > 0, "invalid max. borrowable amount");
@@ -38,6 +39,7 @@ contract Test {
         levelWeights = _levelWeights;
         initMinLpAmount = _initMinLpAmount;
         scaleFactor = uint128(10**PRECISION);
+        loanIdx = 1;//bump to 1 to handle default 0 in lpToMaxLoanIdxClaimed
     }
 
     function addLiquidity(uint256 _slotIdx, bool[LEVELS_PER_SLOT] calldata _levelFlags) external {
@@ -51,10 +53,7 @@ contract Test {
         }
         totalWeights += weights;
         totalLiquidity += weights * initMinLpAmount * scaleFactor / 10**PRECISION;
-        LpInfo memory lpInfo;
-        lpInfo.addr = msg.sender;
-        lpInfo.weights = weights;
-        slotIdxToLpInfo[_slotIdx] = lpInfo;
+        slotIdxToLpInfo[_slotIdx] = LpInfo(msg.sender, weights);
     }
 
     function removeLiquidity(uint256 _slotIdx) external {
@@ -69,8 +68,8 @@ contract Test {
         lpInfo.addr = address(0);
     }
 
-    function borrow(uint128 _pledgeAmount) external {
-        uint256 loanAmount = _pledgeAmount * uint256(maxBorrowablePerColl);
+    function borrow(uint256 _pledgeAmount) external {
+        uint256 loanAmount = _pledgeAmount * maxBorrowablePerColl;
         scaleFactor = scaleFactor;//update
         LoanInfo memory loanInfo;
         loanInfo.lpSnapshot = lpSlots;
@@ -79,28 +78,42 @@ contract Test {
         loanIdx += 1;
     }
 
-    function claim(uint256 _slotIdx, uint128[] calldata _loanIdxs, uint8 _checkLevel) external {
+    function repay(uint256 _loanIdx) external {
+        LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
+        require(block.number + 1 < loanInfo.expiry, "loan expired");
+        require(!loanInfo.repaid, "loan already repaid");
+        loanInfo.repaid = true;
+    }
+
+    function claim(uint256 _slotIdx, uint256[] calldata _loanIdxs, uint8 _checkLevel) external {
         LpInfo memory lpInfo = slotIdxToLpInfo[_slotIdx];
-        require(lpInfo.addr == msg.sender, "unentitled lp slot");
+        require(lpInfo.addr == msg.sender, "lp unentitled for slot");
+        require(_loanIdxs[0] != 0, "loan idx must be > 0");
+        require(_loanIdxs[0] > lpToMaxLoanIdxClaimed[msg.sender], "lp already claimed");
         uint128 repayments;
         uint128 collateral;
         uint256 check = uint256(1) << _slotIdx;
-        for (uint128 i = 0; i < _loanIdxs.length; ++i) {
-            LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
-            //uint256 flag = (loanInfo.lpSnapshot[_checkLevel] >> _slotIdx) & uint8(1);
-            //require(flag == 1, "unentitled lp");
+        uint256 arrayLen = _loanIdxs.length;
+        uint256 currLoanIdx;
+        uint256 prevLoanIdx;
+        for (uint128 i = 0; i < arrayLen; ++i) {
+            currLoanIdx = _loanIdxs[i];
+            require(i==0 || _loanIdxs[i] > prevLoanIdx, "loanIdxs must be ascending");
+            LoanInfo memory loanInfo = loanIdxToLoanInfo[currLoanIdx];
             check &= loanInfo.lpSnapshot[_checkLevel];
             if (loanInfo.repaid) {
-                repayments += uint128(loanInfo.repayAndCollateral >> 128);
+                repayments += uint128(loanInfo.repayAndCollateral << 128);
             } else {
-                collateral += uint128(loanInfo.repayAndCollateral << 128);
+                collateral += uint128(loanInfo.repayAndCollateral);
             }
+            prevLoanIdx = currLoanIdx;
         }
-        check = (check >> _slotIdx) & uint8(1); //check outside of loop to reduce gas costs
-        require(check == 1, "unentitled lp");
+        check = (check >> _slotIdx) & uint256(1); //check outside of loop to reduce gas costs
+        lpToMaxLoanIdxClaimed[msg.sender] = currLoanIdx;
+        require(check == 1, "lp not entitled for all loan idxs");
     }
 
-    function isEntitled(uint8 _slotIdx, uint128[] calldata _loanIdxs) external view returns(bool[] memory) {
+    function isEntitled(uint8 _slotIdx, uint256[] calldata _loanIdxs) external view returns(bool[] memory) {
         uint256 n = _loanIdxs.length;
         require(n > 0, "invalid _loanIdxs");
         bool[] memory _isEntitled = new bool[](n);
