@@ -9,7 +9,6 @@ contract Contract {
     uint24 constant LOAN_TENOR = 10; //1M = 199384
     uint24 constant GRACE_PERIOD = 199384;
     uint24 constant MIN_LPING_PERIOD = 1;
-    uint8 constant BORR_DECIMALS = 6;
     uint8 constant COLL_DECIMALS = 18;
     uint8 constant PRECISION = 18;
     uint8 constant LEVELS_PER_SLOT = 3;
