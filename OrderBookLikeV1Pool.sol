@@ -23,7 +23,7 @@ contract Contract {
         uint128 weights;
         bool removedLiquidity;
         uint32 claimUntil;
-        uint32 removeAfter;
+        uint32 earliestRemove;
     }
 
     struct LoanInfo {
@@ -79,7 +79,7 @@ contract Contract {
         lpInfo.addr = msg.sender;
         lpInfo.weights = weights;
         lpInfo.removedLiquidity = false;
-        lpInfo.removeAfter = uint32(block.number) + MIN_LPING_PERIOD;
+        lpInfo.earliestRemove = uint32(block.number) + MIN_LPING_PERIOD;
         //ERC20 transfer liquidityAdded
     }
 
@@ -88,7 +88,7 @@ contract Contract {
         require(lpInfo.addr != address(0), "empty lp slot");
         require(lpInfo.addr == msg.sender, "unauthorized lp slot");
         require(!lpInfo.removedLiquidity, "already removed liquidity");
-        require(block.number > lpInfo.removeAfter, "before min. lping period");
+        require(block.number > lpInfo.earliestRemove, "before min. lping period");
         uint256 liquidityRemoved;
         for (uint256 i = 0; i < LEVELS_PER_SLOT; ++i) {
             lpSlots[i] = lpSlots[i] & ~(uint256(1) << _slotIdx);
