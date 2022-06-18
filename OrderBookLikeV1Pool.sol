@@ -3,16 +3,20 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 
-contract Test {
+contract Contract {
 
-    event Test(uint256 a, uint256 b, uint256 c);
+    event Test(uint256 a, uint256 b, uint256 c, uint256 d, uint256 e);
     uint24 constant LOAN_TENOR = 10; //1M = 199384
     uint24 constant GRACE_PERIOD = 199384;
-    uint8 constant COLL_DEICMALS = 18;
+    uint24 constant MIN_LPING_PERIOD = 1;
+    uint8 constant BORR_DECIMALS = 6;
+    uint8 constant COLL_DECIMALS = 18;
     uint8 constant PRECISION = 18;
     uint8 constant LEVELS_PER_SLOT = 3;
     uint256 immutable initMinLpAmount;
     uint256 immutable maxBorrowablePerColl;
+    uint256 immutable minAPR;
+    uint256 immutable scaleAPR;
     uint128[LEVELS_PER_SLOT-1] levelWeights;
 
     struct LpInfo {
@@ -20,6 +24,7 @@ contract Test {
         uint128 weights;
         bool removedLiquidity;
         uint32 claimUntil;
+        uint32 removeAfter;
     }
 
     struct LoanInfo {
@@ -39,9 +44,9 @@ contract Test {
     uint256 public claimable;
     mapping(uint256 => LpInfo) slotIdxToLpInfo;
     mapping(uint256 => LoanInfo) loanIdxToLoanInfo;
-    mapping(address => uint256) lpToMaxLoanIdxClaimed;
+    mapping(bytes32 => uint256) lpToMaxLoanIdxClaimed;
 
-    constructor(uint256 _maxBorrowablePerColl, uint128[LEVELS_PER_SLOT-1] memory _levelWeights, uint256 _initMinLpAmount) {
+    constructor(uint256 _maxBorrowablePerColl, uint128[LEVELS_PER_SLOT-1] memory _levelWeights, uint256 _initMinLpAmount, uint256 _minAPR, uint256 _scaleAPR) {
         require(_maxBorrowablePerColl > 0, "invalid max. borrowable amount");
         require(_initMinLpAmount > 0, "invalid init. lp amount");
         for (uint256 i = 0; i < LEVELS_PER_SLOT-1; ++i) {
@@ -51,6 +56,8 @@ contract Test {
         levelWeights = _levelWeights;
         initMinLpAmount = _initMinLpAmount;
         scaleFactor = 10**PRECISION;
+        minAPR = _minAPR;
+        scaleAPR = _scaleAPR;
         loanIdx = 1;//bump to 1 to handle default 0 in lpToMaxLoanIdxClaimed
     }
 
@@ -73,6 +80,7 @@ contract Test {
         lpInfo.addr = msg.sender;
         lpInfo.weights = weights;
         lpInfo.removedLiquidity = false;
+        lpInfo.removeAfter = uint32(block.number) + MIN_LPING_PERIOD;
         //ERC20 transfer liquidityAdded
     }
 
@@ -81,6 +89,7 @@ contract Test {
         require(lpInfo.addr != address(0), "empty lp slot");
         require(lpInfo.addr == msg.sender, "unauthorized lp slot");
         require(!lpInfo.removedLiquidity, "already removed liquidity");
+        require(block.number > lpInfo.removeAfter, "before min. lping period");
         uint256 liquidityRemoved;
         for (uint256 i = 0; i < LEVELS_PER_SLOT; ++i) {
             lpSlots[i] = lpSlots[i] & ~(uint256(1) << _slotIdx);
@@ -95,12 +104,13 @@ contract Test {
 
     function borrow(uint256 _pledgeAmount) external {
         require(_pledgeAmount > 0, "must pledge > 0");
-        uint256 loanAmount = _pledgeAmount * maxBorrowablePerColl * totalLiquidity / (_pledgeAmount * maxBorrowablePerColl + totalLiquidity * 10**COLL_DEICMALS);
-        uint256 interestRate = 5*10**16;//5% for illustration purpose
+        uint256 loanAmount = _pledgeAmount * maxBorrowablePerColl * totalLiquidity / (_pledgeAmount * maxBorrowablePerColl + totalLiquidity * 10**COLL_DECIMALS);
+        uint256 util = loanAmount * 10**PRECISION / totalLiquidity;
+        uint256 interestRate = scaleAPR * util / (10**PRECISION - util) + minAPR;
         uint256 repaymentAmount = loanAmount * (10**PRECISION + interestRate) / 10**PRECISION;
         require(repaymentAmount > loanAmount, "repayment must be greater than loan");
         scaleFactor = scaleFactor * (totalLiquidity - loanAmount) / totalLiquidity;
-        emit Test(loanAmount, repaymentAmount, scaleFactor);
+        emit Test(loanAmount, util, interestRate, repaymentAmount, scaleFactor);
         require(scaleFactor > 0, "scaleFactor > 0");
         LoanInfo memory loanInfo;
         loanInfo.borrower = msg.sender;
@@ -129,9 +139,8 @@ contract Test {
         LpInfo memory lpInfo = slotIdxToLpInfo[_slotIdx];
         require(lpInfo.addr == msg.sender, "lp unentitled for slot");
         require(_loanIdxs[0] != 0, "loan idx must be > 0");
-        require(_loanIdxs[0] > lpToMaxLoanIdxClaimed[msg.sender], "lp already claimed");
+        require(_loanIdxs[0] > lpToMaxLoanIdxClaimed[keccak256(abi.encodePacked(_slotIdx,msg.sender))], "lp already claimed");
         LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[0]];
-        require(block.number > loanInfo.expiry, "loan must have expired");//only need to check once due to sorting
         uint256 repayments;
         uint256 collateral;
         uint256 check = uint256(1) << _slotIdx;
@@ -144,15 +153,15 @@ contract Test {
             }
             check &= loanInfo.lpSnapshot[_checkLevel];
             if (loanInfo.repaid) {
-                repayments += uint128(loanInfo.collAndRepayAmounts) * loanInfo.totalWeights / lpInfo.weights;
-            } else {
-                collateral += (loanInfo.collAndRepayAmounts >> 128);
+                repayments += uint128(loanInfo.collAndRepayAmounts) * lpInfo.weights / loanInfo.totalWeights;
+            } else if (block.number > loanInfo.expiry) {
+                collateral += (loanInfo.collAndRepayAmounts >> 128) * lpInfo.weights / loanInfo.totalWeights;
             }
             prevLoanIdx = _loanIdxs[i];
         }
         check = (check >> _slotIdx) & uint256(1);
         require(check == 1, "lp not entitled for all loan ids");
-        lpToMaxLoanIdxClaimed[msg.sender] = _loanIdxs[arrayLen-1];
+        lpToMaxLoanIdxClaimed[keccak256(abi.encodePacked(_slotIdx,msg.sender))] = _loanIdxs[arrayLen-1];
         claimable -= repayments;
         //ERC20 transfer repayments and collateral
     }
