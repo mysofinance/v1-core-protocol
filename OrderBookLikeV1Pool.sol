@@ -32,10 +32,10 @@ contract Contract {
         bool repaid;
     }
 
-    struct GroupedClaimsInfo {
+    struct BatchedClaimsInfo {
         uint128 repayments;
         uint128 collateral;
-        uint128 groupWeight;
+        uint128 batchedWeight;
         uint128 maxLoanIdx;
     }
 
@@ -48,7 +48,7 @@ contract Contract {
     mapping(uint256 => LpInfo) slotIdxToLpInfo;
     mapping(uint256 => LoanInfo) loanIdxToLoanInfo;
     mapping(bytes32 => uint256) lpToMaxLoanIdxClaimed;
-    mapping(bytes32 => GroupedClaimsInfo) slotsToClaimsInfo;
+    mapping(bytes32 => BatchedClaimsInfo) slotsToClaimsInfo;
 
     constructor(
         uint256 _maxLoanPerColl,
@@ -202,7 +202,7 @@ contract Contract {
         //ERC20 transfer repayments and collateral
     }
 
-    function claimOnGroup(
+    function claimBatched(
         uint256 _slotIdx,
         uint256[] calldata _slots,
         uint256[] calldata _loanIdxs
@@ -219,35 +219,35 @@ contract Contract {
             loanArrayLen > 0 && loanArrayLen < loanIdx,
             "loanArrayLen out of bounds"
         );
-        GroupedClaimsInfo memory claimsInfo = slotsToClaimsInfo[
+        BatchedClaimsInfo memory claimsInfo = slotsToClaimsInfo[
             keccak256(abi.encodePacked(_slots, _loanIdxs))
         ];
         lpToMaxLoanIdxClaimed[
             keccak256(abi.encodePacked(_slotIdx, msg.sender))
         ] = _loanIdxs[loanArrayLen - 1];
         uint256 repayments = (claimsInfo.repayments * lpInfo.weight) /
-            claimsInfo.groupWeight;
+            claimsInfo.batchedWeight;
         uint256 collateral = (claimsInfo.collateral * lpInfo.weight) /
-            claimsInfo.groupWeight;
+            claimsInfo.batchedWeight;
         //ERC20 transfer repayments and collateral
     }
 
-    function groupClaims(
+    function batchClaims(
         uint256[] calldata _slots,
         uint256[] calldata _loanIdxs
     ) external {
-        (uint128 groupWeight, uint256 slots) = weightsAndSlots(_slots);
+        (uint128 batchedWeight, uint256 slots) = weightsAndSlots(_slots);
         (
             uint256 repayments,
             uint256 collateral,
             uint256 checkMask
-        ) = repayCollAndCheckMask(slots, _loanIdxs, groupWeight);
+        ) = repayCollAndCheckMask(slots, _loanIdxs, batchedWeight);
         uint256 prev = _loanIdxs[0];
         require(slots == checkMask, "slots not entitled to all loans");
-        GroupedClaimsInfo memory claimsInfo;
+        BatchedClaimsInfo memory claimsInfo;
         claimsInfo.repayments = uint128(repayments);
         claimsInfo.collateral = uint128(collateral);
-        claimsInfo.groupWeight = groupWeight;
+        claimsInfo.batchedWeight = batchedWeight;
         claimsInfo.maxLoanIdx = uint32(prev);
         slotsToClaimsInfo[
             keccak256(abi.encodePacked(_slots, _loanIdxs))
@@ -262,19 +262,19 @@ contract Contract {
         uint256 slotArrayLen = _slots.length;
         require(slotArrayLen < 256, "slotArrayLen out of bounds");
         LpInfo memory lpInfo;
-        uint128 groupWeight;
+        uint128 batchedWeight;
         uint256 slots;
         uint256 prev;
         for (uint128 i = 0; i < slotArrayLen; ++i) {
             lpInfo = slotIdxToLpInfo[_slots[i]];
-            groupWeight += lpInfo.weight;
+            batchedWeight += lpInfo.weight;
             if (i > 0) {
-                require(_slots[i] > prev, "loan ids must be ascending");
+                require(_slots[i] > prev, "slots must be ascending");
             }
             slots |= uint256(1) << _slots[i];
             prev = _slots[i];
         }
-        return (groupWeight, slots);
+        return (batchedWeight, slots);
     }
 
     function repayCollAndCheckMask(
