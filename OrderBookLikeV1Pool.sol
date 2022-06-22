@@ -11,8 +11,10 @@ contract Contract {
     uint8 constant PRECISION = 18;
     uint256 immutable initMinLpAmount;
     uint256 immutable maxLoanPerColl;
-    uint256 immutable minAPR;
-    uint256 immutable scaleAPR;
+    uint256 immutable apr1;
+    uint256 immutable apr2;
+    uint256 immutable tvl1;
+    uint256 immutable tvl2;
 
     struct LpInfo {
         address addr;
@@ -53,16 +55,22 @@ contract Contract {
     constructor(
         uint256 _maxLoanPerColl,
         uint256 _initMinLpAmount,
-        uint256 _minAPR,
-        uint256 _scaleAPR
+        uint256 _apr1,
+        uint256 _apr2,
+        uint256 _tvl1,
+        uint256 _tvl2
     ) {
         require(_maxLoanPerColl > 0, "invalid max. borrowable amount");
         require(_initMinLpAmount > 0, "invalid init. lp amount");
+        require(_apr1 > _apr2, "invalid apr params");
+        require(_tvl2 > _tvl1, "invalid tvl params");
         maxLoanPerColl = _maxLoanPerColl;
         initMinLpAmount = _initMinLpAmount;
         scaleFactor = 10**PRECISION;
-        minAPR = _minAPR;
-        scaleAPR = _scaleAPR;
+        apr1 = _apr1;
+        apr2 = _apr2;
+        tvl1 = _tvl1;
+        tvl2 = _tvl2;
         loanIdx = 1; //bump to 1 to handle default 0 in lpToMaxLoanIdxClaimed
     }
 
@@ -113,6 +121,30 @@ contract Contract {
         //ERC20 transfer liquidityRemoved
     }
 
+    function loanTerms(uint256 _pledgeAmount)
+        public
+        view
+        returns (uint256, uint256)
+    {
+        uint256 loanAmount = (_pledgeAmount * maxLoanPerColl * totalLiquidity) /
+            (_pledgeAmount *
+                maxLoanPerColl +
+                totalLiquidity *
+                10**COLL_DECIMALS);
+
+        uint256 rate;
+        uint256 x = totalLiquidity - loanAmount;
+        if (x < tvl1) {
+            rate = (apr1 * tvl1) / (x);
+        } else if (x < tvl2) {
+            rate = ((apr1 - apr2) * (tvl2 - x)) / (tvl2 - tvl1) + apr2;
+        } else {
+            rate = apr2;
+        }
+
+        return (loanAmount, rate);
+    }
+
     function borrow(
         uint256 _pledgeAmount,
         uint256 _minLoan,
@@ -122,18 +154,10 @@ contract Contract {
         uint256 blockNum = block.number;
         require(blockNum < _deadline, "after deadline");
         require(_pledgeAmount > 0, "must pledge > 0");
-        uint256 loanAmount = (_pledgeAmount * maxLoanPerColl * totalLiquidity) /
-            (_pledgeAmount *
-                maxLoanPerColl +
-                totalLiquidity *
-                10**COLL_DECIMALS);
+        (uint256 loanAmount, uint256 rate) = loanTerms(_pledgeAmount);
         require(loanAmount > _minLoan, "below _minLoan limit");
-        uint256 util = (loanAmount * 10**PRECISION) / totalLiquidity;
-        uint256 interestRate = (scaleAPR * util) /
-            (10**PRECISION - util) +
-            minAPR;
-        uint256 repaymentAmount = (loanAmount *
-            (10**PRECISION + interestRate)) / 10**PRECISION;
+        uint256 repaymentAmount = (loanAmount * (10**PRECISION + rate)) /
+            10**PRECISION;
         require(
             repaymentAmount > loanAmount,
             "repayment must be greater than loan"
@@ -142,7 +166,13 @@ contract Contract {
         scaleFactor =
             (scaleFactor * (totalLiquidity - loanAmount)) /
             totalLiquidity;
-        emit Test(loanAmount, util, interestRate, repaymentAmount, scaleFactor);
+        emit Test(
+            totalLiquidity,
+            loanAmount,
+            rate,
+            repaymentAmount,
+            scaleFactor
+        );
         require(scaleFactor > 0, "scaleFactor > 0");
         LoanInfo memory loanInfo;
         loanInfo.borrower = msg.sender;
@@ -193,7 +223,7 @@ contract Contract {
             uint256 repayments,
             uint256 collateral,
             uint256 checkInAll
-        ) = repayCollAndCheckMask(checkSlot, _loanIdxs, lpInfo.weight);
+        ) = _repayCollAndCheckMask(checkSlot, _loanIdxs, lpInfo.weight);
         require(checkInAll == checkSlot, "slot not entitled to all loans");
         lpToMaxLoanIdxClaimed[
             keccak256(abi.encodePacked(_slotIdx, msg.sender))
@@ -236,12 +266,12 @@ contract Contract {
         uint256[] calldata _slots,
         uint256[] calldata _loanIdxs
     ) external {
-        (uint128 batchedWeight, uint256 slots) = weightsAndSlots(_slots);
+        (uint128 batchedWeight, uint256 slots) = _weightsAndSlots(_slots);
         (
             uint256 repayments,
             uint256 collateral,
             uint256 checkMask
-        ) = repayCollAndCheckMask(slots, _loanIdxs, batchedWeight);
+        ) = _repayCollAndCheckMask(slots, _loanIdxs, batchedWeight);
         uint256 prev = _loanIdxs[0];
         require(slots == checkMask, "slots not entitled to all loans");
         BatchedClaimsInfo memory claimsInfo;
@@ -254,7 +284,7 @@ contract Contract {
         ] = claimsInfo;
     }
 
-    function weightsAndSlots(uint256[] calldata _slots)
+    function _weightsAndSlots(uint256[] calldata _slots)
         internal
         view
         returns (uint128, uint256)
@@ -277,7 +307,7 @@ contract Contract {
         return (batchedWeight, slots);
     }
 
-    function repayCollAndCheckMask(
+    function _repayCollAndCheckMask(
         uint256 _slots,
         uint256[] calldata _loanIdxs,
         uint256 _weight
