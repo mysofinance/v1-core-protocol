@@ -40,8 +40,10 @@ describe("Greeter", function () {
 
   it("Should allow LPs to add liquidity", async function () {
     await pool.connect(lp).addLiquidity(0, 1);
+    await pool.connect(lp).addLiquidity(1, 10);
+    await pool.connect(lp).addLiquidity(255, 100);
     totalLiquidity = await pool.totalLiquidity();
-    expect(totalLiquidity).to.be.equal(_initMinLpAmount);
+    expect(totalLiquidity).to.be.equal(_initMinLpAmount.mul(111));
   });
 
   it("Should not allow LPs to add to same slot", async function () {
@@ -55,5 +57,19 @@ describe("Greeter", function () {
 
   it("Should not allow LPs to add with 0 weight", async function () {
     await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, 0))).to.be.reverted;
+  });
+
+  it("Should allow borrowing", async function () {
+    await pool.connect(lp).addLiquidity(0, 1);
+    await pool.connect(lp).addLiquidity(1, 10);
+    await pool.connect(lp).addLiquidity(255, 100);
+
+    loanTerms = await pool.loanTerms(ONE_ETH);
+    minLoanLimit = loanTerms[0].mul(98).div(100);
+    maxRepayLimit = loanTerms[0].mul(MONE.add(loanTerms[1])).mul(105).div(100).div(MONE);
+    console.log(loanTerms);
+    console.log(minLoanLimit, maxRepayLimit);
+    currBlock = await ethers.provider.getBlockNumber();
+    await pool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, currBlock+10);
   });
 });
