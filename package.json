@@ -19,5 +19,9 @@
   "homepage": "https://github.com/mysofinance/orderbook-style-prototyping#readme",
   "devDependencies": {
     "hardhat": "^2.9.9"
+  },
+  "dependencies": {
+    "@nomiclabs/hardhat-waffle": "^2.0.3",
+    "chai": "^4.3.6"
   }
 }

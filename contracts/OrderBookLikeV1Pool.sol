@@ -2,7 +2,7 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-contract Contract {
+contract OrderBookLikeV1Pool {
     event Test(uint256 a, uint256 b, uint256 c, uint256 d, uint256 e);
     uint24 constant LOAN_TENOR = 10; //1M = 199384
     uint24 constant GRACE_PERIOD = 199384;
