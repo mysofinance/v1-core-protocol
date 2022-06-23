@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("Greeter", function () {
+describe("Simple Testing", function () {
 
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
   const ONE_USDC = ethers.BigNumber.from("1000000");
@@ -15,11 +15,11 @@ describe("Greeter", function () {
 
     _maxLoanPerColl = ONE_USDC.mul(500);
     _initMinLpAmount = ONE_USDC.mul(1000);
-    _apr1 = MONE.mul(2).div(10)
-    _apr2 = MONE.mul(2).div(100)
+    _r1 = MONE.mul(2).div(10)
+    _r2 = MONE.mul(2).div(100)
     _tvl1 = ONE_USDC.mul(100000);
     _tvl2 = ONE_USDC.mul(1000000);
-    pool = await Pool.deploy(_maxLoanPerColl, _initMinLpAmount, _apr1, _apr2, _tvl1, _tvl2);
+    pool = await Pool.deploy(_maxLoanPerColl, _initMinLpAmount, _r1, _r2, _tvl1, _tvl2);
     await pool.deployed();
   });
 
@@ -39,30 +39,31 @@ describe("Greeter", function () {
   });
 
   it("Should allow LPs to add liquidity", async function () {
-    await pool.connect(lp).addLiquidity(0, 1);
-    await pool.connect(lp).addLiquidity(1, 10);
-    await pool.connect(lp).addLiquidity(255, 100);
+    await pool.connect(lp).addLiquidity(0, ONE_USDC.mul(1111));
+    await pool.connect(lp).addLiquidity(1, ONE_USDC.mul(10111));
+    await pool.connect(lp).addLiquidity(255, ONE_USDC.mul(130111));
     totalLiquidity = await pool.totalLiquidity();
-    expect(totalLiquidity).to.be.equal(_initMinLpAmount.mul(111));
+    expect(totalLiquidity).to.be.equal(ONE_USDC.mul(141000));
+  });
+
+  it("Should not allow adding too small amounts", async function () {
+    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, 0))).to.be.reverted;
+    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, _initMinLpAmount.sub(1)))).to.be.reverted;
   });
 
   it("Should not allow LPs to add to same slot", async function () {
-    await pool.connect(lp).addLiquidity(0, 1);
-    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, 1))).to.be.reverted;
+    await pool.connect(lp).addLiquidity(0, ONE_USDC.mul(1000));
+    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, ONE_USDC.mul(1000)))).to.be.reverted;
   });
 
   it("Should not allow LPs to add to slot higher than 255", async function () {
-    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, 256))).to.be.reverted;
-  });
-
-  it("Should not allow LPs to add with 0 weight", async function () {
-    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(0, 0))).to.be.reverted;
+    await expect(pool.loanTerms(pool.connect(lp).addLiquidity(256, ONE_USDC.mul(1000)))).to.be.reverted;
   });
 
   it("Should allow borrowing", async function () {
-    await pool.connect(lp).addLiquidity(0, 1);
-    await pool.connect(lp).addLiquidity(1, 10);
-    await pool.connect(lp).addLiquidity(255, 100);
+    await pool.connect(lp).addLiquidity(0, ONE_USDC.mul(1000));
+    await pool.connect(lp).addLiquidity(1, ONE_USDC.mul(10000));
+    await pool.connect(lp).addLiquidity(255, ONE_USDC.mul(100000));
 
     loanTerms = await pool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);

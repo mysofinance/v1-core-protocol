@@ -11,8 +11,8 @@ contract OrderBookLikeV1Pool {
     uint8 constant PRECISION = 18;
     uint256 immutable initMinLpAmount;
     uint256 immutable maxLoanPerColl;
-    uint256 immutable apr1;
-    uint256 immutable apr2;
+    uint256 immutable r1;
+    uint256 immutable r2;
     uint256 immutable tvl1;
     uint256 immutable tvl2;
 
@@ -55,20 +55,20 @@ contract OrderBookLikeV1Pool {
     constructor(
         uint256 _maxLoanPerColl,
         uint256 _initMinLpAmount,
-        uint256 _apr1,
-        uint256 _apr2,
+        uint256 _r1,
+        uint256 _r2,
         uint256 _tvl1,
         uint256 _tvl2
     ) {
         require(_maxLoanPerColl > 0, "invalid max. borrowable amount");
         require(_initMinLpAmount > 0, "invalid init. lp amount");
-        require(_apr1 > _apr2, "invalid apr params");
+        require(_r1 > _r2, "invalid apr params");
         require(_tvl2 > _tvl1, "invalid tvl params");
         maxLoanPerColl = _maxLoanPerColl;
         initMinLpAmount = _initMinLpAmount;
         scaleFactor = 10**PRECISION;
-        apr1 = _apr1;
-        apr2 = _apr2;
+        r1 = _r1;
+        r2 = _r2;
         tvl1 = _tvl1;
         tvl2 = _tvl2;
         loanIdx = 1; //bump to 1 to handle default 0 in lpToMaxLoanIdxClaimed
@@ -78,9 +78,9 @@ contract OrderBookLikeV1Pool {
         return (initMinLpAmount * scaleFactor) / 10**PRECISION;
     }
 
-    function addLiquidity(uint256 _slotIdx, uint128 _weight) external {
+    function addLiquidity(uint256 _slotIdx, uint128 _amount) external {
         require(_slotIdx < 256, "_slotIdx out of bounds");
-        require(_weight > 0, "weights > 0");
+        require(_amount > 0, "weights > 0");
         LpInfo storage lpInfo = slotIdxToLpInfo[_slotIdx];
         require(
             lpInfo.addr == address(0) ||
@@ -88,14 +88,14 @@ contract OrderBookLikeV1Pool {
                     lpInfo.reassignableAfter < block.number),
             "lp slot alreay in use"
         );
-        uint256 liquidityAdded = (_weight * initMinLpAmount * scaleFactor) /
-            10**PRECISION;
+        uint128 weight = uint128(_amount * 10**PRECISION / (initMinLpAmount * scaleFactor));
+        uint256 liquidityAdded = weight * initMinLpAmount * scaleFactor / 10**PRECISION;
         require(liquidityAdded > 0, "liquidityAdded > 0");
         lpSlots |= uint256(1) << _slotIdx;
-        totalWeights += _weight;
+        totalWeights += weight;
         totalLiquidity += liquidityAdded;
         lpInfo.addr = msg.sender;
-        lpInfo.weight = _weight;
+        lpInfo.weight = weight;
         lpInfo.removedLiquidity = false;
         lpInfo.earliestRemove = uint32(block.number) + MIN_LPING_PERIOD;
         //ERC20 transfer liquidityAdded
@@ -121,10 +121,10 @@ contract OrderBookLikeV1Pool {
         //ERC20 transfer liquidityRemoved
     }
 
-    function loanTerms(uint256 _pledgeAmount)
+    function loanTerms(uint128 _pledgeAmount)
         public
         view
-        returns (uint256, uint256)
+        returns (uint128, uint256)
     {
         uint256 loanAmount = (_pledgeAmount * maxLoanPerColl * totalLiquidity) /
             (_pledgeAmount *
@@ -135,29 +135,29 @@ contract OrderBookLikeV1Pool {
         uint256 rate;
         uint256 x = totalLiquidity - loanAmount;
         if (x < tvl1) {
-            rate = (apr1 * tvl1) / (x);
+            rate = (r1 * tvl1) / (x);
         } else if (x < tvl2) {
-            rate = ((apr1 - apr2) * (tvl2 - x)) / (tvl2 - tvl1) + apr2;
+            rate = ((r1 - r2) * (tvl2 - x)) / (tvl2 - tvl1) + r2;
         } else {
-            rate = apr2;
+            rate = r2;
         }
 
-        return (loanAmount, rate);
+        return (uint128(loanAmount), rate);
     }
 
     function borrow(
-        uint256 _pledgeAmount,
-        uint256 _minLoan,
-        uint256 _maxRepay,
+        uint128 _pledgeAmount,
+        uint128 _minLoan,
+        uint128 _maxRepay,
         uint256 _deadline
     ) external {
         uint256 blockNum = block.number;
         require(blockNum < _deadline, "after deadline");
         require(_pledgeAmount > 0, "must pledge > 0");
-        (uint256 loanAmount, uint256 rate) = loanTerms(_pledgeAmount);
+        (uint128 loanAmount, uint256 rate) = loanTerms(_pledgeAmount);
         require(loanAmount > _minLoan, "below _minLoan limit");
-        uint256 repaymentAmount = (loanAmount * (10**PRECISION + rate)) /
-            10**PRECISION;
+        uint128 repaymentAmount = uint128((loanAmount * (10**PRECISION + rate)) /
+            10**PRECISION);
         require(
             repaymentAmount > loanAmount,
             "repayment must be greater than loan"
@@ -179,8 +179,8 @@ contract OrderBookLikeV1Pool {
         loanInfo.expiry = uint32(blockNum) + LOAN_TENOR;
         loanInfo.lpSnapshot = lpSlots;
         loanInfo.totalWeights = totalWeights;
-        loanInfo.repayment = uint128(repaymentAmount);
-        loanInfo.collateral = uint128(_pledgeAmount);
+        loanInfo.repayment = repaymentAmount;
+        loanInfo.collateral = _pledgeAmount;
         loanIdxToLoanInfo[loanIdx] = loanInfo;
         loanIdx += 1;
         totalLiquidity -= loanAmount;
@@ -206,9 +206,10 @@ contract OrderBookLikeV1Pool {
         require(_slotIdx < 256, "_slotIdx out of bounds");
         uint256 arrayLen = _loanIdxs.length;
         require(arrayLen > 0 && arrayLen < loanIdx, "_loanIdxs out of bounds");
+        require(_loanIdxs[0] != 0, "loan idx must be > 0");
+        require(_loanIdxs[arrayLen-1] < loanIdx, "invalid loan id");
         LpInfo memory lpInfo = slotIdxToLpInfo[_slotIdx];
         require(lpInfo.addr == msg.sender, "lp unentitled for slot");
-        require(_loanIdxs[0] != 0, "loan idx must be > 0");
         require(
             _loanIdxs[0] >
                 lpToMaxLoanIdxClaimed[
@@ -233,27 +234,29 @@ contract OrderBookLikeV1Pool {
     }
 
     function claimBatched(
-        uint256 _slotIdx,
+        uint256 _idx,
         uint256[] calldata _slots,
         uint256[] calldata _loanIdxs
     ) external {
         uint256 slotArrayLen = _slots.length;
         require(
-            slotArrayLen > _slotIdx && slotArrayLen < 256,
+            slotArrayLen > _idx && slotArrayLen < 256,
             "slotArrayLen out of bounds"
         );
-        LpInfo memory lpInfo = slotIdxToLpInfo[_slots[_slotIdx]];
+        LpInfo memory lpInfo = slotIdxToLpInfo[_slots[_idx]];
         require(lpInfo.addr == msg.sender, "unentitled lp");
         uint256 loanArrayLen = _loanIdxs.length;
         require(
             loanArrayLen > 0 && loanArrayLen < loanIdx,
             "loanArrayLen out of bounds"
         );
+        require(_loanIdxs[0] != 0, "loan idx must be > 0");
+        require(_loanIdxs[loanArrayLen-1] < loanIdx, "invalid loan id");
         BatchedClaimsInfo memory claimsInfo = slotsToClaimsInfo[
             keccak256(abi.encodePacked(_slots, _loanIdxs))
         ];
         lpToMaxLoanIdxClaimed[
-            keccak256(abi.encodePacked(_slotIdx, msg.sender))
+            keccak256(abi.encodePacked(_idx, msg.sender))
         ] = _loanIdxs[loanArrayLen - 1];
         uint256 repayments = (claimsInfo.repayments * lpInfo.weight) /
             claimsInfo.batchedWeight;
