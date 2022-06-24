@@ -94,17 +94,63 @@ describe("Simple Testing", function () {
     await ethers.provider.send("hardhat_mine", ["0x1000"]);
 
     //claim
-    await subPool.connect(lp).claim(0, [1]);
+    await subPool.connect(lp).claim(0, [1], true);
 
     //remove liquidity
     await subPool.connect(lp).removeLiquidity(0);
 
-    //move forward until slot reassignable
-    await ethers.provider.send("hardhat_mine", ["0x1000"]);
-
     //ensure new lp cannot claim in retrospect
     currBlock2 = await ethers.provider.getBlockNumber();
     await subPool.connect(addrs[0]).addLiquidity(0, ONE_USDC.mul(1000), 0, currBlock2+10);
-    await expect(subPool.connect(addrs[0]).claim(0, [1])).to.be.reverted;
+    await expect(subPool.connect(addrs[0]).claim(0, [1], true)).to.be.reverted;
   });
+
+  it("Should facilitate n loans before scale factor drops to 1 (1/3)", async function () {
+    currBlock = await ethers.provider.getBlockNumber();
+    await subPool.connect(lp).addLiquidity(0, ONE_USDC.mul(1000), 0, currBlock+10);
+
+    for (let i = 0; i < 7; i++) {
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000);
+    }
+    await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000)).to.be.reverted;
+  });
+
+  it("Should facilitate n loans before scale factor drops to 1 (2/3)", async function () {
+    currBlock = await ethers.provider.getBlockNumber();
+    await subPool.connect(lp).addLiquidity(0, ONE_USDC.mul(10000), 0, currBlock+10);
+
+    for (let i = 0; i < 28; i++) {
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000);
+    }
+    await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000)).to.be.reverted;
+  });
+
+  it("Should facilitate n loans before scale factor drops to 1 (3/3)", async function () {
+    currBlock = await ethers.provider.getBlockNumber();
+    await subPool.connect(lp).addLiquidity(0, ONE_USDC.mul(100000), 0, currBlock+10);
+
+    for (let i = 0; i < 210; i++) {
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000);
+    }
+    totalLiquidity = await subPool.totalLiquidity();
+    console.log("totalLiquidity: ", totalLiquidity);
+    loanTerms = await subPool.loanTerms(ONE_ETH);
+    await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000)).to.be.reverted;
+  });
+
+  it("Should facilitate one large loan easier than n smaller loans before scale factor drops to 1 ", async function () {
+    currBlock = await ethers.provider.getBlockNumber();
+    await subPool.connect(lp).addLiquidity(0, ONE_USDC.mul(100000), 0, currBlock+10);
+    totalLiquidity = await subPool.totalLiquidity();
+    console.log("totalLiquidity: ", totalLiquidity);
+    loanTerms = await subPool.loanTerms(ONE_ETH);
+    console.log(loanTerms);
+    await subPool.connect(borrower).borrow(ONE_ETH.mul(10000000), 0, MONE, currBlock+1000000000);
+    loanTerms = await subPool.loanTerms(ONE_ETH);
+    console.log(loanTerms);
+    totalLiquidity = await subPool.totalLiquidity();
+    console.log("totalLiquidity: ", totalLiquidity);
+    //await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000)).to.be.reverted;
+  });
+
 });
