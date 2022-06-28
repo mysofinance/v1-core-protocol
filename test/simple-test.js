@@ -150,6 +150,8 @@ describe("Simple Testing", function () {
     console.log(loanTerms);
     totalLiquidity = await subPool.totalLiquidity();
     console.log("totalLiquidity: ", totalLiquidity);
+    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000);
+
     //await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, currBlock+1000000000)).to.be.reverted;
   });
 
