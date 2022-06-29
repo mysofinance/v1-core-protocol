@@ -108,11 +108,10 @@ contract SubPoolV1 {
         require(timeStamp < _deadline, "after deadline");
         require(_amount > 0, "_amount > 0");
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        uint32 loanIdxDiff = lpInfo.toLoanIdx - lpInfo.fromLoanIdx;
-        require(
-            !lpInfo.activeLp && loanIdxDiff == 0,
-            "must be inactive without open claims"
-        );
+        bool canAdd = lpInfo.activeLp
+            ? false
+            : lpInfo.toLoanIdx == lpInfo.fromLoanIdx;
+        require(canAdd, "must be inactive without open claims");
         uint128 newLpShares;
         if (totalLiquidity == 0 && totalLpShares == 0) {
             newLpShares = _amount / 10**6;
