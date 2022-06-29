@@ -2,143 +2,204 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 contract SubPoolV1 {
-    event Test(uint256 a, uint256 b, uint256 c, uint256 d, uint256 e);
-    uint24 constant LOAN_TENOR = 10; //1M = 199384
-    uint24 constant GRACE_PERIOD = 1;
-    uint24 constant MIN_LPING_PERIOD = 1;
-    uint8 constant COLL_DECIMALS = 18;
-    uint8 constant PRECISION = 18;
-    uint16 public numActiveSlots;
-    uint128 public claimIdx;
-    uint128 immutable initMinLpAmount;
-    uint128 immutable maxLoanPerColl;
-    uint256 immutable r1;
-    uint256 immutable r2;
-    uint256 immutable tvl1;
-    uint256 immutable tvl2;
+    event NewSubPool(
+        address collCcyToken,
+        address loanCcyToken,
+        uint24 loanTenor,
+        uint128 maxLoanPerColl,
+        uint256 r1,
+        uint256 r2,
+        uint256 tvl1,
+        uint256 tvl2
+    );
+    event AddLiquidity(
+        uint256 amount,
+        uint256 newLpShares,
+        uint256 totalLiquidity,
+        uint256 totalLpShares,
+        uint256 earliestRemove
+    );
+    event RemoveLiquidity(
+        uint256 amount,
+        uint256 removedLpShares,
+        uint256 totalLiquidity,
+        uint256 totalLpShares
+    );
+    event Borrow(
+        uint256 loanIdx,
+        uint256 collateral,
+        uint256 loanAmount,
+        uint256 repaymentAmount,
+        uint256 expiry
+    );
+    event AggregateClaims(
+        uint256 fromLoanIdx,
+        uint256 toLoanIdx,
+        uint256 repayments,
+        uint256 collateral,
+        uint256 numDefaults
+    );
+    event ClaimFromAggregated(
+        uint256 fromLoanIdx,
+        uint256 toLoanIdx,
+        uint256 repayments,
+        uint256 collateral
+    );
+    event Claim(
+        uint256[] loanIdxs,
+        uint256 repayments,
+        uint256 collateral,
+        uint256 numDefaults
+    );
+    event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
+
+    uint32 constant MIN_LPING_PERIOD = 30;
+    uint24 immutable LOAN_TENOR;
+    uint8 immutable COLL_TOKEN_DECIMALS;
+
+    uint128 public totalLpShares;
+    uint256 public totalLiquidity;
+    uint256 public loanIdx;
+    uint256 public maxLoanPerColl;
+    uint256 public r1;
+    uint256 public r2;
+    uint256 public tvl1;
+    uint256 public tvl2;
+
+    address public collCcyToken;
+    address public loanCcyToken;
+
+    mapping(address => LpInfo) public addrToLpInfo;
+    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
+    mapping(bytes32 => AggClaimsInfo) loanIdxRangeToAggClaimsInfo;
 
     struct LpInfo {
-        address addr;
-        uint32 minLoanIdx;
-        uint32 maxLoanIdx;
+        uint32 fromLoanIdx;
+        uint32 toLoanIdx;
         uint32 earliestRemove;
-        uint8 slotIdx;
-        uint128 weight;
+        uint128 shares;
+        bool activeLp;
     }
 
     struct LoanInfo {
         uint256 lpSnapshot;
         uint128 repayment;
         uint128 collateral;
-        uint128 totalWeights;
+        uint128 totalLpShares;
         address borrower;
         uint32 expiry;
         bool repaid;
     }
 
-    struct BatchedClaimsInfo {
+    struct AggClaimsInfo {
         uint128 repayments;
         uint128 collateral;
-        uint128 batchedWeight;
-        uint128 maxLoanIdx;
     }
 
-    uint128 public loanIdx;
-    uint128 totalWeights;
-    uint256 scaleFactor;
-    uint256 public totalLiquidity;
-    uint256 lpSlots;
-    mapping(uint256 => LpInfo) public slotIdxToLpInfo;
-    mapping(uint256 => LpInfo) public claimIdxToLpInfo;
-    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
-    mapping(bytes32 => BatchedClaimsInfo) slotsToClaimsInfo;
-
     constructor(
+        address _loanCcyToken,
+        address _collCcyToken,
+        uint24 _loanTenor,
         uint128 _maxLoanPerColl,
-        uint128 _initMinLpAmount,
         uint256 _r1,
         uint256 _r2,
         uint256 _tvl1,
         uint256 _tvl2
     ) {
+        require(_loanCcyToken != address(0), "invalid loan ccy token");
+        require(_collCcyToken != _loanCcyToken, "same ccys");
+        require(_loanTenor >= 86400, "invalid loanTenor");
         require(_maxLoanPerColl > 0, "invalid max. borrowable amount");
-        require(_initMinLpAmount > 0, "invalid init. lp amount");
         require(_r1 > _r2, "invalid apr params");
         require(_tvl2 > _tvl1, "invalid tvl params");
+        loanCcyToken = _loanCcyToken;
+        collCcyToken = _collCcyToken;
+        LOAN_TENOR = _loanTenor;
         maxLoanPerColl = _maxLoanPerColl;
-        initMinLpAmount = _initMinLpAmount;
-        scaleFactor = 10**PRECISION;
         r1 = _r1;
         r2 = _r2;
         tvl1 = _tvl1;
         tvl2 = _tvl2;
-        loanIdx = 1; //bump to 1 to handle default 0 in slotToMaxLoanIdxClaimed
-    }
-
-    function lpTerms(uint128 _amount) public view returns (uint256, uint128) {
-        uint128 weight = uint128(
-            (_amount * 10**PRECISION) / (initMinLpAmount * scaleFactor)
+        loanIdx = 1;
+        COLL_TOKEN_DECIMALS = _collCcyToken == address(0)
+            ? 18
+            : IERC20Metadata(_collCcyToken).decimals();
+        emit NewSubPool(
+            _loanCcyToken,
+            _collCcyToken,
+            _loanTenor,
+            _maxLoanPerColl,
+            _r1,
+            _r2,
+            _tvl1,
+            _tvl2
         );
-        uint256 lpAmount = (weight * initMinLpAmount * scaleFactor) /
-            10**PRECISION;
-        return (lpAmount, weight);
     }
 
-    function addLiquidity(
-        uint8 _slotIdx,
-        uint128 _amount,
-        uint256 _minAmount,
-        uint256 _deadline
-    ) external {
-        uint256 blockNum = block.number;
-        require(blockNum < _deadline, "after deadline");
+    function addLiquidity(uint128 _amount, uint256 _deadline) external {
+        uint256 timeStamp = block.timestamp;
+        require(timeStamp < _deadline, "after deadline");
         require(_amount > 0, "_amount > 0");
-        require(scaleFactor > 1, "scaleFactor > 1");
-        LpInfo storage lpInfo = slotIdxToLpInfo[_slotIdx];
-        require(lpInfo.addr == address(0), "active lp slot");
-        (uint256 liquidityAdded, uint128 weight) = lpTerms(_amount);
-        require(liquidityAdded > 0, "liquidityAdded > 0");
-        require(liquidityAdded > _minAmount, "below _minAmount");
-        lpSlots |= uint256(1) << _slotIdx;
-        totalWeights += weight;
-        totalLiquidity += liquidityAdded;
-        lpInfo.addr = msg.sender;
-        lpInfo.weight = weight;
-        lpInfo.slotIdx = _slotIdx;
-        lpInfo.minLoanIdx = uint32(loanIdx);
-        lpInfo.earliestRemove = uint32(blockNum) + MIN_LPING_PERIOD;
-        numActiveSlots += 1;
-        //ERC20 transfer liquidityAdded
+        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
+        bool canAdd = lpInfo.activeLp
+            ? false
+            : lpInfo.toLoanIdx == lpInfo.fromLoanIdx;
+        require(canAdd, "must be inactive without open claims");
+        uint128 newLpShares;
+        if (totalLiquidity == 0 && totalLpShares == 0) {
+            newLpShares = _amount / 10**6;
+        } else {
+            newLpShares = uint128((_amount * totalLpShares) / totalLiquidity);
+        }
+        totalLpShares += newLpShares;
+        totalLiquidity += _amount;
+        lpInfo.shares = newLpShares;
+        lpInfo.fromLoanIdx = uint32(loanIdx);
+        if (lpInfo.toLoanIdx != 0) {
+            lpInfo.toLoanIdx = 0;
+        }
+        lpInfo.earliestRemove = uint32(timeStamp) + MIN_LPING_PERIOD;
+        lpInfo.activeLp = true;
+
+        IERC20Metadata(loanCcyToken).transferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
+        emit AddLiquidity(
+            _amount,
+            newLpShares,
+            totalLiquidity,
+            totalLpShares,
+            lpInfo.earliestRemove
+        );
     }
 
-    function removeLiquidity(uint8 _slotIdx) external {
-        LpInfo storage lpInfo = slotIdxToLpInfo[_slotIdx];
-        require(lpInfo.addr != address(0), "empty lp slot");
-        require(lpInfo.addr == msg.sender, "unauthorized lp slot");
+    function removeLiquidity() external {
+        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
+        require(lpInfo.shares != 0, "no shares");
         require(
-            block.number > lpInfo.earliestRemove,
+            block.timestamp > lpInfo.earliestRemove,
             "before min. lping period"
         );
-        lpInfo.addr = address(0);
-        lpSlots &= ~(uint256(1) << _slotIdx);
-        uint256 liquidityRemoved = (lpInfo.weight *
-            initMinLpAmount *
-            scaleFactor) / 10**PRECISION;
-        totalWeights -= lpInfo.weight;
+        require(lpInfo.activeLp, "must be active lp");
+        uint256 liquidityRemoved = (lpInfo.shares * totalLiquidity) /
+            totalLpShares;
+        totalLpShares -= lpInfo.shares;
         totalLiquidity -= liquidityRemoved;
-        numActiveSlots -= 1;
+        lpInfo.toLoanIdx = uint32(loanIdx);
+        lpInfo.activeLp = false;
 
-        LpInfo memory lpClaimInfo;
-        lpClaimInfo.addr = msg.sender;
-        lpClaimInfo.weight = lpInfo.weight;
-        lpClaimInfo.slotIdx = lpInfo.slotIdx;
-        lpClaimInfo.minLoanIdx = lpInfo.minLoanIdx;
-        lpClaimInfo.maxLoanIdx = uint32(loanIdx > 0 ? loanIdx - 1 : 0);
-        claimIdxToLpInfo[claimIdx] = lpClaimInfo;
-
-        claimIdx += 1;
-        //ERC20 transfer liquidityRemoved
+        IERC20Metadata(loanCcyToken).transfer(msg.sender, liquidityRemoved);
+        emit RemoveLiquidity(
+            liquidityRemoved,
+            lpInfo.shares,
+            totalLiquidity,
+            totalLpShares
+        );
     }
 
     function loanTerms(uint128 _pledgeAmount)
@@ -151,7 +212,7 @@ contract SubPoolV1 {
                 (_pledgeAmount *
                     maxLoanPerColl +
                     totalLiquidity *
-                    10**COLL_DECIMALS)
+                    10**COLL_TOKEN_DECIMALS)
         );
 
         uint256 rate;
@@ -172,180 +233,222 @@ contract SubPoolV1 {
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline
-    ) external {
-        uint256 blockNum = block.number;
-        require(blockNum < _deadline, "after deadline");
-        require(_pledgeAmount > 0, "must pledge > 0");
-        (uint128 loanAmount, uint256 rate) = loanTerms(_pledgeAmount);
+    ) external payable {
+        uint256 timeStamp = block.timestamp;
+        require(timeStamp < _deadline, "after deadline");
+        uint128 pledgeAmount = collCcyToken == address(0)
+            ? uint128(msg.value)
+            : _pledgeAmount;
+        require(pledgeAmount > 0, "must pledge > 0");
+        (uint128 loanAmount, uint256 rate) = loanTerms(pledgeAmount);
         require(loanAmount > _minLoan, "below _minLoan limit");
         uint128 repaymentAmount = uint128(
-            (loanAmount * (10**PRECISION + rate)) / 10**PRECISION
+            (loanAmount * (10**18 + rate)) / 10**18
         );
         require(
             repaymentAmount > loanAmount,
             "repayment must be greater than loan"
         );
         require(repaymentAmount < _maxRepay, "above _maxRepay limit");
-        scaleFactor =
-            (scaleFactor * (totalLiquidity - loanAmount)) /
-            totalLiquidity;
-        emit Test(
-            totalLiquidity,
-            loanAmount,
-            rate,
-            repaymentAmount,
-            scaleFactor
-        );
-        require(scaleFactor > 0, "scaleFactor > 0");
         LoanInfo memory loanInfo;
         loanInfo.borrower = msg.sender;
-        loanInfo.expiry = uint32(blockNum) + LOAN_TENOR;
-        loanInfo.lpSnapshot = lpSlots;
-        loanInfo.totalWeights = totalWeights;
+        loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
+        loanInfo.totalLpShares = totalLpShares;
         loanInfo.repayment = repaymentAmount;
-        loanInfo.collateral = _pledgeAmount;
+        loanInfo.collateral = pledgeAmount;
         loanIdxToLoanInfo[loanIdx] = loanInfo;
         loanIdx += 1;
         totalLiquidity -= loanAmount;
-        //ERC20 transfer _pledgeAmount and loanAmount
+
+        if (collCcyToken != address(0)) {
+            IERC20Metadata(collCcyToken).transferFrom(
+                msg.sender,
+                address(this),
+                pledgeAmount
+            );
+        }
+        IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
+
+        emit Borrow(
+            loanIdx - 1,
+            pledgeAmount,
+            loanAmount,
+            repaymentAmount,
+            loanInfo.expiry
+        );
     }
 
     function repay(uint256 _loanIdx) external {
         require(_loanIdx > 0 && _loanIdx < loanIdx, "loan id out of bounds");
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         require(loanInfo.borrower == msg.sender, "unauthorized repay");
-        require(block.number + 1 < loanInfo.expiry, "loan expired");
+        require(block.timestamp < loanInfo.expiry, "loan expired");
         require(!loanInfo.repaid, "loan already repaid");
         require(
-            block.number > loanInfo.expiry - LOAN_TENOR,
+            block.timestamp > loanInfo.expiry - LOAN_TENOR,
             "cannot repay in same block"
         );
         loanInfo.repaid = true;
-        //ERC20 transfer repaid and collateral
+
+        IERC20Metadata(loanCcyToken).transferFrom(
+            msg.sender,
+            address(this),
+            loanInfo.repayment
+        );
+        if (collCcyToken == address(0)) {
+            payable(msg.sender).transfer(loanInfo.collateral);
+        } else {
+            IERC20Metadata(collCcyToken).transfer(
+                msg.sender,
+                loanInfo.collateral
+            );
+        }
+        emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
-    function claim(
-        uint8 _idx,
-        uint256[] calldata _loanIdxs,
-        bool _activeLp
-    ) external {
+    function claim(uint256[] calldata _loanIdxs) external {
         uint256 arrayLen = _loanIdxs.length;
         require(arrayLen > 0 && arrayLen < loanIdx, "_loanIdxs out of bounds");
         require(_loanIdxs[0] != 0, "loan idx must be > 0");
         require(_loanIdxs[arrayLen - 1] < loanIdx, "invalid loan id");
 
-        LpInfo storage lpInfo;
-        uint8 _slotIdx;
-        if (_activeLp) {
-            lpInfo = slotIdxToLpInfo[_idx];
-            _slotIdx = _idx;
-        } else {
-            lpInfo = claimIdxToLpInfo[_idx];
-            _slotIdx = lpInfo.slotIdx;
-        }
-        require(lpInfo.addr == msg.sender, "lp unentitled for slot");
+        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
+        require(lpInfo.shares > 0, "nothing to claim");
+        require(_loanIdxs[0] >= lpInfo.fromLoanIdx, "outside lower loan id");
         require(
-            _loanIdxs[0] >= lpInfo.minLoanIdx,
-            "already claimed or loan happened before LPing"
-        );
-        require(
-            _activeLp || _loanIdxs[arrayLen - 1] <= lpInfo.maxLoanIdx,
-            "loan happened after LPing"
+            lpInfo.toLoanIdx == 0 || _loanIdxs[arrayLen - 1] < lpInfo.toLoanIdx,
+            "outside upper loan id"
         );
 
-        LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[0]];
-        require(block.number > loanInfo.expiry, "loans must have expired");
-        uint256 checkSlot = uint256(1) << _slotIdx;
         (
             uint256 repayments,
             uint256 collateral,
-            uint256 checkInAll
-        ) = _repayCollAndCheckMask(checkSlot, _loanIdxs, lpInfo.weight);
-        require(checkInAll == checkSlot, "slot not entitled to all loans");
-        lpInfo.minLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
-        //ERC20 transfer repayments and collateral
+            uint256 numDefaults
+        ) = getClaimsFromList(_loanIdxs, arrayLen, lpInfo.shares);
+        lpInfo.fromLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
+
+        if (repayments > 0) {
+            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+        }
+        if (collateral > 0) {
+            if (collCcyToken == address(0)) {
+                payable(msg.sender).transfer(collateral);
+            } else {
+                IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+            }
+        }
+        emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
-    /*
-    function claimBatched(
-        uint8 _idx,
-        uint8[] calldata _slots,
-        uint256[] calldata _loanIdxs
-    ) external {
-        uint256 slotArrayLen = _slots.length;
-        require(
-            slotArrayLen > _idx && slotArrayLen < 256,
-            "slotArrayLen out of bounds"
-        );
-        LpInfo memory lpInfo = slotIdxToLpInfo[_slots[_idx]];
-        require(lpInfo.addr == msg.sender, "unentitled lp");
-        uint256 loanArrayLen = _loanIdxs.length;
-        require(
-            loanArrayLen > 0 && loanArrayLen < loanIdx,
-            "loanArrayLen out of bounds"
-        );
-        require(_loanIdxs[0] != 0, "loan idx must be > 0");
-        require(_loanIdxs[loanArrayLen - 1] < loanIdx, "invalid loan id");
-        BatchedClaimsInfo memory claimsInfo = slotsToClaimsInfo[
-            keccak256(abi.encodePacked(_slots, _loanIdxs))
-        ];
-        slotToMaxLoanIdxClaimed[_slots[_idx]] = _loanIdxs[loanArrayLen - 1];
-        uint256 repayments = (claimsInfo.repayments * lpInfo.weight) /
-            claimsInfo.batchedWeight;
-        uint256 collateral = (claimsInfo.collateral * lpInfo.weight) /
-            claimsInfo.batchedWeight;
-        //ERC20 transfer repayments and collateral
-    }
-
-    function batchClaims(uint8[] calldata _slots, uint256[] calldata _loanIdxs)
+    //including _fromLoanIdx and _toLoanIdx
+    function aggregateClaims(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external
     {
-        (uint128 batchedWeight, uint256 slots) = _weightsAndSlots(_slots);
-        (
-            uint256 repayments,
-            uint256 collateral,
-            uint256 checkMask
-        ) = _repayCollAndCheckMask(slots, _loanIdxs, batchedWeight);
-        uint256 prev = _loanIdxs[0];
-        require(slots == checkMask, "slots not entitled to all loans");
-        BatchedClaimsInfo memory claimsInfo;
-        claimsInfo.repayments = uint128(repayments);
-        claimsInfo.collateral = uint128(collateral);
-        claimsInfo.batchedWeight = batchedWeight;
-        claimsInfo.maxLoanIdx = uint32(prev);
-        slotsToClaimsInfo[
-            keccak256(abi.encodePacked(_slots, _loanIdxs))
-        ] = claimsInfo;
-    }
-    */
-
-    function _weightsAndSlots(uint8[] calldata _slots)
-        internal
-        view
-        returns (uint128, uint256)
-    {
-        uint256 slotArrayLen = _slots.length;
-        require(slotArrayLen < 256, "slotArrayLen out of bounds");
-        LpInfo memory lpInfo;
-        uint128 batchedWeight;
-        uint256 slots;
-        uint256 prev;
-        for (uint128 i = 0; i < slotArrayLen; ++i) {
-            lpInfo = slotIdxToLpInfo[_slots[i]];
-            batchedWeight += lpInfo.weight;
-            if (i > 0) {
-                require(_slots[i] > prev, "slots must be ascending");
+        require(_fromLoanIdx > 0, "_fromLoanIdx > 0");
+        require(_toLoanIdx < loanIdx, "_toLoanIdx < loanIdx");
+        require(_fromLoanIdx < _toLoanIdx, "_fromLoanIdx < _toLoanIdx");
+        AggClaimsInfo memory aggClaimsInfo;
+        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
+            keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
+        ];
+        require(
+            aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0,
+            "already aggregated"
+        );
+        uint128 repayments;
+        uint128 collateral;
+        uint256 numDefaults;
+        LoanInfo memory loanInfo;
+        for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ++i) {
+            loanInfo = loanIdxToLoanInfo[i];
+            if (loanInfo.repaid) {
+                repayments +=
+                    (loanInfo.repayment * 10**18) /
+                    loanInfo.totalLpShares;
+            } else if (loanInfo.expiry < block.timestamp) {
+                collateral +=
+                    (loanInfo.collateral * 10**18) /
+                    loanInfo.totalLpShares;
+                numDefaults += 1;
+            } else {
+                require(false, "must have been repaid or expired");
             }
-            slots |= uint256(1) << _slots[i];
-            prev = _slots[i];
         }
-        return (batchedWeight, slots);
+        aggClaimsInfo.repayments = repayments;
+        aggClaimsInfo.collateral = collateral;
+        loanIdxRangeToAggClaimsInfo[
+            keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
+        ] = aggClaimsInfo;
+        emit AggregateClaims(
+            _fromLoanIdx,
+            _toLoanIdx,
+            repayments,
+            collateral,
+            numDefaults
+        );
     }
 
-    function _repayCollAndCheckMask(
-        uint256 _slots,
+    //including _fromLoanIdx and _toLoanIdx
+    function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
+        external
+    {
+        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
+        require(lpInfo.shares > 0, "nothing to claim");
+        require(_fromLoanIdx >= lpInfo.fromLoanIdx, "outside lower loan id");
+        require(
+            lpInfo.toLoanIdx == 0 || _toLoanIdx < lpInfo.toLoanIdx,
+            "outside upper loan id"
+        );
+
+        (uint256 repayments, uint256 collateral) = getClaimsFromAggregated(
+            _fromLoanIdx,
+            _toLoanIdx,
+            lpInfo.shares
+        );
+        lpInfo.fromLoanIdx = uint32(_toLoanIdx);
+
+        if (repayments > 0) {
+            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+        }
+        if (collateral > 0) {
+            if (collCcyToken == address(0)) {
+                payable(msg.sender).transfer(collateral);
+            } else {
+                IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+            }
+        }
+        emit ClaimFromAggregated(
+            _fromLoanIdx,
+            _toLoanIdx,
+            repayments,
+            collateral
+        );
+    }
+
+    function getClaimsFromAggregated(
+        uint256 _fromLoanIdx,
+        uint256 _toLoanIdx,
+        uint256 _shares
+    ) public view returns (uint256, uint256) {
+        AggClaimsInfo memory aggClaimsInfo;
+        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
+            keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
+        ];
+        require(
+            aggClaimsInfo.repayments > 0 || aggClaimsInfo.collateral > 0,
+            "nothing aggregated"
+        );
+
+        uint256 repayments = (aggClaimsInfo.repayments * _shares) / 10**18;
+        uint256 collateral = (aggClaimsInfo.collateral * _shares) / 10**18;
+
+        return (repayments, collateral);
+    }
+
+    function getClaimsFromList(
         uint256[] calldata _loanIdxs,
-        uint256 _weight
+        uint256 arrayLen,
+        uint256 _shares
     )
         internal
         view
@@ -355,34 +458,32 @@ contract SubPoolV1 {
             uint256
         )
     {
-        uint256 loanArrayLen = _loanIdxs.length;
-        require(
-            loanArrayLen > 0 && loanArrayLen < loanIdx,
-            "loanArrayLen out of bounds"
-        );
-        LoanInfo memory loanInfo;
-        require(block.number > loanInfo.expiry, "loans must have expired");
-        uint256 checkMask = _slots;
+        LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[0]];
         uint256 repayments;
         uint256 collateral;
-        uint256 prev = _loanIdxs[0];
-        for (uint128 i = 0; i < loanArrayLen; ++i) {
+        uint256 numDefaults;
+        for (uint256 i = 0; i < arrayLen; ++i) {
             if (i > 0) {
-                require(_loanIdxs[i] > prev, "loan ids must be ascending");
+                loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
+                require(
+                    _loanIdxs[i] > _loanIdxs[i - 1],
+                    "non ascending loan ids"
+                );
             }
-            loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
-            checkMask &= loanInfo.lpSnapshot;
             if (loanInfo.repaid) {
                 repayments +=
-                    (loanInfo.repayment * _weight) /
-                    loanInfo.totalWeights;
-            } else {
+                    (loanInfo.repayment * _shares) /
+                    loanInfo.totalLpShares;
+            } else if (loanInfo.expiry < block.timestamp) {
                 collateral +=
-                    (loanInfo.collateral * _weight) /
-                    loanInfo.totalWeights;
+                    (loanInfo.collateral * _shares) /
+                    loanInfo.totalLpShares;
+                numDefaults += 1;
+            } else {
+                require(false, "must have been repaid or expired");
             }
-            prev = _loanIdxs[i];
         }
-        return (repayments, collateral, checkMask);
+
+        return (repayments, collateral, numDefaults);
     }
 }
