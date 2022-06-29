@@ -104,7 +104,7 @@ describe("Simple Testing", function () {
     await expect(subPool.connect(lp2).claim([1])).to.be.reverted;
   });
 
-  it("Should facilitate loans as long as there's sufficient liquidity, and allow new LPs to add liquidity to continue again", async function () {
+  it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+10);
@@ -132,7 +132,7 @@ describe("Simple Testing", function () {
     await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
   });
 
-  it("Should allow claiming individually", async function () {
+  it("Should allow LPs to claim individually", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+10);
@@ -155,7 +155,7 @@ describe("Simple Testing", function () {
     await subPool.connect(lp3).claim(loanIds);
   });
 
-  it("Should allow aggregating claims and claiming on precomputed results", async function () {
+  it("Should allow to aggregate claims and let LPs claim from aggregated results", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+10);

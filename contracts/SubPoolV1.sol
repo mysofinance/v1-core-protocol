@@ -34,7 +34,8 @@ contract SubPoolV1 {
         uint256 fromLoanIdx,
         uint256 toLoanIdx,
         uint256 repayments,
-        uint256 collateral
+        uint256 collateral,
+        uint256 numDefaults
     );
     event ClaimFromAggregated(
         uint256 fromLoanIdx,
@@ -42,11 +43,16 @@ contract SubPoolV1 {
         uint256 repayments,
         uint256 collateral
     );
-    event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral);
+    event Claim(
+        uint256[] loanIdxs,
+        uint256 repayments,
+        uint256 collateral,
+        uint256 numDefaults
+    );
     event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
 
     uint32 constant MIN_LPING_PERIOD = 30;
-    uint24 constant LOAN_TENOR = 30; //1M = 199384
+    uint24 constant LOAN_TENOR = 30;
     uint8 constant COLL_DECIMALS = 18;
 
     uint128 public totalLpShares;
@@ -253,14 +259,14 @@ contract SubPoolV1 {
             "outside upper loan id"
         );
 
-        (uint256 repayments, uint256 collateral) = getClaimsFromList(
-            _loanIdxs,
-            arrayLen,
-            lpInfo.shares
-        );
+        (
+            uint256 repayments,
+            uint256 collateral,
+            uint256 numDefaults
+        ) = getClaimsFromList(_loanIdxs, arrayLen, lpInfo.shares);
         lpInfo.fromLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
         //ERC20 transfer repayments and collateral
-        emit Claim(_loanIdxs, repayments, collateral);
+        emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
     //including _fromLoanIdx and _toLoanIdx
@@ -278,8 +284,9 @@ contract SubPoolV1 {
             aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0,
             "already aggregated"
         );
-        uint128 collateral;
         uint128 repayments;
+        uint128 collateral;
+        uint256 numDefaults;
         LoanInfo memory loanInfo;
         for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ++i) {
             loanInfo = loanIdxToLoanInfo[i];
@@ -291,6 +298,7 @@ contract SubPoolV1 {
                 collateral +=
                     (loanInfo.collateral * 10**18) /
                     loanInfo.totalLpShares;
+                numDefaults += 1;
             } else {
                 require(false, "must have been repaid or expired");
             }
@@ -300,7 +308,13 @@ contract SubPoolV1 {
         loanIdxRangeToAggClaimsInfo[
             keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
         ] = aggClaimsInfo;
-        emit AggregateClaims(_fromLoanIdx, _toLoanIdx, repayments, collateral);
+        emit AggregateClaims(
+            _fromLoanIdx,
+            _toLoanIdx,
+            repayments,
+            collateral,
+            numDefaults
+        );
     }
 
     //including _fromLoanIdx and _toLoanIdx
@@ -334,7 +348,7 @@ contract SubPoolV1 {
         uint256 _fromLoanIdx,
         uint256 _toLoanIdx,
         uint256 _shares
-    ) public returns (uint256, uint256) {
+    ) public view returns (uint256, uint256) {
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
             keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
@@ -354,11 +368,20 @@ contract SubPoolV1 {
         uint256[] calldata _loanIdxs,
         uint256 arrayLen,
         uint256 _shares
-    ) internal returns (uint256, uint256) {
+    )
+        internal
+        view
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
+    {
         LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[0]];
         require(block.timestamp > loanInfo.expiry, "loans must have expired");
-        uint256 collateral;
         uint256 repayments;
+        uint256 collateral;
+        uint256 numDefaults;
         for (uint256 i = 0; i < arrayLen; ++i) {
             if (i > 0) {
                 loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
@@ -375,11 +398,12 @@ contract SubPoolV1 {
                 collateral +=
                     (loanInfo.collateral * _shares) /
                     loanInfo.totalLpShares;
+                numDefaults += 1;
             } else {
                 require(false, "unfinalized claim");
             }
         }
 
-        return (repayments, collateral);
+        return (repayments, collateral, numDefaults);
     }
 }
