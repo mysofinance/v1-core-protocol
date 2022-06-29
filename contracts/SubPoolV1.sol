@@ -2,8 +2,13 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 contract SubPoolV1 {
-    event Create(
+    event NewSubPool(
+        address collCcyToken,
+        address loanCcyToken,
+        uint24 loanTenor,
         uint128 maxLoanPerColl,
         uint256 r1,
         uint256 r2,
@@ -52,8 +57,8 @@ contract SubPoolV1 {
     event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
 
     uint32 constant MIN_LPING_PERIOD = 30;
-    uint24 constant LOAN_TENOR = 30;
-    uint8 constant COLL_DECIMALS = 18;
+    uint24 immutable LOAN_TENOR;
+    uint8 immutable COLL_TOKEN_DECIMALS;
 
     uint128 public totalLpShares;
     uint256 public totalLiquidity;
@@ -63,6 +68,10 @@ contract SubPoolV1 {
     uint256 public r2;
     uint256 public tvl1;
     uint256 public tvl2;
+
+    address public collCcyToken;
+    address public loanCcyToken;
+
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(bytes32 => AggClaimsInfo) loanIdxRangeToAggClaimsInfo;
@@ -91,22 +100,43 @@ contract SubPoolV1 {
     }
 
     constructor(
+        address _loanCcyToken,
+        address _collCcyToken,
+        uint24 _loanTenor,
         uint128 _maxLoanPerColl,
         uint256 _r1,
         uint256 _r2,
         uint256 _tvl1,
         uint256 _tvl2
     ) {
+        require(_loanCcyToken != address(0), "invalid loan ccy token");
+        require(_collCcyToken != _loanCcyToken, "same ccys");
+        require(_loanTenor >= 86400, "invalid loanTenor");
         require(_maxLoanPerColl > 0, "invalid max. borrowable amount");
         require(_r1 > _r2, "invalid apr params");
         require(_tvl2 > _tvl1, "invalid tvl params");
+        loanCcyToken = _loanCcyToken;
+        collCcyToken = _collCcyToken;
+        LOAN_TENOR = _loanTenor;
         maxLoanPerColl = _maxLoanPerColl;
         r1 = _r1;
         r2 = _r2;
         tvl1 = _tvl1;
         tvl2 = _tvl2;
         loanIdx = 1;
-        emit Create(_maxLoanPerColl, _r1, _r2, _tvl1, _tvl2);
+        COLL_TOKEN_DECIMALS = _collCcyToken == address(0)
+            ? 18
+            : IERC20Metadata(_collCcyToken).decimals();
+        emit NewSubPool(
+            _loanCcyToken,
+            _collCcyToken,
+            _loanTenor,
+            _maxLoanPerColl,
+            _r1,
+            _r2,
+            _tvl1,
+            _tvl2
+        );
     }
 
     function addLiquidity(uint128 _amount, uint256 _deadline) external {
@@ -133,7 +163,12 @@ contract SubPoolV1 {
         }
         lpInfo.earliestRemove = uint32(timeStamp) + MIN_LPING_PERIOD;
         lpInfo.activeLp = true;
-        //ERC20 transfer liquidityAdded
+
+        IERC20Metadata(loanCcyToken).transferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
         emit AddLiquidity(
             _amount,
             newLpShares,
@@ -157,7 +192,8 @@ contract SubPoolV1 {
         totalLiquidity -= liquidityRemoved;
         lpInfo.toLoanIdx = uint32(loanIdx);
         lpInfo.activeLp = false;
-        //ERC20 transfer liquidityRemoved
+
+        IERC20Metadata(loanCcyToken).transfer(msg.sender, liquidityRemoved);
         emit RemoveLiquidity(
             liquidityRemoved,
             lpInfo.shares,
@@ -176,7 +212,7 @@ contract SubPoolV1 {
                 (_pledgeAmount *
                     maxLoanPerColl +
                     totalLiquidity *
-                    10**COLL_DECIMALS)
+                    10**COLL_TOKEN_DECIMALS)
         );
 
         uint256 rate;
@@ -197,11 +233,14 @@ contract SubPoolV1 {
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline
-    ) external {
+    ) external payable {
         uint256 timeStamp = block.timestamp;
         require(timeStamp < _deadline, "after deadline");
-        require(_pledgeAmount > 0, "must pledge > 0");
-        (uint128 loanAmount, uint256 rate) = loanTerms(_pledgeAmount);
+        uint128 pledgeAmount = collCcyToken == address(0)
+            ? uint128(msg.value)
+            : _pledgeAmount;
+        require(pledgeAmount > 0, "must pledge > 0");
+        (uint128 loanAmount, uint256 rate) = loanTerms(pledgeAmount);
         require(loanAmount > _minLoan, "below _minLoan limit");
         uint128 repaymentAmount = uint128(
             (loanAmount * (10**18 + rate)) / 10**18
@@ -216,14 +255,23 @@ contract SubPoolV1 {
         loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.repayment = repaymentAmount;
-        loanInfo.collateral = _pledgeAmount;
+        loanInfo.collateral = pledgeAmount;
         loanIdxToLoanInfo[loanIdx] = loanInfo;
         loanIdx += 1;
         totalLiquidity -= loanAmount;
-        //ERC20 transfer _pledgeAmount and loanAmount
+
+        if (collCcyToken != address(0)) {
+            IERC20Metadata(collCcyToken).transferFrom(
+                msg.sender,
+                address(this),
+                pledgeAmount
+            );
+        }
+        IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
+
         emit Borrow(
             loanIdx - 1,
-            _pledgeAmount,
+            pledgeAmount,
             loanAmount,
             repaymentAmount,
             loanInfo.expiry
@@ -241,7 +289,20 @@ contract SubPoolV1 {
             "cannot repay in same block"
         );
         loanInfo.repaid = true;
-        //ERC20 transfer repaid and collateral
+
+        IERC20Metadata(loanCcyToken).transferFrom(
+            msg.sender,
+            address(this),
+            loanInfo.repayment
+        );
+        if (collCcyToken == address(0)) {
+            payable(msg.sender).transfer(loanInfo.collateral);
+        } else {
+            IERC20Metadata(collCcyToken).transfer(
+                msg.sender,
+                loanInfo.collateral
+            );
+        }
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
@@ -265,7 +326,17 @@ contract SubPoolV1 {
             uint256 numDefaults
         ) = getClaimsFromList(_loanIdxs, arrayLen, lpInfo.shares);
         lpInfo.fromLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
-        //ERC20 transfer repayments and collateral
+
+        if (repayments > 0) {
+            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+        }
+        if (collateral > 0) {
+            if (collCcyToken == address(0)) {
+                payable(msg.sender).transfer(collateral);
+            } else {
+                IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+            }
+        }
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
@@ -335,7 +406,17 @@ contract SubPoolV1 {
             lpInfo.shares
         );
         lpInfo.fromLoanIdx = uint32(_toLoanIdx);
-        //ERC20 transfer
+
+        if (repayments > 0) {
+            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+        }
+        if (collateral > 0) {
+            if (collCcyToken == address(0)) {
+                payable(msg.sender).transfer(collateral);
+            } else {
+                IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+            }
+        }
         emit ClaimFromAggregated(
             _fromLoanIdx,
             _toLoanIdx,
@@ -378,7 +459,6 @@ contract SubPoolV1 {
         )
     {
         LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[0]];
-        require(block.timestamp > loanInfo.expiry, "loans must have expired");
         uint256 repayments;
         uint256 collateral;
         uint256 numDefaults;
@@ -400,7 +480,7 @@ contract SubPoolV1 {
                     loanInfo.totalLpShares;
                 numDefaults += 1;
             } else {
-                require(false, "unfinalized claim");
+                require(false, "must have been repaid or expired");
             }
         }
 

@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("Simple Testing", function () {
+describe("ETH-USDC SubPool Testing", function () {
 
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
   const ONE_USDC = ethers.BigNumber.from("1000000");
@@ -10,16 +10,32 @@ describe("Simple Testing", function () {
   beforeEach( async () => {
     [deployer, lp1, lp2, lp3, borrower, ...addrs] = await ethers.getSigners();
 
+    TestToken = await ethers.getContractFactory("TestToken");
+    TestToken = await TestToken.connect(deployer);
+    testToken = await TestToken.deploy("USDC", "USDC", 6);
+    await testToken.connect(deployer).mint(lp1.address, ONE_USDC.mul(1000000));
+    await testToken.connect(deployer).mint(lp2.address, ONE_USDC.mul(1000000));
+    await testToken.connect(deployer).mint(lp3.address, ONE_USDC.mul(1000000));
+    await testToken.connect(deployer).mint(borrower.address, ONE_USDC.mul(1000000));
+
     SubPool = await ethers.getContractFactory("SubPoolV1");
     SubPool = await SubPool.connect(deployer);
 
+    _loanCcyToken = testToken.address;
+    _collCcyToken = "0x0000000000000000000000000000000000000000";
+    _loanTenor = 86400;
     _maxLoanPerColl = ONE_USDC.mul(500);
     _r1 = MONE.mul(2).div(10)
     _r2 = MONE.mul(2).div(100)
     _tvl1 = ONE_USDC.mul(100000);
     _tvl2 = ONE_USDC.mul(1000000);
-    subPool = await SubPool.deploy(_maxLoanPerColl, _r1, _r2, _tvl1, _tvl2);
+    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2);
     await subPool.deployed();
+
+    testToken.connect(lp1).approve(subPool.address, ONE_USDC.mul(1000000));
+    testToken.connect(lp2).approve(subPool.address, ONE_USDC.mul(1000000));
+    testToken.connect(lp3).approve(subPool.address, ONE_USDC.mul(1000000));
+    testToken.connect(borrower).approve(subPool.address, ONE_USDC.mul(1000000));
   });
 
   it("Should have correct initial values", async function () {
@@ -51,7 +67,7 @@ describe("Simple Testing", function () {
     await expect(subPool.loanTerms(subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+10))).to.be.reverted;
   });
 
-  it("Should allow borrowing", async function () {
+  it("Should allow borrowing with ETH", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60);
@@ -64,7 +80,23 @@ describe("Simple Testing", function () {
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60);
+    await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+60, {value: ONE_ETH});
+  });
+
+  it("Should not allow borrowing without ETH", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60);
+    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(10000), timestamp+60);
+    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(100000), timestamp+60);
+
+    loanTerms = await subPool.loanTerms(ONE_ETH);
+    minLoanLimit = loanTerms[0].mul(98).div(100);
+    maxRepayLimit = loanTerms[0].mul(MONE.add(loanTerms[1])).mul(102).div(100).div(MONE);
+    console.log(loanTerms);
+    console.log(minLoanLimit, maxRepayLimit);
+    currBlock = await ethers.provider.getBlockNumber();
+    await expect(subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60)).to.be.reverted;
   });
 
   it("Should not allow new LPs to claim in retrospect", async function () {
@@ -81,7 +113,8 @@ describe("Simple Testing", function () {
     console.log(minLoanLimit, maxRepayLimit);
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60);
+    await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+60, {value: ONE_ETH});
+    //await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -114,9 +147,11 @@ describe("Simple Testing", function () {
       loanTerms = await subPool.loanTerms(ONE_ETH);
       console.log("totalLiquidity: ", totalLiquidity);
       console.log("loanTerms: ", loanTerms);
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
+      await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
     }
-    await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
+    await expect(subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH})).to.be.reverted;
+    //await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
 
     console.log("--------------------------------------------------------")
     blocknum = await ethers.provider.getBlockNumber();
@@ -127,9 +162,11 @@ describe("Simple Testing", function () {
       loanTerms = await subPool.loanTerms(ONE_ETH);
       console.log("totalLiquidity: ", totalLiquidity);
       console.log("loanTerms: ", loanTerms);
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
+      await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
     }
-    await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
+    await expect(subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH})).to.be.reverted;
+    //await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
   });
 
   it("Should allow LPs to claim individually", async function () {
@@ -142,7 +179,8 @@ describe("Simple Testing", function () {
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       loanTerms = await subPool.loanTerms(ONE_ETH);
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
+      await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
       await subPool.connect(borrower).repay(i+1);
     }
     loanIds = Array.from({length:99},(v,k)=>k+1);
@@ -165,7 +203,8 @@ describe("Simple Testing", function () {
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       loanTerms = await subPool.loanTerms(ONE_ETH);
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
+      await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
       await subPool.connect(borrower).repay(i+1);
     }
     await subPool.connect(addrs[0]).aggregateClaims(1, 99);
