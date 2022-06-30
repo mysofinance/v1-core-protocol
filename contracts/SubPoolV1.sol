@@ -85,7 +85,6 @@ contract SubPoolV1 {
     }
 
     struct LoanInfo {
-        uint256 lpSnapshot;
         uint128 repayment;
         uint128 collateral;
         uint128 totalLpShares;
@@ -150,7 +149,7 @@ contract SubPoolV1 {
         require(canAdd, "must be inactive without open claims");
         uint128 newLpShares;
         if (totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = _amount / 10**6;
+            newLpShares = _amount;
         } else {
             newLpShares = uint128((_amount * totalLpShares) / totalLiquidity);
         }
@@ -205,7 +204,7 @@ contract SubPoolV1 {
     function loanTerms(uint128 _pledgeAmount)
         public
         view
-        returns (uint128, uint256)
+        returns (uint128, uint128)
     {
         uint128 loanAmount = uint128(
             (_pledgeAmount * maxLoanPerColl * totalLiquidity) /
@@ -224,8 +223,10 @@ contract SubPoolV1 {
         } else {
             rate = r2;
         }
-
-        return (loanAmount, rate);
+        uint128 repaymentAmount = uint128(
+            (loanAmount * (10**18 + rate)) / 10**18
+        );
+        return (loanAmount, repaymentAmount);
     }
 
     function borrow(
@@ -240,16 +241,13 @@ contract SubPoolV1 {
             ? uint128(msg.value)
             : _pledgeAmount;
         require(pledgeAmount > 0, "must pledge > 0");
-        (uint128 loanAmount, uint256 rate) = loanTerms(pledgeAmount);
-        require(loanAmount > _minLoan, "below _minLoan limit");
-        uint128 repaymentAmount = uint128(
-            (loanAmount * (10**18 + rate)) / 10**18
-        );
+        (uint128 loanAmount, uint128 repaymentAmount) = loanTerms(pledgeAmount);
+        require(loanAmount >= _minLoan, "below _minLoan limit");
         require(
             repaymentAmount > loanAmount,
             "repayment must be greater than loan"
         );
-        require(repaymentAmount < _maxRepay, "above _maxRepay limit");
+        require(repaymentAmount <= _maxRepay, "above _maxRepay limit");
         LoanInfo memory loanInfo;
         loanInfo.borrower = msg.sender;
         loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
@@ -472,17 +470,19 @@ contract SubPoolV1 {
             }
             if (loanInfo.repaid) {
                 repayments +=
-                    (loanInfo.repayment * _shares) /
+                    (loanInfo.repayment * 10**18) /
                     loanInfo.totalLpShares;
             } else if (loanInfo.expiry < block.timestamp) {
                 collateral +=
-                    (loanInfo.collateral * _shares) /
+                    (loanInfo.collateral * 10**18) /
                     loanInfo.totalLpShares;
                 numDefaults += 1;
             } else {
                 require(false, "must have been repaid or expired");
             }
         }
+        repayments = (repayments * _shares) / 10**18;
+        collateral = (collateral * _shares) / 10**18;
 
         return (repayments, collateral, numDefaults);
     }
