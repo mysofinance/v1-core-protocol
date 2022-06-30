@@ -8,7 +8,7 @@ describe("ETH-USDC SubPool Testing", function () {
   const ONE_ETH = MONE;
 
   beforeEach( async () => {
-    [deployer, lp1, lp2, lp3, borrower, ...addrs] = await ethers.getSigners();
+    [deployer, lp1, lp2, lp3, lp4, borrower, ...addrs] = await ethers.getSigners();
 
     TestToken = await ethers.getContractFactory("TestToken");
     TestToken = await TestToken.connect(deployer);
@@ -16,6 +16,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await testToken.connect(deployer).mint(lp1.address, ONE_USDC.mul(1000000));
     await testToken.connect(deployer).mint(lp2.address, ONE_USDC.mul(1000000));
     await testToken.connect(deployer).mint(lp3.address, ONE_USDC.mul(1000000));
+    await testToken.connect(deployer).mint(lp4.address, ONE_USDC.mul(1000000));
     await testToken.connect(deployer).mint(borrower.address, ONE_USDC.mul(1000000));
 
     SubPool = await ethers.getContractFactory("SubPoolV1");
@@ -35,9 +36,10 @@ describe("ETH-USDC SubPool Testing", function () {
     testToken.connect(lp1).approve(subPool.address, ONE_USDC.mul(1000000));
     testToken.connect(lp2).approve(subPool.address, ONE_USDC.mul(1000000));
     testToken.connect(lp3).approve(subPool.address, ONE_USDC.mul(1000000));
+    testToken.connect(lp4).approve(subPool.address, ONE_USDC.mul(1000000));
     testToken.connect(borrower).approve(subPool.address, ONE_USDC.mul(1000000));
   });
-
+  
   it("Should have correct initial values", async function () {
     totalLiquidity = await subPool.totalLiquidity();
     expect(totalLiquidity).to.be.equal(0);
@@ -76,7 +78,7 @@ describe("ETH-USDC SubPool Testing", function () {
 
     loanTerms = await subPool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
-    maxRepayLimit = loanTerms[0].mul(MONE.add(loanTerms[1])).mul(102).div(100).div(MONE);
+    maxRepayLimit = loanTerms[1].mul(102).div(100);
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
@@ -92,7 +94,7 @@ describe("ETH-USDC SubPool Testing", function () {
 
     loanTerms = await subPool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
-    maxRepayLimit = loanTerms[0].mul(MONE.add(loanTerms[1])).mul(102).div(100).div(MONE);
+    maxRepayLimit = loanTerms[1].mul(102).div(100);
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
@@ -108,13 +110,12 @@ describe("ETH-USDC SubPool Testing", function () {
     //borrow
     loanTerms = await subPool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
-    maxRepayLimit = loanTerms[0].mul(MONE.add(loanTerms[1])).mul(102).div(100).div(MONE);
+    maxRepayLimit = loanTerms[1].mul(102).div(100);
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+60, {value: ONE_ETH});
-    //await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -148,10 +149,8 @@ describe("ETH-USDC SubPool Testing", function () {
       console.log("totalLiquidity: ", totalLiquidity);
       console.log("loanTerms: ", loanTerms);
       await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
     }
     await expect(subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH})).to.be.reverted;
-    //await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
 
     console.log("--------------------------------------------------------")
     blocknum = await ethers.provider.getBlockNumber();
@@ -163,10 +162,8 @@ describe("ETH-USDC SubPool Testing", function () {
       console.log("totalLiquidity: ", totalLiquidity);
       console.log("loanTerms: ", loanTerms);
       await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
     }
     await expect(subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH})).to.be.reverted;
-    //await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000)).to.be.reverted;
   });
 
   it("Should allow LPs to claim individually", async function () {
@@ -180,10 +177,9 @@ describe("ETH-USDC SubPool Testing", function () {
       totalLiquidity = await subPool.totalLiquidity();
       loanTerms = await subPool.loanTerms(ONE_ETH);
       await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
       await subPool.connect(borrower).repay(i+1);
     }
-    loanIds = Array.from({length:99},(v,k)=>k+1);
+    loanIds = Array.from(Array(100), (_, index) => index + 1);
 
     await subPool.connect(lp1).claim(loanIds);
     //cannot claim twice
@@ -192,28 +188,180 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp2).claim(loanIds);
     await subPool.connect(lp3).claim(loanIds);
   });
-
-  it("Should allow to aggregate claims and let LPs claim from aggregated results", async function () {
+  
+  it("Should handle aggregate claims correctly (1/2)", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+10);
-    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(100000), timestamp+10);
-    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(100000), timestamp+10);
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(300000), timestamp+10);
+    await subPool.connect(lp4).addLiquidity(ONE_USDC.mul(200000), timestamp+10);
 
+    totalRepaymentsIndicative = ethers.BigNumber.from(0);
+    totalRepayments = ethers.BigNumber.from(0);
+    totalInterestCosts = ethers.BigNumber.from(0);
+    preBorrBal = await testToken.balanceOf(borrower.address);
+    pledgeAmount = ONE_ETH.mul(2);
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
-      await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-      //await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000);
+      //indicative repayment
+      loanTerms = await subPool.loanTerms(pledgeAmount);
+      totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
+      //borrow
+      await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: pledgeAmount});
+      //actual repayment
+      loanInfo = await subPool.loanIdxToLoanInfo(i+1);
+      totalRepayments = totalRepayments.add(loanInfo[0]);
+      //interest costs
+      totalInterestCosts = totalInterestCosts.add(loanTerms[1].sub(loanTerms[0]));
+      //repay
       await subPool.connect(borrower).repay(i+1);
     }
-    await subPool.connect(addrs[0]).aggregateClaims(1, 99);
-    await subPool.connect(lp1).claimFromAggregated(1,99);
+    await expect(totalRepaymentsIndicative).to.be.equal(totalRepayments);
+    console.log("totalRepayments", totalRepayments)
+    //total interest cost
+    postBorrBal = await testToken.balanceOf(borrower.address);
+    await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
+
+    //aggregate claims
+    await subPool.connect(addrs[0]).aggregateClaims(1, 100);
+
+    //lp1 claims individually
+    preClaimBal = await testToken.balanceOf(lp1.address);
+    loanIds = Array.from(Array(100), (_, index) => index + 1);
+    await subPool.connect(lp1).claim(loanIds);
+    postClaimBal = await testToken.balanceOf(lp1.address);
+    expClaim = totalRepayments.mul(5).div(15);
+    actClaim = postClaimBal.sub(preClaimBal);
+    pct = actClaim.mul(10000).div(actClaim)
+    await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
+
     //cannot claim twice
-    await expect(subPool.connect(lp1).claimFromAggregated(1,99)).to.be.reverted;
+    await expect(subPool.connect(lp1).claimFromAggregated(1, 100)).to.be.reverted;
+    
+    //lp2 claims via aggregate
+    benchmarkDiff = postClaimBal.sub(preClaimBal)
+    preClaimBal = await testToken.balanceOf(lp2.address);
+    await subPool.connect(lp2).claimFromAggregated(1, 100);
+    postClaimBal = await testToken.balanceOf(lp2.address);
+    diff = postClaimBal.sub(preClaimBal)
+    await expect(benchmarkDiff).to.be.equal(diff);
 
-    await subPool.connect(lp2).claimFromAggregated(1,99);
-    await subPool.connect(lp3).claimFromAggregated(1,99);
+    //cannot claim twice
+    await expect(subPool.connect(lp2).claimFromAggregated(1, 100)).to.be.reverted;
+
+    //lp3 claims
+    preClaimBal = await testToken.balanceOf(lp3.address);
+    await subPool.connect(lp3).claimFromAggregated(1,100);
+    postClaimBal = await testToken.balanceOf(lp3.address);
+    expClaim = totalRepayments.mul(5).div(15);
+    actClaim = postClaimBal.sub(preClaimBal);
+    pct = actClaim.mul(10000).div(actClaim)
+    await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
+
+    //lp4 claims
+    preClaimBal = await testToken.balanceOf(lp4.address);
+    await subPool.connect(lp4).claimFromAggregated(1,100);
+    postClaimBal = await testToken.balanceOf(lp4.address);
+    expClaim = totalRepayments.mul(5).div(15);
+    actClaim = postClaimBal.sub(preClaimBal);
+    pct = actClaim.mul(10000).div(actClaim)
+    await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
   });
+  
+  it("Should handle aggregate claims correctly (2/2)", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(300000), timestamp+10);
+    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(200000), timestamp+10);
 
+    totalRepayments = ethers.BigNumber.from(0);
+    totalLeftColl = ethers.BigNumber.from(0);
+
+    //1st borrow & repay
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+    loanInfo = await subPool.loanIdxToLoanInfo(1);
+    totalRepayments = totalRepayments.add(loanInfo[0]);
+    await subPool.connect(borrower).repay(1);
+
+    //2nd borrow & repay
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+    loanInfo = await subPool.loanIdxToLoanInfo(2);
+    totalRepayments = totalRepayments.add(loanInfo[0]);
+    await subPool.connect(borrower).repay(2);
+
+    //3rd borrow & default
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+    totalLeftColl = totalLeftColl.add(ONE_ETH);
+
+    //move forward to loan expiry
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_mine");
+
+    //aggregate claims
+    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+
+    //lp1 claims
+    console.log("totalRepayments", totalRepayments)
+    preClaimEthBal = await ethers.provider.getBalance(lp1.address);
+    preClaimTokenBal = await testToken.balanceOf(lp1.address);
+    await subPool.connect(lp1).claimFromAggregated(1, 3);
+    postClaimEthBal = await ethers.provider.getBalance(lp1.address);
+    postClaimTokenBal = await testToken.balanceOf(lp1.address);
+
+    //ETH diffs
+    ethDiff = postClaimEthBal.sub(preClaimEthBal);
+    expEthDiff = totalLeftColl.mul(5).div(10);
+    pctEthDiff = expEthDiff.mul(10000).div(ethDiff)
+    await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
+
+    //token diffs
+    tokenDiff = postClaimTokenBal.sub(preClaimTokenBal);
+    expTokenDiff = totalRepayments.mul(5).div(10);
+    pctTokenDiff = expTokenDiff.mul(10000).div(tokenDiff)
+    await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
+
+
+    //lp2 claims
+    console.log("totalRepayments", totalRepayments)
+    preClaimEthBal = await ethers.provider.getBalance(lp2.address);
+    preClaimTokenBal = await testToken.balanceOf(lp2.address);
+    await subPool.connect(lp2).claimFromAggregated(1, 3);
+    postClaimEthBal = await ethers.provider.getBalance(lp2.address);
+    postClaimTokenBal = await testToken.balanceOf(lp2.address);
+
+    //ETH diffs
+    ethDiff = postClaimEthBal.sub(preClaimEthBal);
+    expEthDiff = totalLeftColl.mul(3).div(10);
+    pctEthDiff = expEthDiff.mul(10000).div(ethDiff)
+    await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
+
+    //token diffs
+    tokenDiff = postClaimTokenBal.sub(preClaimTokenBal);
+    expTokenDiff = totalRepayments.mul(3).div(10);
+    pctTokenDiff = expTokenDiff.mul(10000).div(tokenDiff)
+    await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
+
+
+    //lp3 claims
+    console.log("totalRepayments", totalRepayments)
+    preClaimEthBal = await ethers.provider.getBalance(lp3.address);
+    preClaimTokenBal = await testToken.balanceOf(lp3.address);
+    await subPool.connect(lp3).claimFromAggregated(1, 3);
+    postClaimEthBal = await ethers.provider.getBalance(lp3.address);
+    postClaimTokenBal = await testToken.balanceOf(lp3.address);
+
+    //ETH diffs
+    ethDiff = postClaimEthBal.sub(preClaimEthBal);
+    expEthDiff = totalLeftColl.mul(2).div(10);
+    pctEthDiff = expEthDiff.mul(10000).div(ethDiff)
+    await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
+
+    //token diffs
+    tokenDiff = postClaimTokenBal.sub(preClaimTokenBal);
+    expTokenDiff = totalRepayments.mul(2).div(10);
+    pctTokenDiff = expTokenDiff.mul(10000).div(tokenDiff)
+    await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
+  });
 });
