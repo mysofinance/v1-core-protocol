@@ -149,7 +149,7 @@ contract SubPoolV1 {
         require(canAdd, "must be inactive without open claims");
         uint128 newLpShares;
         if (totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = _amount * 10**8;
+            newLpShares = _amount;
         } else {
             newLpShares = uint128((_amount * totalLpShares) / totalLiquidity);
         }
