@@ -3,59 +3,9 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 
-contract SubPoolV1 {
-    event NewSubPool(
-        address collCcyToken,
-        address loanCcyToken,
-        uint24 loanTenor,
-        uint128 maxLoanPerColl,
-        uint256 r1,
-        uint256 r2,
-        uint256 tvl1,
-        uint256 tvl2
-    );
-    event AddLiquidity(
-        uint256 amount,
-        uint256 newLpShares,
-        uint256 totalLiquidity,
-        uint256 totalLpShares,
-        uint256 earliestRemove
-    );
-    event RemoveLiquidity(
-        uint256 amount,
-        uint256 removedLpShares,
-        uint256 totalLiquidity,
-        uint256 totalLpShares
-    );
-    event Borrow(
-        uint256 loanIdx,
-        uint256 collateral,
-        uint256 loanAmount,
-        uint256 repaymentAmount,
-        uint256 expiry
-    );
-    event AggregateClaims(
-        uint256 fromLoanIdx,
-        uint256 toLoanIdx,
-        uint256 repayments,
-        uint256 collateral,
-        uint256 numDefaults
-    );
-    event ClaimFromAggregated(
-        uint256 fromLoanIdx,
-        uint256 toLoanIdx,
-        uint256 repayments,
-        uint256 collateral
-    );
-    event Claim(
-        uint256[] loanIdxs,
-        uint256 repayments,
-        uint256 collateral,
-        uint256 numDefaults
-    );
-    event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
-
+contract SubPoolV1 is ISubPoolV1 {
     uint32 constant MIN_LPING_PERIOD = 30;
     uint24 immutable LOAN_TENOR;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -112,8 +62,8 @@ contract SubPoolV1 {
         require(_collCcyToken != _loanCcyToken, "same ccys");
         require(_loanTenor >= 86400, "invalid loanTenor");
         require(_maxLoanPerColl > 0, "invalid max. borrowable amount");
-        require(_r1 > _r2, "invalid apr params");
-        require(_tvl2 > _tvl1, "invalid tvl params");
+        require(_r1 > _r2 && _r2 > 0, "invalid apr params");
+        require(_tvl2 > _tvl1 && _tvl1 > 0, "invalid tvl params");
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -138,7 +88,10 @@ contract SubPoolV1 {
         );
     }
 
-    function addLiquidity(uint128 _amount, uint256 _deadline) external {
+    function addLiquidity(uint128 _amount, uint256 _deadline)
+        external
+        override
+    {
         uint256 timeStamp = block.timestamp;
         require(timeStamp < _deadline, "after deadline");
         require(_amount > 0, "_amount > 0");
@@ -177,7 +130,7 @@ contract SubPoolV1 {
         );
     }
 
-    function removeLiquidity() external {
+    function removeLiquidity() external override {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         require(lpInfo.shares != 0, "no shares");
         require(
@@ -234,7 +187,7 @@ contract SubPoolV1 {
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline
-    ) external payable {
+    ) external payable override {
         uint256 timeStamp = block.timestamp;
         require(timeStamp < _deadline, "after deadline");
         uint128 pledgeAmount = collCcyToken == address(0)
@@ -276,7 +229,7 @@ contract SubPoolV1 {
         );
     }
 
-    function repay(uint256 _loanIdx) external {
+    function repay(uint256 _loanIdx) external override {
         require(_loanIdx > 0 && _loanIdx < loanIdx, "loan id out of bounds");
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         require(loanInfo.borrower == msg.sender, "unauthorized repay");
@@ -304,7 +257,7 @@ contract SubPoolV1 {
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
-    function claim(uint256[] calldata _loanIdxs) external {
+    function claim(uint256[] calldata _loanIdxs) external override {
         uint256 arrayLen = _loanIdxs.length;
         require(arrayLen > 0 && arrayLen < loanIdx, "_loanIdxs out of bounds");
         require(_loanIdxs[0] != 0, "loan idx must be > 0");
@@ -341,6 +294,7 @@ contract SubPoolV1 {
     //including _fromLoanIdx and _toLoanIdx
     function aggregateClaims(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external
+        override
     {
         require(_fromLoanIdx > 0, "_fromLoanIdx > 0");
         require(_toLoanIdx < loanIdx, "_toLoanIdx < loanIdx");
@@ -389,6 +343,7 @@ contract SubPoolV1 {
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external
+        override
     {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         require(lpInfo.shares > 0, "nothing to claim");
