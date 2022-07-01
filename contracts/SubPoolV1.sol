@@ -7,7 +7,7 @@ import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     address public constant TREASURY =
-        0x45804880De22913dAFE09f4980848ECE6EcbAf78;
+        0x0000000000000000000000000000000000000000;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint24 immutable LOAN_TENOR;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -206,9 +206,10 @@ contract SubPoolV1 is ISubPoolV1 {
                 (!isEthColl && msg.value == 0),
             "must pledge ETH xor ERC20"
         );
-        uint128 pledgeAmount = isEthColl ? uint128(msg.value) : _pledgeAmount;
-        require(pledgeAmount > 0, "pledgeAmount > 0");
-        (uint128 loanAmount, uint128 repaymentAmount) = loanTerms(pledgeAmount);
+        require(_pledgeAmount > 0, "_pledgeAmount > 0");
+        (uint128 loanAmount, uint128 repaymentAmount) = loanTerms(
+            _pledgeAmount
+        );
         require(loanAmount >= minLoan, "loan too small");
         require(loanAmount >= _minLoan, "below _minLoan limit");
         require(
@@ -221,7 +222,7 @@ contract SubPoolV1 is ISubPoolV1 {
         loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.repayment = repaymentAmount;
-        loanInfo.collateral = pledgeAmount;
+        loanInfo.collateral = _pledgeAmount;
         loanIdxToLoanInfo[loanIdx] = loanInfo;
         loanIdx += 1;
         totalLiquidity -= loanAmount;
@@ -230,14 +231,14 @@ contract SubPoolV1 is ISubPoolV1 {
             IERC20Metadata(collCcyToken).transferFrom(
                 msg.sender,
                 address(this),
-                pledgeAmount
+                _pledgeAmount
             );
         }
         IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
 
         emit Borrow(
             loanIdx - 1,
-            pledgeAmount,
+            _pledgeAmount,
             loanAmount,
             repaymentAmount,
             loanInfo.expiry

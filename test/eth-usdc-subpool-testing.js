@@ -16,7 +16,7 @@ describe("ETH-USDC SubPool Testing", function () {
   const _minLoan = ONE_USDC.mul(1);
 
   beforeEach( async () => {
-    [deployer, lp1, lp2, lp3, lp4, borrower, treasury, ...addrs] = await ethers.getSigners();
+    [deployer, lp1, lp2, lp3, lp4, borrower, ...addrs] = await ethers.getSigners();
 
     TestToken = await ethers.getContractFactory("TestToken");
     TestToken = await TestToken.connect(deployer);
