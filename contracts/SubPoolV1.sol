@@ -7,7 +7,7 @@ import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     address public constant TREASURY =
-        0x0000000000000000000000000000000000000000;
+        0x0000000000000000000000000000000000000001;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint24 immutable LOAN_TENOR;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -22,7 +22,8 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public tvl1;
     uint256 public tvl2;
     uint256 public minLoan;
-    uint256 public protocolFee;
+    uint256 public totalFees;
+    uint128 public protocolFee;
 
     address public collCcyToken;
     address public loanCcyToken;
@@ -165,14 +166,20 @@ contract SubPoolV1 is ISubPoolV1 {
         );
     }
 
-    function loanTerms(uint128 _pledgeAmount)
+    function loanTerms(uint128 _inAmount)
         public
         view
-        returns (uint128, uint128)
+        returns (
+            uint128,
+            uint128,
+            uint128
+        )
     {
+        uint128 fee = (_inAmount * protocolFee) / 10**18;
+        uint128 pledgeAmount = _inAmount - fee;
         uint128 loanAmount = uint128(
-            (_pledgeAmount * maxLoanPerColl * totalLiquidity) /
-                (_pledgeAmount *
+            (pledgeAmount * maxLoanPerColl * totalLiquidity) /
+                (pledgeAmount *
                     maxLoanPerColl +
                     totalLiquidity *
                     10**COLL_TOKEN_DECIMALS)
@@ -190,55 +197,71 @@ contract SubPoolV1 is ISubPoolV1 {
         uint128 repaymentAmount = uint128(
             (loanAmount * (10**18 + rate)) / 10**18
         );
-        return (loanAmount, repaymentAmount);
+        return (loanAmount, repaymentAmount, pledgeAmount);
     }
 
     function borrow(
-        uint128 _pledgeAmount,
-        uint128 _minLoan,
-        uint128 _maxRepay,
+        uint128 _inAmount,
+        uint128 _minLoanLimit,
+        uint128 _maxRepayLimit,
         uint256 _deadline
     ) external payable override {
         uint256 timeStamp = block.timestamp;
-        require(timeStamp < _deadline, "after deadline");
+        require(timeStamp < _deadline, "must have timeStamp < deadline");
         require(
-            (isEthColl && _pledgeAmount == msg.value) ||
+            (isEthColl && _inAmount == msg.value) ||
                 (!isEthColl && msg.value == 0),
             "must pledge ETH xor ERC20"
         );
-        require(_pledgeAmount > 0, "_pledgeAmount > 0");
-        (uint128 loanAmount, uint128 repaymentAmount) = loanTerms(
-            _pledgeAmount
-        );
-        require(loanAmount >= minLoan, "loan too small");
-        require(loanAmount >= _minLoan, "below _minLoan limit");
+        (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount
+        ) = loanTerms(_inAmount);
+        require(pledgeAmount > 0, "must have pledgeAmount > 0");
+        require(loanAmount >= minLoan, "must have loan > minLoan");
         require(
-            repaymentAmount > loanAmount,
-            "repayment must be greater than loan"
+            loanAmount >= _minLoanLimit,
+            "below have loan amount >= _minLoanLimit"
         );
-        require(repaymentAmount <= _maxRepay, "above _maxRepay limit");
+        require(repaymentAmount > loanAmount, "must have repayment > loan");
+        require(
+            repaymentAmount <= _maxRepayLimit,
+            "must have repayment amount <= _maxRepayLimit"
+        );
         LoanInfo memory loanInfo;
         loanInfo.borrower = msg.sender;
         loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.repayment = repaymentAmount;
-        loanInfo.collateral = _pledgeAmount;
+        loanInfo.collateral = pledgeAmount;
         loanIdxToLoanInfo[loanIdx] = loanInfo;
         loanIdx += 1;
         totalLiquidity -= loanAmount;
 
+        uint128 fee = _inAmount - pledgeAmount;
+        totalFees += fee;
         if (!isEthColl) {
             IERC20Metadata(collCcyToken).transferFrom(
                 msg.sender,
                 address(this),
-                _pledgeAmount
+                pledgeAmount - fee
             );
+            if (fee > 0) {
+                IERC20Metadata(collCcyToken).transferFrom(
+                    msg.sender,
+                    TREASURY,
+                    fee
+                );
+            }
+        } else if (fee > 0) {
+            payable(TREASURY).transfer(fee);
         }
         IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
 
         emit Borrow(
             loanIdx - 1,
-            _pledgeAmount,
+            pledgeAmount,
             loanAmount,
             repaymentAmount,
             loanInfo.expiry
@@ -256,21 +279,18 @@ contract SubPoolV1 is ISubPoolV1 {
             "cannot repay in same block"
         );
         loanInfo.repaid = true;
-        uint256 fee = (loanInfo.collateral * protocolFee) / 10**18;
         IERC20Metadata(loanCcyToken).transferFrom(
             msg.sender,
             address(this),
             loanInfo.repayment
         );
         if (isEthColl) {
-            payable(msg.sender).transfer(loanInfo.collateral - fee);
-            payable(TREASURY).transfer(fee);
+            payable(msg.sender).transfer(loanInfo.collateral);
         } else {
             IERC20Metadata(collCcyToken).transfer(
                 msg.sender,
-                loanInfo.collateral - fee
+                loanInfo.collateral
             );
-            IERC20Metadata(collCcyToken).transfer(TREASURY, fee);
         }
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
