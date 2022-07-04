@@ -8,6 +8,7 @@ import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 contract SubPoolV1 is ISubPoolV1 {
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
+    uint128 constant MAX_PROTOCOL_FEE = 50 * 10**15;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint24 immutable LOAN_TENOR;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -478,5 +479,13 @@ contract SubPoolV1 is ISubPoolV1 {
         collateral = (collateral * _shares) / 10**18;
 
         return (repayments, collateral, numDefaults);
+    }
+
+    function setProtocolFee(uint128 _newFee) external {
+        require(msg.sender == TREASURY, "must have treasury as sender");
+        require(_newFee != protocolFee, "must have different _newFee");
+        require(_newFee <= MAX_PROTOCOL_FEE, "must be <= MAX_PROTOCOL_FEE");
+        emit FeeUpdate(protocolFee, _newFee);
+        protocolFee = _newFee;
     }
 }

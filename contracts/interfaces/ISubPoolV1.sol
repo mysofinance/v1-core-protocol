@@ -52,6 +52,7 @@ interface ISubPoolV1 {
         uint256 collateral,
         uint256 numDefaults
     );
+    event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
 
     function addLiquidity(uint128 _amount, uint256 _deadline) external;
