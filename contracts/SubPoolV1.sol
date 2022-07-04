@@ -31,6 +31,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
+    mapping(uint256 => address) public loanIdxToBorrower;
     mapping(bytes32 => AggClaimsInfo) loanIdxRangeToAggClaimsInfo;
 
     struct LpInfo {
@@ -45,7 +46,6 @@ contract SubPoolV1 is ISubPoolV1 {
         uint128 repayment;
         uint128 collateral;
         uint128 totalLpShares;
-        address borrower;
         uint32 expiry;
         bool repaid;
     }
@@ -231,12 +231,12 @@ contract SubPoolV1 is ISubPoolV1 {
             "must have repayment amount <= _maxRepayLimit"
         );
         LoanInfo memory loanInfo;
-        loanInfo.borrower = msg.sender;
         loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.repayment = repaymentAmount;
         loanInfo.collateral = pledgeAmount;
         loanIdxToLoanInfo[loanIdx] = loanInfo;
+        loanIdxToBorrower[loanIdx] = msg.sender;
         loanIdx += 1;
         totalLiquidity -= loanAmount;
 
@@ -271,8 +271,11 @@ contract SubPoolV1 is ISubPoolV1 {
 
     function repay(uint256 _loanIdx) external override {
         require(_loanIdx > 0 && _loanIdx < loanIdx, "loan id out of bounds");
+        require(
+            loanIdxToBorrower[_loanIdx] == msg.sender,
+            "unauthorized repay"
+        );
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
-        require(loanInfo.borrower == msg.sender, "unauthorized repay");
         require(block.timestamp < loanInfo.expiry, "loan expired");
         require(!loanInfo.repaid, "loan already repaid");
         require(
