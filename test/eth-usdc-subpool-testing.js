@@ -101,7 +101,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect(subPool.connect(borrower).borrow(ONE_ETH.sub(1), minLoanLimit, maxRepayLimit, timestamp+60, {value: ONE_ETH})).to.be.reverted;
   });
   
-  it("Should not allow new LPs to claim in retrospect", async function () {
+  it("Should not allow new LPs to claim on unentitled previous loans", async function () {
     //add liquidity
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
@@ -394,4 +394,107 @@ describe("ETH-USDC SubPool Testing", function () {
     pctTokenDiff = expTokenDiff.mul(10000).div(tokenDiff)
     await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
   });
+
+  it("Should allow removing liquidity", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(300000), timestamp+10);
+    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(200000), timestamp+10);
+
+    totalRepayments = ethers.BigNumber.from(0);
+    totalLeftColl = ethers.BigNumber.from(0);
+
+    //1st borrow & repay
+    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+    loanInfo = await subPool.loanIdxToLoanInfo(1);
+    totalRepayments = totalRepayments.add(loanInfo[0]);
+    await subPool.connect(borrower).repay(1);
+
+    //2nd borrow & repay
+    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+    loanInfo = await subPool.loanIdxToLoanInfo(2);
+    totalRepayments = totalRepayments.add(loanInfo[0]);
+    await subPool.connect(borrower).repay(2);
+
+    //3rd borrow & default
+    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+    totalLeftColl = totalLeftColl.add(ONE_ETH);
+
+    //move forward to loan expiry
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_mine");
+
+    //aggregate claims
+    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+    
+    //claim
+    await subPool.connect(lp1).claimFromAggregated(1, 3);
+    await subPool.connect(lp2).claimFromAggregated(1, 3);
+    await subPool.connect(lp3).claimFromAggregated(1, 3);
+
+    //remove liquidity
+    await subPool.connect(lp1).removeLiquidity();
+    await subPool.connect(lp2).removeLiquidity();
+    await subPool.connect(lp3).removeLiquidity();
+
+    balEth = await ethers.provider.getBalance(subPool.address);
+    balTestToken = await testToken.balanceOf(subPool.address);
+    console.log("balEth:", balEth);
+    console.log("balTestToken:", balTestToken);
+    })
+
+    it("Should allow adding liquidity again after removing and claiming", async function () {
+      blocknum = await ethers.provider.getBlockNumber();
+      timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+      await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+      await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(300000), timestamp+10);
+      await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(200000), timestamp+10);
+  
+      totalRepayments = ethers.BigNumber.from(0);
+      totalLeftColl = ethers.BigNumber.from(0);
+  
+      //1st borrow & repay
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      loanInfo = await subPool.loanIdxToLoanInfo(1);
+      totalRepayments = totalRepayments.add(loanInfo[0]);
+      await subPool.connect(borrower).repay(1);
+  
+      //2nd borrow & repay
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      loanInfo = await subPool.loanIdxToLoanInfo(2);
+      totalRepayments = totalRepayments.add(loanInfo[0]);
+      await subPool.connect(borrower).repay(2);
+  
+      //3rd borrow & default
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      totalLeftColl = totalLeftColl.add(ONE_ETH);
+  
+      //move forward to loan expiry
+      await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+      await ethers.provider.send("evm_mine");
+  
+      //aggregate claims
+      await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+      
+      //claim
+      await subPool.connect(lp1).claimFromAggregated(1, 3);
+      await subPool.connect(lp2).claimFromAggregated(1, 3);
+      await subPool.connect(lp3).claimFromAggregated(1, 3);
+  
+      //remove liquidity
+      await subPool.connect(lp1).removeLiquidity();
+      await subPool.connect(lp2).removeLiquidity();
+      await subPool.connect(lp3).removeLiquidity();
+  
+      balEth = await ethers.provider.getBalance(subPool.address);
+      balTestToken = await testToken.balanceOf(subPool.address);
+      console.log("balEth:", balEth);
+      console.log("balTestToken:", balTestToken);
+
+      //add liquidity again
+      blocknum = await ethers.provider.getBlockNumber();
+      timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+      await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+    })
 });

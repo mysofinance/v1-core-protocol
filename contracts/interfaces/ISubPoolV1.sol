@@ -11,7 +11,8 @@ interface ISubPoolV1 {
         uint256 r1,
         uint256 r2,
         uint256 tvl1,
-        uint256 tvl2
+        uint256 tvl2,
+        uint256 minLoan
     );
     event AddLiquidity(
         uint256 amount,
@@ -31,7 +32,8 @@ interface ISubPoolV1 {
         uint256 collateral,
         uint256 loanAmount,
         uint256 repaymentAmount,
-        uint256 expiry
+        uint256 expiry,
+        uint256 fee
     );
     event AggregateClaims(
         uint256 fromLoanIdx,

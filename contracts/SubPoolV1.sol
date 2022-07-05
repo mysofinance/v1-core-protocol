@@ -97,7 +97,8 @@ contract SubPoolV1 is ISubPoolV1 {
             _r1,
             _r2,
             _tvl1,
-            _tvl2
+            _tvl2,
+            _minLoan
         );
     }
 
@@ -111,7 +112,8 @@ contract SubPoolV1 is ISubPoolV1 {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         bool canAdd = lpInfo.activeLp
             ? false
-            : lpInfo.toLoanIdx == lpInfo.fromLoanIdx;
+            : (lpInfo.toLoanIdx == 0 && lpInfo.fromLoanIdx == 0) ||
+                lpInfo.toLoanIdx - lpInfo.fromLoanIdx == 1;
         require(canAdd, "must be inactive without open claims");
         uint128 newLpShares;
         if (totalLiquidity == 0 && totalLpShares == 0) {
@@ -265,7 +267,8 @@ contract SubPoolV1 is ISubPoolV1 {
             pledgeAmount,
             loanAmount,
             repaymentAmount,
-            loanInfo.expiry
+            loanInfo.expiry,
+            fee
         );
     }
 
