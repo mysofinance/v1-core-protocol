@@ -8,16 +8,18 @@ import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 contract SubPoolV1 is ISubPoolV1 {
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
+    uint256 constant BASE = 10**18;
     uint128 constant MAX_PROTOCOL_FEE = 50 * 10**15;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint24 immutable LOAN_TENOR;
     uint8 immutable COLL_TOKEN_DECIMALS;
+    uint256 public immutable maxLoanPerColl;
+    address public immutable collCcyToken;
+    address public immutable loanCcyToken;
 
-    bool public isEthColl;
     uint128 public totalLpShares;
     uint256 public totalLiquidity;
     uint256 public loanIdx;
-    uint256 public maxLoanPerColl;
     uint256 public r1;
     uint256 public r2;
     uint256 public tvl1;
@@ -25,9 +27,6 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public minLoan;
     uint256 public totalFees;
     uint128 public protocolFee;
-
-    address public collCcyToken;
-    address public loanCcyToken;
 
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
@@ -68,16 +67,13 @@ contract SubPoolV1 is ISubPoolV1 {
     ) {
         require(_loanCcyToken != address(0), "must be non-zero address");
         require(_collCcyToken != _loanCcyToken, "must different ccys");
-        require(_loanTenor >= 86400, "must have loanTenor > 1d");
+        require(_loanTenor >= 86400, "must have loanTenor >= 1d");
         require(_maxLoanPerColl > 0, "must have max. borrowable amount > 0");
         require(_r1 > _r2 && _r2 > 0, "must have valid apr params");
         require(_tvl2 > _tvl1 && _tvl1 > 0, "must have valid tvl params");
         require(_minLoan > 0, "must have larger _minLoan param");
         loanCcyToken = _loanCcyToken;
-        isEthColl = _collCcyToken == address(0);
-        if (!isEthColl) {
-            collCcyToken = _collCcyToken;
-        }
+        collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
         maxLoanPerColl = _maxLoanPerColl;
         r1 = _r1;
@@ -86,7 +82,7 @@ contract SubPoolV1 is ISubPoolV1 {
         tvl2 = _tvl2;
         minLoan = _minLoan;
         loanIdx = 1;
-        COLL_TOKEN_DECIMALS = isEthColl
+        COLL_TOKEN_DECIMALS = _collCcyToken == address(0)
             ? 18
             : IERC20Metadata(_collCcyToken).decimals();
         emit NewSubPool(
@@ -102,6 +98,10 @@ contract SubPoolV1 is ISubPoolV1 {
         );
     }
 
+    function isEthColl() internal view returns (bool) {
+        return collCcyToken == address(0);
+    }
+
     function addLiquidity(uint128 _amount, uint256 _deadline)
         external
         override
@@ -112,16 +112,28 @@ contract SubPoolV1 is ISubPoolV1 {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         bool canAdd = lpInfo.activeLp
             ? false
-            : (lpInfo.toLoanIdx == 0 && lpInfo.fromLoanIdx == 0) ||
-                lpInfo.toLoanIdx - lpInfo.fromLoanIdx == 1;
+            : lpInfo.toLoanIdx - lpInfo.fromLoanIdx == 0;
         require(canAdd, "must be inactive without open claims");
         uint128 newLpShares;
         if (totalLiquidity == 0 && totalLpShares == 0) {
             newLpShares = _amount;
         } else {
-            newLpShares = uint128((_amount * totalLpShares) / totalLiquidity);
+            newLpShares = uint128(
+                (uint256(_amount) * uint256(totalLpShares)) / totalLiquidity
+            );
         }
         totalLpShares += newLpShares;
+        require(
+            ((minLoan * BASE) / totalLpShares) * newLpShares > 0,
+            "1 too small liquidity contribution"
+        );
+        require(
+            ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
+                totalLpShares) *
+                newLpShares >
+                0,
+            "2 too small liquidity contribution"
+        );
         totalLiquidity += _amount;
         lpInfo.shares = newLpShares;
         lpInfo.fromLoanIdx = uint32(loanIdx);
@@ -178,15 +190,13 @@ contract SubPoolV1 is ISubPoolV1 {
             uint128
         )
     {
-        uint128 fee = (_inAmount * protocolFee) / 10**18;
-        uint128 pledgeAmount = _inAmount - fee;
-        uint128 loanAmount = uint128(
-            (pledgeAmount * maxLoanPerColl * totalLiquidity) /
-                (pledgeAmount *
-                    maxLoanPerColl +
-                    totalLiquidity *
-                    10**COLL_TOKEN_DECIMALS)
-        );
+        uint256 fee = (_inAmount * protocolFee) / BASE;
+        uint256 pledgeAmount = _inAmount - fee;
+        uint256 loanAmount = (pledgeAmount * maxLoanPerColl * totalLiquidity) /
+            (pledgeAmount *
+                maxLoanPerColl +
+                totalLiquidity *
+                10**COLL_TOKEN_DECIMALS);
 
         uint256 rate;
         uint256 x = totalLiquidity - loanAmount;
@@ -197,10 +207,12 @@ contract SubPoolV1 is ISubPoolV1 {
         } else {
             rate = r2;
         }
-        uint128 repaymentAmount = uint128(
-            (loanAmount * (10**18 + rate)) / 10**18
+        uint256 repaymentAmount = (loanAmount * (BASE + rate)) / BASE;
+        return (
+            uint128(loanAmount),
+            uint128(repaymentAmount),
+            uint128(pledgeAmount)
         );
-        return (loanAmount, repaymentAmount, pledgeAmount);
     }
 
     function borrow(
@@ -212,8 +224,8 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 timeStamp = block.timestamp;
         require(timeStamp < _deadline, "must have timeStamp < deadline");
         require(
-            (isEthColl && _inAmount == msg.value) ||
-                (!isEthColl && msg.value == 0),
+            (isEthColl() && _inAmount == msg.value) ||
+                (!isEthColl() && msg.value == 0),
             "must pledge ETH xor ERC20"
         );
         (
@@ -244,7 +256,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
         uint128 fee = _inAmount - pledgeAmount;
         totalFees += fee;
-        if (!isEthColl) {
+        if (!isEthColl()) {
             IERC20Metadata(collCcyToken).transferFrom(
                 msg.sender,
                 address(this),
@@ -291,7 +303,7 @@ contract SubPoolV1 is ISubPoolV1 {
             address(this),
             loanInfo.repayment
         );
-        if (isEthColl) {
+        if (isEthColl()) {
             payable(msg.sender).transfer(loanInfo.collateral);
         } else {
             IERC20Metadata(collCcyToken).transfer(
@@ -304,7 +316,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     function claim(uint256[] calldata _loanIdxs) external override {
         uint256 arrayLen = _loanIdxs.length;
-        require(arrayLen > 0 && arrayLen < loanIdx, "_loanIdxs out of bounds");
+        require(arrayLen > 0, "_loanIdxs out of bounds");
         require(_loanIdxs[0] != 0, "loan idx must be > 0");
         require(_loanIdxs[arrayLen - 1] < loanIdx, "invalid loan id");
 
@@ -327,7 +339,7 @@ contract SubPoolV1 is ISubPoolV1 {
             IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
         }
         if (collateral > 0) {
-            if (isEthColl) {
+            if (isEthColl()) {
                 payable(msg.sender).transfer(collateral);
             } else {
                 IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
@@ -352,27 +364,30 @@ contract SubPoolV1 is ISubPoolV1 {
             aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0,
             "already aggregated"
         );
-        uint128 repayments;
-        uint128 collateral;
+        uint256 repayments;
+        uint256 collateral;
         uint256 numDefaults;
         LoanInfo memory loanInfo;
-        for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ++i) {
+        for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ) {
             loanInfo = loanIdxToLoanInfo[i];
             if (loanInfo.repaid) {
                 repayments +=
-                    (loanInfo.repayment * 10**18) /
+                    (loanInfo.repayment * BASE) /
                     loanInfo.totalLpShares;
             } else if (loanInfo.expiry < block.timestamp) {
                 collateral +=
-                    (loanInfo.collateral * 10**18) /
+                    (loanInfo.collateral * BASE) /
                     loanInfo.totalLpShares;
                 numDefaults += 1;
             } else {
                 require(false, "must have been repaid or expired");
             }
+            unchecked {
+                i++;
+            }
         }
-        aggClaimsInfo.repayments = repayments;
-        aggClaimsInfo.collateral = collateral;
+        aggClaimsInfo.repayments = uint128(repayments);
+        aggClaimsInfo.collateral = uint128(collateral);
         loanIdxRangeToAggClaimsInfo[
             keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
         ] = aggClaimsInfo;
@@ -403,13 +418,13 @@ contract SubPoolV1 is ISubPoolV1 {
             _toLoanIdx,
             lpInfo.shares
         );
-        lpInfo.fromLoanIdx = uint32(_toLoanIdx);
+        lpInfo.fromLoanIdx = uint32(_toLoanIdx) + 1;
 
         if (repayments > 0) {
             IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
         }
         if (collateral > 0) {
-            if (isEthColl) {
+            if (isEthColl()) {
                 payable(msg.sender).transfer(collateral);
             } else {
                 IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
@@ -437,8 +452,8 @@ contract SubPoolV1 is ISubPoolV1 {
             "nothing aggregated"
         );
 
-        uint256 repayments = (aggClaimsInfo.repayments * _shares) / 10**18;
-        uint256 collateral = (aggClaimsInfo.collateral * _shares) / 10**18;
+        uint256 repayments = (aggClaimsInfo.repayments * _shares) / BASE;
+        uint256 collateral = (aggClaimsInfo.collateral * _shares) / BASE;
 
         return (repayments, collateral);
     }
@@ -456,13 +471,12 @@ contract SubPoolV1 is ISubPoolV1 {
             uint256
         )
     {
-        LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[0]];
         uint256 repayments;
         uint256 collateral;
         uint256 numDefaults;
-        for (uint256 i = 0; i < arrayLen; ++i) {
+        for (uint256 i = 0; i < arrayLen; ) {
+            LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
             if (i > 0) {
-                loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
                 require(
                     _loanIdxs[i] > _loanIdxs[i - 1],
                     "non ascending loan ids"
@@ -470,19 +484,22 @@ contract SubPoolV1 is ISubPoolV1 {
             }
             if (loanInfo.repaid) {
                 repayments +=
-                    (loanInfo.repayment * 10**18) /
+                    (loanInfo.repayment * BASE) /
                     loanInfo.totalLpShares;
             } else if (loanInfo.expiry < block.timestamp) {
                 collateral +=
-                    (loanInfo.collateral * 10**18) /
+                    (loanInfo.collateral * BASE) /
                     loanInfo.totalLpShares;
                 numDefaults += 1;
             } else {
                 require(false, "must have been repaid or expired");
             }
+            unchecked {
+                i++;
+            }
         }
-        repayments = (repayments * _shares) / 10**18;
-        collateral = (collateral * _shares) / 10**18;
+        repayments = (repayments * _shares) / BASE;
+        collateral = (collateral * _shares) / BASE;
 
         return (repayments, collateral, numDefaults);
     }

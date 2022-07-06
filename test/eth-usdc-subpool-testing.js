@@ -13,7 +13,7 @@ describe("ETH-USDC SubPool Testing", function () {
   const _r2 = MONE.mul(2).div(100)
   const _tvl1 = ONE_USDC.mul(100000);
   const _tvl2 = ONE_USDC.mul(1000000);
-  const _minLoan = ONE_USDC.mul(1);
+  const _minLoan = ONE_USDC.mul(300);
 
   beforeEach( async () => {
     [deployer, lp1, lp2, lp3, lp4, borrower, ...addrs] = await ethers.getSigners();
@@ -405,33 +405,30 @@ describe("ETH-USDC SubPool Testing", function () {
     totalRepayments = ethers.BigNumber.from(0);
     totalLeftColl = ethers.BigNumber.from(0);
 
-    //1st borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-    loanInfo = await subPool.loanIdxToLoanInfo(1);
-    totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(1);
+    for (let i = 0; i < 100; i++) {
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      loanInfo = await subPool.loanIdxToLoanInfo(i+1);
+      totalRepayments = totalRepayments.add(loanInfo[0]);
+      await subPool.connect(borrower).repay(i+1);
+    }
 
-    //2nd borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-    loanInfo = await subPool.loanIdxToLoanInfo(2);
-    totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(2);
-
-    //3rd borrow & default
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
-    totalLeftColl = totalLeftColl.add(ONE_ETH);
+    for (let i = 0; i < 100; i++) {
+      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
+      loanInfo = await subPool.loanIdxToLoanInfo(i+101);
+      totalRepayments = totalRepayments.add(loanInfo[0]);
+      await subPool.connect(borrower).repay(i+101);
+    }
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+    await subPool.connect(addrs[0]).aggregateClaims(1, 200);
     
     //claim
-    await subPool.connect(lp1).claimFromAggregated(1, 3);
-    await subPool.connect(lp2).claimFromAggregated(1, 3);
-    await subPool.connect(lp3).claimFromAggregated(1, 3);
+    await subPool.connect(lp1).claimFromAggregated(1, 200);
+    await subPool.connect(lp2).claimFromAggregated(1, 200);
 
     //remove liquidity
     await subPool.connect(lp1).removeLiquidity();
@@ -440,9 +437,16 @@ describe("ETH-USDC SubPool Testing", function () {
 
     balEth = await ethers.provider.getBalance(subPool.address);
     balTestToken = await testToken.balanceOf(subPool.address);
-    console.log("balEth:", balEth);
-    console.log("balTestToken:", balTestToken);
-    })
+    totalLiquidity = await subPool.totalLiquidity();
+    totalLpShares = await subPool.totalLpShares();
+
+    await expect(totalLiquidity).to.be.equal(0);
+    await expect(totalLpShares).to.be.equal(0);
+    console.log("(2/2) balEth:", balEth);
+    console.log("(2/2) balTestToken:", balTestToken);
+    console.log("(2/2) totalLiquidity:", totalLiquidity);
+    console.log("(2/2) totalLpShares:", totalLpShares);
+  })
 
     it("Should allow adding liquidity again after removing and claiming", async function () {
       blocknum = await ethers.provider.getBlockNumber();
@@ -496,5 +500,8 @@ describe("ETH-USDC SubPool Testing", function () {
       blocknum = await ethers.provider.getBlockNumber();
       timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
       await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+
+      totalLpShares = await subPool.totalLpShares();
+      await expect(totalLpShares).to.be.equal(ONE_USDC.mul(500000));
     })
 });
