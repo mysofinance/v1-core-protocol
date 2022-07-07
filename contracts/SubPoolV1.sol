@@ -6,6 +6,40 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
+    error LoanCcyCannotBeZeroAddress();
+    error CollAndLoanCcyCannoteBeEqual();
+    error InvalidLoanTenor();
+    error InvalidMaxLoanPerColl();
+    error InvalidRateParams();
+    error InvalidTvlParams();
+    error InvalidMinLoan();
+    error PastDeadline();
+    error InvalidAddAmount();
+    error TooSmallAddForRepayClaim();
+    error TooSmallAddForCollClaim();
+    error NothingToRemove();
+    error BeforeEarliestRemove();
+    error InconsistentMsgValue();
+    error InvalidPledgeAmount();
+    error TooSmallLoan();
+    error LoanBelowLimit();
+    error ErroneousLoanTerms();
+    error RepaymentAboveLimit();
+    error InvalidLoanIdx();
+    error UnauthorizedRepay();
+    error CannotRepayAfterExpiry();
+    error AlreadyRepaid();
+    error CannotRepayInSameBlock();
+    error NothingToClaim();
+    error UnentitledFromLoanIdx();
+    error UnentitledToLoanIdx();
+    error InvalidFromToAggregation();
+    error CannotAggregateWithUnsettledLoan();
+    error AggregatedAlready();
+    error NothingAggregatedToClaim();
+    error NonAscendingLoanIdxs();
+    error CannotClaimWithUnsettledLoan();
+
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
     uint256 constant BASE = 10**18;
@@ -65,13 +99,15 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _tvl2,
         uint256 _minLoan
     ) {
-        require(_loanCcyToken != address(0), "must be non-zero address");
-        require(_collCcyToken != _loanCcyToken, "must different ccys");
-        require(_loanTenor >= 86400, "must have loanTenor >= 1d");
-        require(_maxLoanPerColl > 0, "must have max. borrowable amount > 0");
-        require(_r1 > _r2 && _r2 > 0, "must have valid apr params");
-        require(_tvl2 > _tvl1 && _tvl1 > 0, "must have valid tvl params");
-        require(_minLoan > 0, "must have larger _minLoan param");
+        if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
+        if (_collCcyToken == _loanCcyToken)
+            revert CollAndLoanCcyCannoteBeEqual();
+        if (_loanTenor < 86400) revert InvalidLoanTenor();
+        if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
+        if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
+        if (_tvl2 <= _tvl1 || _tvl1 == 0) revert InvalidTvlParams();
+        if (_minLoan == 0) revert InvalidMinLoan();
+
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -107,8 +143,8 @@ contract SubPoolV1 is ISubPoolV1 {
         override
     {
         uint256 timeStamp = block.timestamp;
-        require(timeStamp < _deadline, "after deadline");
-        require(_amount > 0, "_amount > 0");
+        if (timeStamp > _deadline) revert PastDeadline();
+        if (_amount == 0) revert InvalidAddAmount();
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         bool canAdd = lpInfo.activeLp
             ? false
@@ -123,17 +159,14 @@ contract SubPoolV1 is ISubPoolV1 {
             );
         }
         totalLpShares += newLpShares;
-        require(
-            ((minLoan * BASE) / totalLpShares) * newLpShares > 0,
-            "1 too small liquidity contribution"
-        );
-        require(
+        if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
+            revert TooSmallAddForRepayClaim();
+        if (
             ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
                 totalLpShares) *
-                newLpShares >
-                0,
-            "2 too small liquidity contribution"
-        );
+                newLpShares ==
+            0
+        ) revert TooSmallAddForCollClaim();
         totalLiquidity += _amount;
         lpInfo.shares = newLpShares;
         lpInfo.fromLoanIdx = uint32(loanIdx);
@@ -159,11 +192,9 @@ contract SubPoolV1 is ISubPoolV1 {
 
     function removeLiquidity() external override {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        require(lpInfo.shares != 0, "no shares");
-        require(
-            block.timestamp > lpInfo.earliestRemove,
-            "before min. lping period"
-        );
+        if (lpInfo.shares == 0) revert NothingToRemove();
+        if (block.timestamp < lpInfo.earliestRemove)
+            revert BeforeEarliestRemove();
         require(lpInfo.activeLp, "must be active lp");
         uint256 liquidityRemoved = (lpInfo.shares * totalLiquidity) /
             totalLpShares;
@@ -222,28 +253,21 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline
     ) external payable override {
         uint256 timeStamp = block.timestamp;
-        require(timeStamp < _deadline, "must have timeStamp < deadline");
-        require(
-            (isEthColl() && _inAmount == msg.value) ||
-                (!isEthColl() && msg.value == 0),
-            "must pledge ETH xor ERC20"
-        );
+        if (timeStamp > _deadline) revert PastDeadline();
+        if (
+            (isEthColl() && _inAmount != msg.value) ||
+            (!isEthColl() && msg.value != 0)
+        ) revert InconsistentMsgValue();
         (
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount
         ) = loanTerms(_inAmount);
-        require(pledgeAmount > 0, "must have pledgeAmount > 0");
-        require(loanAmount >= minLoan, "must have loan > minLoan");
-        require(
-            loanAmount >= _minLoanLimit,
-            "below have loan amount >= _minLoanLimit"
-        );
-        require(repaymentAmount > loanAmount, "must have repayment > loan");
-        require(
-            repaymentAmount <= _maxRepayLimit,
-            "must have repayment amount <= _maxRepayLimit"
-        );
+        if (pledgeAmount == 0) revert InvalidPledgeAmount();
+        if (loanAmount < minLoan) revert TooSmallLoan();
+        if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
+        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
+        if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         LoanInfo memory loanInfo;
         loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
         loanInfo.totalLpShares = totalLpShares;
@@ -285,18 +309,14 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function repay(uint256 _loanIdx) external override {
-        require(_loanIdx > 0 && _loanIdx < loanIdx, "loan id out of bounds");
-        require(
-            loanIdxToBorrower[_loanIdx] == msg.sender,
-            "unauthorized repay"
-        );
+        if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
+        if (loanIdxToBorrower[_loanIdx] != msg.sender)
+            revert UnauthorizedRepay();
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
-        require(block.timestamp < loanInfo.expiry, "loan expired");
-        require(!loanInfo.repaid, "loan already repaid");
-        require(
-            block.timestamp > loanInfo.expiry - LOAN_TENOR,
-            "cannot repay in same block"
-        );
+        if (block.timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
+        if (loanInfo.repaid) revert AlreadyRepaid();
+        if (block.timestamp == loanInfo.expiry - LOAN_TENOR)
+            revert CannotRepayInSameBlock();
         loanInfo.repaid = true;
         IERC20Metadata(loanCcyToken).transferFrom(
             msg.sender,
@@ -316,17 +336,14 @@ contract SubPoolV1 is ISubPoolV1 {
 
     function claim(uint256[] calldata _loanIdxs) external override {
         uint256 arrayLen = _loanIdxs.length;
-        require(arrayLen > 0, "_loanIdxs out of bounds");
-        require(_loanIdxs[0] != 0, "loan idx must be > 0");
-        require(_loanIdxs[arrayLen - 1] < loanIdx, "invalid loan id");
-
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        require(lpInfo.shares > 0, "nothing to claim");
-        require(_loanIdxs[0] >= lpInfo.fromLoanIdx, "outside lower loan id");
-        require(
-            lpInfo.toLoanIdx == 0 || _loanIdxs[arrayLen - 1] < lpInfo.toLoanIdx,
-            "outside upper loan id"
-        );
+        if (arrayLen == 0 || lpInfo.shares == 0) revert NothingToClaim();
+        if (_loanIdxs[0] == 0 || _loanIdxs[arrayLen - 1] >= loanIdx)
+            revert InvalidLoanIdx();
+        if (_loanIdxs[0] < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
+        if (
+            lpInfo.toLoanIdx != 0 && _loanIdxs[arrayLen - 1] >= lpInfo.toLoanIdx
+        ) revert UnentitledToLoanIdx();
 
         (
             uint256 repayments,
@@ -353,17 +370,14 @@ contract SubPoolV1 is ISubPoolV1 {
         external
         override
     {
-        require(_fromLoanIdx > 0, "_fromLoanIdx > 0");
-        require(_toLoanIdx < loanIdx, "_toLoanIdx < loanIdx");
-        require(_fromLoanIdx < _toLoanIdx, "_fromLoanIdx < _toLoanIdx");
+        if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
+        if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
             keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
         ];
-        require(
-            aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0,
-            "already aggregated"
-        );
+        if (aggClaimsInfo.repayments > 0 || aggClaimsInfo.collateral > 0)
+            revert AggregatedAlready();
         uint256 repayments;
         uint256 collateral;
         uint256 numDefaults;
@@ -380,7 +394,7 @@ contract SubPoolV1 is ISubPoolV1 {
                     loanInfo.totalLpShares;
                 numDefaults += 1;
             } else {
-                require(false, "must have been repaid or expired");
+                revert CannotAggregateWithUnsettledLoan();
             }
             unchecked {
                 i++;
@@ -406,12 +420,10 @@ contract SubPoolV1 is ISubPoolV1 {
         override
     {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        require(lpInfo.shares > 0, "nothing to claim");
-        require(_fromLoanIdx >= lpInfo.fromLoanIdx, "outside lower loan id");
-        require(
-            lpInfo.toLoanIdx == 0 || _toLoanIdx < lpInfo.toLoanIdx,
-            "outside upper loan id"
-        );
+        if (lpInfo.shares == 0) revert NothingToClaim();
+        if (_fromLoanIdx < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
+        if (lpInfo.toLoanIdx != 0 && _toLoanIdx >= lpInfo.toLoanIdx)
+            revert UnentitledToLoanIdx();
 
         (uint256 repayments, uint256 collateral) = getClaimsFromAggregated(
             _fromLoanIdx,
@@ -447,10 +459,8 @@ contract SubPoolV1 is ISubPoolV1 {
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
             keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
         ];
-        require(
-            aggClaimsInfo.repayments > 0 || aggClaimsInfo.collateral > 0,
-            "nothing aggregated"
-        );
+        if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
+            revert NothingAggregatedToClaim();
 
         uint256 repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         uint256 collateral = (aggClaimsInfo.collateral * _shares) / BASE;
@@ -477,10 +487,8 @@ contract SubPoolV1 is ISubPoolV1 {
         for (uint256 i = 0; i < arrayLen; ) {
             LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
             if (i > 0) {
-                require(
-                    _loanIdxs[i] > _loanIdxs[i - 1],
-                    "non ascending loan ids"
-                );
+                if (_loanIdxs[i] <= _loanIdxs[i - 1])
+                    revert NonAscendingLoanIdxs();
             }
             if (loanInfo.repaid) {
                 repayments +=
@@ -492,7 +500,7 @@ contract SubPoolV1 is ISubPoolV1 {
                     loanInfo.totalLpShares;
                 numDefaults += 1;
             } else {
-                require(false, "must have been repaid or expired");
+                revert CannotClaimWithUnsettledLoan();
             }
             unchecked {
                 i++;
