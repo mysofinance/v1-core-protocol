@@ -15,11 +15,14 @@ contract SubPoolV1 is ISubPoolV1 {
     error InvalidMinLoan();
     error PastDeadline();
     error InvalidAddAmount();
+    error CannotAddWithUnclaimedDust();
+    error CannotAddWithZeroLiquidityAndOtherLps();
     error TooSmallAddForRepayClaim();
     error TooSmallAddForCollClaim();
     error NothingToRemove();
     error BeforeEarliestRemove();
     error InconsistentMsgValue();
+    error InsufficientLiquidity();
     error InvalidPledgeAmount();
     error TooSmallLoan();
     error LoanBelowLimit();
@@ -39,18 +42,26 @@ contract SubPoolV1 is ISubPoolV1 {
     error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
+    error UnauthorizedFeeUpdate();
+    error NewFeeMustBeDifferent();
+    error NewFeeToHigh();
+    error CannotUndustWithActiveLps();
+    error InsufficientBalanceForUndust();
 
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
-    uint256 constant BASE = 10**18;
-    uint128 constant MAX_PROTOCOL_FEE = 50 * 10**15;
-    uint32 constant MIN_LPING_PERIOD = 30;
     uint24 immutable LOAN_TENOR;
+    uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
+
+    uint256 constant BASE = 10**18;
+    uint256 constant MIN_LIQUIDITY = 10**6;
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
     address public immutable loanCcyToken;
+    uint128 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
+    uint128 public protocolFee;
     uint128 public totalLpShares;
     uint256 public totalLiquidity;
     uint256 public loanIdx;
@@ -60,7 +71,6 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public tvl2;
     uint256 public minLoan;
     uint256 public totalFees;
-    uint128 public protocolFee;
 
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
@@ -153,7 +163,10 @@ contract SubPoolV1 is ISubPoolV1 {
         uint128 newLpShares;
         if (totalLiquidity == 0 && totalLpShares == 0) {
             newLpShares = _amount;
+        } else if (totalLiquidity > 0 && totalLpShares == 0) {
+            revert CannotAddWithUnclaimedDust();
         } else {
+            //assert(!(totalLiquidity == 0 && totalLpShares > 0));
             newLpShares = uint128(
                 (uint256(_amount) * uint256(totalLpShares)) / totalLiquidity
             );
@@ -196,8 +209,8 @@ contract SubPoolV1 is ISubPoolV1 {
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
         require(lpInfo.activeLp, "must be active lp");
-        uint256 liquidityRemoved = (lpInfo.shares * totalLiquidity) /
-            totalLpShares;
+        uint256 liquidityRemoved = (lpInfo.shares *
+            (totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
         totalLpShares -= lpInfo.shares;
         totalLiquidity -= liquidityRemoved;
         lpInfo.toLoanIdx = uint32(loanIdx);
@@ -263,6 +276,8 @@ contract SubPoolV1 is ISubPoolV1 {
             uint128 repaymentAmount,
             uint128 pledgeAmount
         ) = loanTerms(_inAmount);
+        if (totalLiquidity - loanAmount <= MIN_LIQUIDITY)
+            revert InsufficientLiquidity();
         if (pledgeAmount == 0) revert InvalidPledgeAmount();
         if (loanAmount < minLoan) revert TooSmallLoan();
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
@@ -365,61 +380,75 @@ contract SubPoolV1 is ISubPoolV1 {
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
+    function claimOnBehalf(address _claimant) external override {
+        LpInfo memory lpInfo = addrToLpInfo[_claimant];
+        uint256 toLoanIdx = lpInfo.toLoanIdx == 0
+            ? loanIdx - 1
+            : lpInfo.toLoanIdx;
+        aggregateClaims(lpInfo.fromLoanIdx, toLoanIdx);
+        _claimFromAggregated(_claimant, lpInfo.fromLoanIdx, toLoanIdx);
+    }
+
     //including _fromLoanIdx and _toLoanIdx
-    function aggregateClaims(uint256 _fromLoanIdx, uint256 _toLoanIdx)
-        external
-        override
-    {
+    function aggregateClaims(uint256 _fromLoanIdx, uint256 _toLoanIdx) public {
         if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
         if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
             keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
         ];
-        if (aggClaimsInfo.repayments > 0 || aggClaimsInfo.collateral > 0)
-            revert AggregatedAlready();
-        uint256 repayments;
-        uint256 collateral;
-        uint256 numDefaults;
-        LoanInfo memory loanInfo;
-        for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ) {
-            loanInfo = loanIdxToLoanInfo[i];
-            if (loanInfo.repaid) {
-                repayments +=
-                    (loanInfo.repayment * BASE) /
-                    loanInfo.totalLpShares;
-            } else if (loanInfo.expiry < block.timestamp) {
-                collateral +=
-                    (loanInfo.collateral * BASE) /
-                    loanInfo.totalLpShares;
-                numDefaults += 1;
-            } else {
-                revert CannotAggregateWithUnsettledLoan();
+        if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0) {
+            uint256 repayments;
+            uint256 collateral;
+            uint256 numDefaults;
+            LoanInfo memory loanInfo;
+            for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ) {
+                loanInfo = loanIdxToLoanInfo[i];
+                if (loanInfo.repaid) {
+                    repayments +=
+                        (loanInfo.repayment * BASE) /
+                        loanInfo.totalLpShares;
+                } else if (loanInfo.expiry < block.timestamp) {
+                    collateral +=
+                        (loanInfo.collateral * BASE) /
+                        loanInfo.totalLpShares;
+                    numDefaults += 1;
+                } else {
+                    revert CannotAggregateWithUnsettledLoan();
+                }
+                unchecked {
+                    i++;
+                }
             }
-            unchecked {
-                i++;
-            }
+            aggClaimsInfo.repayments = uint128(repayments);
+            aggClaimsInfo.collateral = uint128(collateral);
+            loanIdxRangeToAggClaimsInfo[
+                keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
+            ] = aggClaimsInfo;
+            emit AggregateClaims(
+                _fromLoanIdx,
+                _toLoanIdx,
+                repayments,
+                collateral,
+                numDefaults
+            );
         }
-        aggClaimsInfo.repayments = uint128(repayments);
-        aggClaimsInfo.collateral = uint128(collateral);
-        loanIdxRangeToAggClaimsInfo[
-            keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
-        ] = aggClaimsInfo;
-        emit AggregateClaims(
-            _fromLoanIdx,
-            _toLoanIdx,
-            repayments,
-            collateral,
-            numDefaults
-        );
     }
 
-    //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external
         override
     {
-        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
+        _claimFromAggregated(msg.sender, _fromLoanIdx, _toLoanIdx);
+    }
+
+    //including _fromLoanIdx and _toLoanIdx
+    function _claimFromAggregated(
+        address _claimant,
+        uint256 _fromLoanIdx,
+        uint256 _toLoanIdx
+    ) internal {
+        LpInfo storage lpInfo = addrToLpInfo[_claimant];
         if (lpInfo.shares == 0) revert NothingToClaim();
         if (_fromLoanIdx < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
         if (lpInfo.toLoanIdx != 0 && _toLoanIdx >= lpInfo.toLoanIdx)
@@ -433,13 +462,13 @@ contract SubPoolV1 is ISubPoolV1 {
         lpInfo.fromLoanIdx = uint32(_toLoanIdx) + 1;
 
         if (repayments > 0) {
-            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+            IERC20Metadata(loanCcyToken).transfer(_claimant, repayments);
         }
         if (collateral > 0) {
             if (isEthColl()) {
-                payable(msg.sender).transfer(collateral);
+                payable(_claimant).transfer(collateral);
             } else {
-                IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+                IERC20Metadata(collCcyToken).transfer(_claimant, collateral);
             }
         }
         emit ClaimFromAggregated(
@@ -513,10 +542,21 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function setProtocolFee(uint128 _newFee) external {
-        require(msg.sender == TREASURY, "must have treasury as sender");
-        require(_newFee != protocolFee, "must have different _newFee");
-        require(_newFee <= MAX_PROTOCOL_FEE, "must be <= MAX_PROTOCOL_FEE");
+        if (msg.sender != TREASURY) revert UnauthorizedFeeUpdate();
+        if (_newFee == protocolFee) revert NewFeeMustBeDifferent();
+        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeToHigh();
         emit FeeUpdate(protocolFee, _newFee);
         protocolFee = _newFee;
+    }
+
+    function undust() external override {
+        if (totalLpShares > 0) revert CannotUndustWithActiveLps();
+        uint256 loanTokenBal = IERC20Metadata(loanCcyToken).balanceOf(
+            address(this)
+        );
+        if (loanTokenBal < totalLiquidity)
+            revert InsufficientBalanceForUndust();
+        totalLiquidity = 0;
+        IERC20Metadata(loanCcyToken).transfer(TREASURY, totalLiquidity);
     }
 }

@@ -416,7 +416,6 @@ describe("ETH-USDC SubPool Testing", function () {
       await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, {value: ONE_ETH});
       loanInfo = await subPool.loanIdxToLoanInfo(i+101);
       totalRepayments = totalRepayments.add(loanInfo[0]);
-      await subPool.connect(borrower).repay(i+101);
     }
 
     //move forward to loan expiry
@@ -440,7 +439,7 @@ describe("ETH-USDC SubPool Testing", function () {
     totalLiquidity = await subPool.totalLiquidity();
     totalLpShares = await subPool.totalLpShares();
 
-    await expect(totalLiquidity).to.be.equal(0);
+    await expect(totalLiquidity).to.be.equal("1000000");
     await expect(totalLpShares).to.be.equal(0);
     console.log("(2/2) balEth:", balEth);
     console.log("(2/2) balTestToken:", balTestToken);
@@ -496,10 +495,14 @@ describe("ETH-USDC SubPool Testing", function () {
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
 
-    //add liquidity again
+    //add liquidity with dust should fail
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+10);
+    await expect(subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000)).to.be.reverted;
+
+    //after undust add liquidity
+    await subPool.undust();
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000);
 
     totalLpShares = await subPool.totalLpShares();
     await expect(totalLpShares).to.be.equal(ONE_USDC.mul(500000));

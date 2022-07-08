@@ -72,10 +72,11 @@ interface ISubPoolV1 {
 
     function claim(uint256[] calldata _loanIdxs) external;
 
-    //including _fromLoanIdx and _toLoanIdx
-    function aggregateClaims(uint256 _fromLoanIdx, uint256 _toLoanIdx) external;
+    function claimOnBehalf(address _claimant) external;
 
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external;
+
+    function undust() external;
 }
