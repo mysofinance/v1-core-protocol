@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
+import {IWETH} from "./interfaces/IWETH.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     error LoanCcyCannotBeZeroAddress();
+    error CollCcyCannotBeZeroAddress();
     error CollAndLoanCcyCannoteBeEqual();
     error InvalidLoanTenor();
     error InvalidMaxLoanPerColl();
@@ -50,6 +52,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -110,6 +113,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _minLoan
     ) {
         if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
+        if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
         if (_collCcyToken == _loanCcyToken)
             revert CollAndLoanCcyCannoteBeEqual();
         if (_loanTenor < 86400) revert InvalidLoanTenor();
@@ -128,7 +132,7 @@ contract SubPoolV1 is ISubPoolV1 {
         tvl2 = _tvl2;
         minLoan = _minLoan;
         loanIdx = 1;
-        COLL_TOKEN_DECIMALS = _collCcyToken == address(0)
+        COLL_TOKEN_DECIMALS = _collCcyToken == WETH
             ? 18
             : IERC20Metadata(_collCcyToken).decimals();
         emit NewSubPool(
@@ -144,16 +148,17 @@ contract SubPoolV1 is ISubPoolV1 {
         );
     }
 
-    function isEthColl() internal view returns (bool) {
-        return collCcyToken == address(0);
+    function isEthPool() internal view returns (bool) {
+        return collCcyToken == WETH;
     }
 
-    function addLiquidity(uint128 _amount, uint256 _deadline)
-        external
-        override
-    {
-        uint256 timeStamp = block.timestamp;
-        if (timeStamp > _deadline) revert PastDeadline();
+    function addLiquidity(
+        uint128 _amount,
+        uint256 _deadline,
+        uint16 _referralCode
+    ) external override {
+        uint256 timestamp = block.timestamp;
+        if (timestamp > _deadline) revert PastDeadline();
         if (_amount == 0) revert InvalidAddAmount();
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         bool canAdd = lpInfo.activeLp
@@ -186,7 +191,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (lpInfo.toLoanIdx != 0) {
             lpInfo.toLoanIdx = 0;
         }
-        lpInfo.earliestRemove = uint32(timeStamp) + MIN_LPING_PERIOD;
+        lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
         lpInfo.activeLp = true;
 
         IERC20Metadata(loanCcyToken).transferFrom(
@@ -199,7 +204,8 @@ contract SubPoolV1 is ISubPoolV1 {
             newLpShares,
             totalLiquidity,
             totalLpShares,
-            lpInfo.earliestRemove
+            lpInfo.earliestRemove,
+            _referralCode
         );
     }
 
@@ -263,14 +269,70 @@ contract SubPoolV1 is ISubPoolV1 {
         uint128 _inAmount,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline
+        uint256 _deadline,
+        uint16 _referralCode
     ) external payable override {
-        uint256 timeStamp = block.timestamp;
-        if (timeStamp > _deadline) revert PastDeadline();
-        if (
-            (isEthColl() && _inAmount != msg.value) ||
-            (!isEthColl() && msg.value != 0)
-        ) revert InconsistentMsgValue();
+        bool wrapToWeth = isEthPool() && _inAmount == 0 && msg.value > 0;
+        {
+            bool isWeth = isEthPool() && _inAmount > 0 && msg.value == 0;
+            bool isErc20 = !isEthPool() && _inAmount > 0 && msg.value == 0;
+            if (!wrapToWeth && !isWeth && !isErc20)
+                revert InconsistentMsgValue();
+        }
+        uint128 inAmount = wrapToWeth ? uint128(msg.value) : _inAmount;
+        (
+            uint128 pledgeAmount,
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint32 expiry,
+            uint128 fee
+        ) = _borrow(inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
+        if (wrapToWeth) {
+            IWETH(collCcyToken).deposit{value: inAmount}();
+        } else {
+            IERC20Metadata(collCcyToken).transferFrom(
+                msg.sender,
+                address(this),
+                pledgeAmount - fee
+            );
+        }
+        if (fee > 0) {
+            IERC20Metadata(collCcyToken).transferFrom(
+                msg.sender,
+                TREASURY,
+                fee
+            );
+        }
+
+        IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
+        emit Borrow(
+            loanIdx - 1,
+            pledgeAmount,
+            loanAmount,
+            repaymentAmount,
+            expiry,
+            fee,
+            _referralCode
+        );
+    }
+
+    function _borrow(
+        uint128 _inAmount,
+        uint128 _minLoanLimit,
+        uint128 _maxRepayLimit,
+        uint256 _deadline
+    )
+        internal
+        returns (
+            uint128,
+            uint128,
+            uint128,
+            uint32,
+            uint128
+        )
+    {
+        uint256 timestamp = block.timestamp;
+        if (timestamp > _deadline) revert PastDeadline();
         (
             uint128 loanAmount,
             uint128 repaymentAmount,
@@ -284,7 +346,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         LoanInfo memory loanInfo;
-        loanInfo.expiry = uint32(timeStamp) + LOAN_TENOR;
+        loanInfo.expiry = uint32(timestamp) + LOAN_TENOR;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.repayment = repaymentAmount;
         loanInfo.collateral = pledgeAmount;
@@ -295,26 +357,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
         uint128 fee = _inAmount - pledgeAmount;
         totalFees += fee;
-        if (!isEthColl()) {
-            IERC20Metadata(collCcyToken).transferFrom(
-                msg.sender,
-                address(this),
-                pledgeAmount - fee
-            );
-            if (fee > 0) {
-                IERC20Metadata(collCcyToken).transferFrom(
-                    msg.sender,
-                    TREASURY,
-                    fee
-                );
-            }
-        } else if (fee > 0) {
-            payable(TREASURY).transfer(fee);
-        }
-        IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
-
-        emit Borrow(
-            loanIdx - 1,
+        return (
             pledgeAmount,
             loanAmount,
             repaymentAmount,
@@ -338,15 +381,73 @@ contract SubPoolV1 is ISubPoolV1 {
             address(this),
             loanInfo.repayment
         );
-        if (isEthColl()) {
-            payable(msg.sender).transfer(loanInfo.collateral);
-        } else {
-            IERC20Metadata(collCcyToken).transfer(
-                msg.sender,
-                loanInfo.collateral
-            );
-        }
+        IERC20Metadata(collCcyToken).transfer(msg.sender, loanInfo.collateral);
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
+    }
+
+    function rollover(
+        uint256 _loanIdx,
+        uint128 _minLoanLimit,
+        uint128 _maxRepayLimit,
+        uint256 _deadline,
+        uint16 _referralCode
+    ) external override {
+        if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
+        if (loanIdxToBorrower[_loanIdx] != msg.sender)
+            revert UnauthorizedRepay();
+        LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
+        {
+            uint256 timestamp = block.timestamp;
+            if (timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
+            if (loanInfo.repaid) revert AlreadyRepaid();
+            if (timestamp == loanInfo.expiry - LOAN_TENOR)
+                revert CannotRepayInSameBlock();
+        }
+        (
+            uint128 pledgeAmount,
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint32 expiry,
+            uint128 fee
+        ) = _borrow(
+                loanInfo.collateral,
+                _minLoanLimit,
+                _maxRepayLimit,
+                _deadline
+            );
+        {
+            loanInfo.repaid = true;
+            LoanInfo memory loanInfoNew;
+            loanInfoNew.expiry = expiry;
+            loanInfoNew.totalLpShares = totalLpShares;
+            loanInfoNew.repayment = repaymentAmount;
+            loanInfoNew.collateral = pledgeAmount;
+            loanIdxToLoanInfo[loanIdx] = loanInfoNew;
+            loanIdxToBorrower[loanIdx] = msg.sender;
+            IERC20Metadata(loanCcyToken).transferFrom(
+                msg.sender,
+                address(this),
+                loanInfo.repayment - loanAmount
+            );
+            if (fee > 0) {
+                IERC20Metadata(collCcyToken).transferFrom(
+                    msg.sender,
+                    TREASURY,
+                    fee
+                );
+            }
+        }
+        emit Roll(
+            _loanIdx,
+            loanIdx - 1,
+            pledgeAmount,
+            loanInfo.repayment - loanAmount,
+            loanInfo.repayment,
+            repaymentAmount,
+            loanInfo.expiry,
+            expiry,
+            _referralCode
+        );
     }
 
     function claim(uint256[] calldata _loanIdxs) external override {
@@ -371,22 +472,9 @@ contract SubPoolV1 is ISubPoolV1 {
             IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
         }
         if (collateral > 0) {
-            if (isEthColl()) {
-                payable(msg.sender).transfer(collateral);
-            } else {
-                IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
-            }
+            IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
         }
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
-    }
-
-    function claimOnBehalf(address _claimant) external override {
-        LpInfo memory lpInfo = addrToLpInfo[_claimant];
-        uint256 toLoanIdx = lpInfo.toLoanIdx == 0
-            ? loanIdx - 1
-            : lpInfo.toLoanIdx;
-        aggregateClaims(lpInfo.fromLoanIdx, toLoanIdx);
-        _claimFromAggregated(_claimant, lpInfo.fromLoanIdx, toLoanIdx);
     }
 
     //including _fromLoanIdx and _toLoanIdx
@@ -435,20 +523,12 @@ contract SubPoolV1 is ISubPoolV1 {
         }
     }
 
+    //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external
         override
     {
-        _claimFromAggregated(msg.sender, _fromLoanIdx, _toLoanIdx);
-    }
-
-    //including _fromLoanIdx and _toLoanIdx
-    function _claimFromAggregated(
-        address _claimant,
-        uint256 _fromLoanIdx,
-        uint256 _toLoanIdx
-    ) internal {
-        LpInfo storage lpInfo = addrToLpInfo[_claimant];
+        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToClaim();
         if (_fromLoanIdx < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
         if (lpInfo.toLoanIdx != 0 && _toLoanIdx >= lpInfo.toLoanIdx)
@@ -462,14 +542,10 @@ contract SubPoolV1 is ISubPoolV1 {
         lpInfo.fromLoanIdx = uint32(_toLoanIdx) + 1;
 
         if (repayments > 0) {
-            IERC20Metadata(loanCcyToken).transfer(_claimant, repayments);
+            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
         }
         if (collateral > 0) {
-            if (isEthColl()) {
-                payable(_claimant).transfer(collateral);
-            } else {
-                IERC20Metadata(collCcyToken).transfer(_claimant, collateral);
-            }
+            IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
         }
         emit ClaimFromAggregated(
             _fromLoanIdx,

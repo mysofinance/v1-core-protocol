@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity 0.8.15;
 
 interface ISubPoolV1 {
     event NewSubPool(
@@ -19,7 +19,8 @@ interface ISubPoolV1 {
         uint256 newLpShares,
         uint256 totalLiquidity,
         uint256 totalLpShares,
-        uint256 earliestRemove
+        uint256 earliestRemove,
+        uint16 referralCode
     );
     event RemoveLiquidity(
         uint256 amount,
@@ -33,7 +34,19 @@ interface ISubPoolV1 {
         uint256 loanAmount,
         uint256 repaymentAmount,
         uint256 expiry,
-        uint256 fee
+        uint256 fee,
+        uint16 referralCode
+    );
+    event Roll(
+        uint256 oldLoanIdx,
+        uint256 newLoanIdx,
+        uint256 collateral,
+        uint256 refinancingCost,
+        uint256 oldRepaymentAmount,
+        uint256 newRepaymentAmount,
+        uint256 oldExpiry,
+        uint256 newExpiry,
+        uint16 referralCode
     );
     event AggregateClaims(
         uint256 fromLoanIdx,
@@ -57,7 +70,11 @@ interface ISubPoolV1 {
     event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
 
-    function addLiquidity(uint128 _amount, uint256 _deadline) external;
+    function addLiquidity(
+        uint128 _amount,
+        uint256 _deadline,
+        uint16 _referralCode
+    ) external;
 
     function removeLiquidity() external;
 
@@ -65,14 +82,21 @@ interface ISubPoolV1 {
         uint128 _pledgeAmount,
         uint128 _minLoan,
         uint128 _maxRepay,
-        uint256 _deadline
+        uint256 _deadline,
+        uint16 _referralCode
     ) external payable;
 
     function repay(uint256 _loanIdx) external;
 
-    function claim(uint256[] calldata _loanIdxs) external;
+    function rollover(
+        uint256 _loanIdx,
+        uint128 _minLoanLimit,
+        uint128 _maxRepayLimit,
+        uint256 _deadline,
+        uint16 _referralCode
+    ) external;
 
-    function claimOnBehalf(address _claimant) external;
+    function claim(uint256[] calldata _loanIdxs) external;
 
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)

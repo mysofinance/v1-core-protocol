@@ -1,6 +1,9 @@
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-contract-sizer");
 require("hardhat-gas-reporter");
+require("dotenv").config();
+
+const { ALCHEMY_API_KEY } = process.env
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -19,5 +22,14 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: "0.8.4",
+  solidity: "0.8.15",
+  networks: {
+    hardhat: {
+      chainId: 31337,
+      forking: {
+        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+        blockNumber: 14000000
+      }
+    }
+  }
 };
