@@ -3,10 +3,13 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
+    using SafeERC20 for IERC20Metadata;
+
     error LoanCcyCannotBeZeroAddress();
     error CollCcyCannotBeZeroAddress();
     error CollAndLoanCcyCannoteBeEqual();
@@ -198,13 +201,13 @@ contract SubPoolV1 is ISubPoolV1 {
         lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
         lpInfo.activeLp = true;
 
-        IERC20Metadata(loanCcyToken).transferFrom(
+        IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
             _amount
         );
         if (dust > 0) {
-            IERC20Metadata(loanCcyToken).transfer(TREASURY, dust);
+            IERC20Metadata(loanCcyToken).safeTransfer(TREASURY, dust);
         }
         emit AddLiquidity(
             _amount,
@@ -229,7 +232,7 @@ contract SubPoolV1 is ISubPoolV1 {
         lpInfo.toLoanIdx = uint32(loanIdx);
         lpInfo.activeLp = false;
 
-        IERC20Metadata(loanCcyToken).transfer(msg.sender, liquidityRemoved);
+        IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
         emit RemoveLiquidity(
             liquidityRemoved,
             lpInfo.shares,
@@ -299,21 +302,21 @@ contract SubPoolV1 is ISubPoolV1 {
         if (wrapToWeth) {
             IWETH(collCcyToken).deposit{value: inAmount}();
         } else {
-            IERC20Metadata(collCcyToken).transferFrom(
+            IERC20Metadata(collCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
                 pledgeAmount - fee
             );
         }
         if (fee > 0) {
-            IERC20Metadata(collCcyToken).transferFrom(
+            IERC20Metadata(collCcyToken).safeTransferFrom(
                 msg.sender,
                 TREASURY,
                 fee
             );
         }
 
-        IERC20Metadata(loanCcyToken).transfer(msg.sender, loanAmount);
+        IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
         emit Borrow(
             loanIdx - 1,
             pledgeAmount,
@@ -384,12 +387,15 @@ contract SubPoolV1 is ISubPoolV1 {
         if (block.timestamp == loanInfo.expiry - LOAN_TENOR)
             revert CannotRepayInSameBlock();
         loanInfo.repaid = true;
-        IERC20Metadata(loanCcyToken).transferFrom(
+        IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
             loanInfo.repayment
         );
-        IERC20Metadata(collCcyToken).transfer(msg.sender, loanInfo.collateral);
+        IERC20Metadata(collCcyToken).safeTransfer(
+            msg.sender,
+            loanInfo.collateral
+        );
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
@@ -432,13 +438,13 @@ contract SubPoolV1 is ISubPoolV1 {
             loanInfoNew.collateral = pledgeAmount;
             loanIdxToLoanInfo[loanIdx] = loanInfoNew;
             loanIdxToBorrower[loanIdx] = msg.sender;
-            IERC20Metadata(loanCcyToken).transferFrom(
+            IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
                 loanInfo.repayment - loanAmount
             );
             if (fee > 0) {
-                IERC20Metadata(collCcyToken).transferFrom(
+                IERC20Metadata(collCcyToken).safeTransferFrom(
                     msg.sender,
                     TREASURY,
                     fee
@@ -477,10 +483,10 @@ contract SubPoolV1 is ISubPoolV1 {
         lpInfo.fromLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
 
         if (repayments > 0) {
-            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
         }
         if (collateral > 0) {
-            IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+            IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
         }
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
@@ -550,10 +556,10 @@ contract SubPoolV1 is ISubPoolV1 {
         lpInfo.fromLoanIdx = uint32(_toLoanIdx) + 1;
 
         if (repayments > 0) {
-            IERC20Metadata(loanCcyToken).transfer(msg.sender, repayments);
+            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
         }
         if (collateral > 0) {
-            IERC20Metadata(collCcyToken).transfer(msg.sender, collateral);
+            IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
         }
         emit ClaimFromAggregated(
             _fromLoanIdx,
