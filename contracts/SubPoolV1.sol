@@ -22,8 +22,8 @@ contract SubPoolV1 is ISubPoolV1 {
     error InvalidAddAmount();
     error CannotAddWhileActiveOrWithOpenClaims();
     error CannotAddWithZeroLiquidityAndOtherLps();
-    error TooSmallAddForRepayClaim();
-    error TooSmallAddForCollClaim();
+    error TooBigAddToLaterClaimOnRepay();
+    error TooBigAddToLaterClaimColl();
     error NothingToRemove();
     error BeforeEarliestRemove();
     error MustBeActiveLp();
@@ -61,7 +61,7 @@ contract SubPoolV1 is ISubPoolV1 {
     uint8 immutable COLL_TOKEN_DECIMALS;
 
     uint256 constant BASE = 10**18;
-    uint256 constant MIN_LIQUIDITY = 10**6;
+    uint256 constant MIN_LIQUIDITY = 100 * 10**6;
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
     address public immutable loanCcyToken;
@@ -124,7 +124,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_tvl2 <= _tvl1 || _tvl1 == 0) revert InvalidTvlParams();
         if (_minLoan == 0) revert InvalidMinLoan();
-        assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY < _minLoan);
+        assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -185,13 +185,13 @@ contract SubPoolV1 is ISubPoolV1 {
         }
         totalLpShares += newLpShares;
         if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
-            revert TooSmallAddForRepayClaim();
+            revert TooBigAddToLaterClaimOnRepay();
         if (
             ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
                 totalLpShares) *
                 newLpShares ==
             0
-        ) revert TooSmallAddForCollClaim();
+        ) revert TooBigAddToLaterClaimColl();
         totalLiquidity += _amount;
         lpInfo.shares = newLpShares;
         lpInfo.fromLoanIdx = uint32(loanIdx);

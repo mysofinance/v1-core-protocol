@@ -14,9 +14,10 @@ describe("ETH-USDC SubPool Testing", function () {
   const _tvl1 = ONE_USDC.mul(100000);
   const _tvl2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(300);
+  const MIN_LIQUIDITY = ONE_USDC.mul(100);
 
   beforeEach( async () => {
-    [deployer, lp1, lp2, lp3, lp4, borrower, ...addrs] = await ethers.getSigners();
+    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
 
     TestToken = await ethers.getContractFactory("TestToken");
     TestToken = await TestToken.connect(deployer);
@@ -25,11 +26,12 @@ describe("ETH-USDC SubPool Testing", function () {
 
     WETH = await ethers.getContractAt("IWETH", _collCcyToken);
 
-    await testToken.connect(deployer).mint(lp1.address, ONE_USDC.mul(1000000));
-    await testToken.connect(deployer).mint(lp2.address, ONE_USDC.mul(1000000));
-    await testToken.connect(deployer).mint(lp3.address, ONE_USDC.mul(1000000));
-    await testToken.connect(deployer).mint(lp4.address, ONE_USDC.mul(1000000));
-    await testToken.connect(deployer).mint(borrower.address, ONE_USDC.mul(1000000));
+    await testToken.connect(deployer).mint(lp1.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await testToken.connect(deployer).mint(lp2.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await testToken.connect(deployer).mint(lp3.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await testToken.connect(deployer).mint(lp4.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await testToken.connect(deployer).mint(lp5.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await testToken.connect(deployer).mint(borrower.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
     SubPool = await ethers.getContractFactory("SubPoolV1");
     SubPool = await SubPool.connect(deployer);
@@ -37,11 +39,12 @@ describe("ETH-USDC SubPool Testing", function () {
     subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan);
     await subPool.deployed();
 
-    testToken.connect(lp1).approve(subPool.address, ONE_USDC.mul(1000000));
-    testToken.connect(lp2).approve(subPool.address, ONE_USDC.mul(1000000));
-    testToken.connect(lp3).approve(subPool.address, ONE_USDC.mul(1000000));
-    testToken.connect(lp4).approve(subPool.address, ONE_USDC.mul(1000000));
-    testToken.connect(borrower).approve(subPool.address, ONE_USDC.mul(1000000));
+    testToken.connect(lp1).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    testToken.connect(lp2).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    testToken.connect(lp3).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    testToken.connect(lp4).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    testToken.connect(lp5).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    testToken.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
   });
   
   it("Should have correct initial values", async function () {
@@ -441,7 +444,7 @@ describe("ETH-USDC SubPool Testing", function () {
     totalLiquidity = await subPool.totalLiquidity();
     totalLpShares = await subPool.totalLpShares();
 
-    await expect(totalLiquidity).to.be.equal("1000000");
+    await expect(totalLiquidity).to.be.equal(MIN_LIQUIDITY);
     await expect(totalLpShares).to.be.equal(0);
     console.log("(2/2) balEth:", balEth);
     console.log("(2/2) balTestToken:", balTestToken);
@@ -504,7 +507,7 @@ describe("ETH-USDC SubPool Testing", function () {
 
     //check dust was transferred to treasury
     balTreasury = await testToken.balanceOf("0x0000000000000000000000000000000000000001");
-    await expect(balTreasury).to.be.equal(ONE_USDC);
+    await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
     totalLpShares = await subPool.totalLpShares();
@@ -512,7 +515,6 @@ describe("ETH-USDC SubPool Testing", function () {
   })
 
   it("Should never fall below MIN_LIQUIDITY", async function () {
-    MIN_LIQUIDITY = ONE_USDC;
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1001), timestamp+10, 0);
@@ -550,5 +552,78 @@ describe("ETH-USDC SubPool Testing", function () {
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
     actRollCost = balTestTokenPre.sub(balTestTokenPost);
     expect(expRollCost).to.be.equal(actRollCost);
+  })
+  
+  it("Shouldn't overflow even after multiple rounds of huge initial LPing with subsequent close-to pool depletion", async function () {
+    //large borrow
+    await ethers.provider.send("hardhat_setBalance", [
+      borrower.address,
+      "0x204FCE5E3E25026110000000",
+    ]);
+
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    pledgeAmount = ONE_ETH.mul(120000000);
+
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
+    loanTerms = await subPool.loanTerms(pledgeAmount);
+    console.log(loanTerms)
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: pledgeAmount});
+    loanInfo = await subPool.loanIdxToLoanInfo(1);
+
+    totalLiquidity = await subPool.totalLiquidity();
+    totalLpShares = await subPool.totalLpShares();
+    console.log(loanInfo)
+    console.log(totalLiquidity)
+    console.log(totalLpShares)
+
+    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
+    loanTerms = await subPool.loanTerms(pledgeAmount);
+    console.log(loanTerms)
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: pledgeAmount});
+    loanInfo = await subPool.loanIdxToLoanInfo(2);
+
+    totalLiquidity = await subPool.totalLiquidity();
+    totalLpShares = await subPool.totalLpShares();
+    console.log(loanInfo)
+    console.log(totalLiquidity)
+    console.log(totalLpShares)
+
+    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
+    loanTerms = await subPool.loanTerms(pledgeAmount);
+    console.log(loanTerms)
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: pledgeAmount});
+    loanInfo = await subPool.loanIdxToLoanInfo(3);
+
+    totalLiquidity = await subPool.totalLiquidity();
+    totalLpShares = await subPool.totalLpShares();
+    console.log(loanInfo)
+    console.log(totalLiquidity)
+    console.log(totalLpShares)
+
+    await subPool.connect(lp4).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
+    loanTerms = await subPool.loanTerms(pledgeAmount);
+    console.log(loanTerms)
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: pledgeAmount});
+    loanInfo = await subPool.loanIdxToLoanInfo(4);
+
+    totalLiquidity = await subPool.totalLiquidity();
+    totalLpShares = await subPool.totalLpShares();
+    console.log(loanInfo)
+    console.log(totalLiquidity)
+    console.log(totalLpShares)
+
+
+    await subPool.connect(lp5).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
+    loanTerms = await subPool.loanTerms(pledgeAmount);
+    console.log(loanTerms)
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: pledgeAmount});
+    loanInfo = await subPool.loanIdxToLoanInfo(5);
+
+    totalLiquidity = await subPool.totalLiquidity();
+    totalLpShares = await subPool.totalLpShares();
+    console.log(loanInfo)
+    console.log(totalLiquidity)
+    console.log(totalLpShares)
   })
 });
