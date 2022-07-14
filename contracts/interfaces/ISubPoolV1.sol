@@ -88,7 +88,7 @@ interface ISubPoolV1 {
 
     function repay(uint256 _loanIdx) external;
 
-    function rollover(
+    function rollOver(
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
@@ -101,6 +101,4 @@ interface ISubPoolV1 {
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
         external;
-
-    function undust() external;
 }

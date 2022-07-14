@@ -497,16 +497,58 @@ describe("ETH-USDC SubPool Testing", function () {
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
 
-    //add liquidity with dust should fail
+    //add liquidity with dust should automatically transfer
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await expect(subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000, 0)).to.be.reverted;
-
-    //after undust add liquidity
-    await subPool.undust();
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000, 0);
 
+    //check dust was transferred to treasury
+    balTreasury = await testToken.balanceOf("0x0000000000000000000000000000000000000001");
+    await expect(balTreasury).to.be.equal(ONE_USDC);
+
+    //check lp shares
     totalLpShares = await subPool.totalLpShares();
     await expect(totalLpShares).to.be.equal(ONE_USDC.mul(500000));
+  })
+
+  it("Should never fall below MIN_LIQUIDITY", async function () {
+    MIN_LIQUIDITY = ONE_USDC;
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1001), timestamp+10, 0);
+
+    //large borrow
+    await ethers.provider.send("hardhat_setBalance", [
+      borrower.address,
+      "0x152D02C7E14AF6800000",
+    ]);
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: ONE_ETH.mul(10000)});
+    
+    //check total liquidity & balance
+    totalLiquidity = await subPool.totalLiquidity();
+    balance = await testToken.balanceOf(subPool.address);
+    console.log("totalLiquidity:", totalLiquidity);
+    console.log("balance:", balance)
+    expect(totalLiquidity).to.be.equal(balance);
+    expect(totalLiquidity).to.be.gte(MIN_LIQUIDITY);
+  })
+
+  it("Should allow rolling over loan", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+10, 0);
+
+    pledgeAmount = ONE_ETH;
+    await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: pledgeAmount});
+    loanInfo = await subPool.loanIdxToLoanInfo(1);
+
+    loanTerms = await subPool.loanTerms(pledgeAmount);
+    balTestTokenPre = await testToken.balanceOf(borrower.address);
+    await subPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0);
+    balTestTokenPost = await testToken.balanceOf(borrower.address);
+
+    expRollCost = loanInfo.repayment.sub(loanTerms[0]);
+    actRollCost = balTestTokenPre.sub(balTestTokenPost);
+    expect(expRollCost).to.be.equal(actRollCost);
   })
 });

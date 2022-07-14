@@ -17,12 +17,13 @@ contract SubPoolV1 is ISubPoolV1 {
     error InvalidMinLoan();
     error PastDeadline();
     error InvalidAddAmount();
-    error CannotAddWithUnclaimedDust();
+    error CannotAddWhileActiveOrWithOpenClaims();
     error CannotAddWithZeroLiquidityAndOtherLps();
     error TooSmallAddForRepayClaim();
     error TooSmallAddForCollClaim();
     error NothingToRemove();
     error BeforeEarliestRemove();
+    error MustBeActiveLp();
     error InconsistentMsgValue();
     error InsufficientLiquidity();
     error InvalidPledgeAmount();
@@ -48,7 +49,6 @@ contract SubPoolV1 is ISubPoolV1 {
     error NewFeeMustBeDifferent();
     error NewFeeToHigh();
     error CannotUndustWithActiveLps();
-    error InsufficientBalanceForUndust();
 
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
@@ -121,7 +121,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_tvl2 <= _tvl1 || _tvl1 == 0) revert InvalidTvlParams();
         if (_minLoan == 0) revert InvalidMinLoan();
-
+        assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY < _minLoan);
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -159,19 +159,23 @@ contract SubPoolV1 is ISubPoolV1 {
     ) external override {
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        if (_amount == 0) revert InvalidAddAmount();
+        if (_amount < MIN_LIQUIDITY || _amount + totalLiquidity < minLoan)
+            revert InvalidAddAmount();
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        bool canAdd = lpInfo.activeLp
-            ? false
-            : lpInfo.toLoanIdx - lpInfo.fromLoanIdx == 0;
-        require(canAdd, "must be inactive without open claims");
+        if (
+            lpInfo.activeLp ||
+            (!lpInfo.activeLp && lpInfo.toLoanIdx - lpInfo.fromLoanIdx != 0)
+        ) revert CannotAddWhileActiveOrWithOpenClaims();
         uint128 newLpShares;
+        uint256 dust;
         if (totalLiquidity == 0 && totalLpShares == 0) {
             newLpShares = _amount;
         } else if (totalLiquidity > 0 && totalLpShares == 0) {
-            revert CannotAddWithUnclaimedDust();
+            dust = totalLiquidity;
+            totalLiquidity = 0;
+            newLpShares = _amount;
         } else {
-            //assert(!(totalLiquidity == 0 && totalLpShares > 0));
+            assert(totalLiquidity > 0 && totalLpShares > 0);
             newLpShares = uint128(
                 (uint256(_amount) * uint256(totalLpShares)) / totalLiquidity
             );
@@ -199,6 +203,9 @@ contract SubPoolV1 is ISubPoolV1 {
             address(this),
             _amount
         );
+        if (dust > 0) {
+            IERC20Metadata(loanCcyToken).transfer(TREASURY, dust);
+        }
         emit AddLiquidity(
             _amount,
             newLpShares,
@@ -214,7 +221,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (lpInfo.shares == 0) revert NothingToRemove();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
-        require(lpInfo.activeLp, "must be active lp");
+        if (!lpInfo.activeLp) revert MustBeActiveLp();
         uint256 liquidityRemoved = (lpInfo.shares *
             (totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
         totalLpShares -= lpInfo.shares;
@@ -242,10 +249,12 @@ contract SubPoolV1 is ISubPoolV1 {
     {
         uint256 fee = (_inAmount * protocolFee) / BASE;
         uint256 pledgeAmount = _inAmount - fee;
-        uint256 loanAmount = (pledgeAmount * maxLoanPerColl * totalLiquidity) /
+        uint256 loanAmount = (pledgeAmount *
+            maxLoanPerColl *
+            (totalLiquidity - MIN_LIQUIDITY)) /
             (pledgeAmount *
                 maxLoanPerColl +
-                totalLiquidity *
+                (totalLiquidity - MIN_LIQUIDITY) *
                 10**COLL_TOKEN_DECIMALS);
 
         uint256 rate;
@@ -338,8 +347,7 @@ contract SubPoolV1 is ISubPoolV1 {
             uint128 repaymentAmount,
             uint128 pledgeAmount
         ) = loanTerms(_inAmount);
-        if (totalLiquidity - loanAmount <= MIN_LIQUIDITY)
-            revert InsufficientLiquidity();
+        assert(totalLiquidity - loanAmount >= MIN_LIQUIDITY);
         if (pledgeAmount == 0) revert InvalidPledgeAmount();
         if (loanAmount < minLoan) revert TooSmallLoan();
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
@@ -385,7 +393,7 @@ contract SubPoolV1 is ISubPoolV1 {
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
-    function rollover(
+    function rollOver(
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
@@ -623,16 +631,5 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeToHigh();
         emit FeeUpdate(protocolFee, _newFee);
         protocolFee = _newFee;
-    }
-
-    function undust() external override {
-        if (totalLpShares > 0) revert CannotUndustWithActiveLps();
-        uint256 loanTokenBal = IERC20Metadata(loanCcyToken).balanceOf(
-            address(this)
-        );
-        if (loanTokenBal < totalLiquidity)
-            revert InsufficientBalanceForUndust();
-        totalLiquidity = 0;
-        IERC20Metadata(loanCcyToken).transfer(TREASURY, totalLiquidity);
     }
 }
