@@ -81,7 +81,7 @@ contract SubPoolV1 is ISubPoolV1 {
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
-    mapping(bytes32 => AggClaimsInfo) loanIdxRangeToAggClaimsInfo;
+    mapping(uint256 => mapping (uint256 => AggClaimsInfo)) loanIdxRangeToAggClaimsInfo;
 
     struct LpInfo {
         uint32 fromLoanIdx;
@@ -496,9 +496,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
         if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
         AggClaimsInfo memory aggClaimsInfo;
-        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
-            keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
-        ];
+        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0) {
             uint256 repayments;
             uint256 collateral;
@@ -524,9 +522,7 @@ contract SubPoolV1 is ISubPoolV1 {
             }
             aggClaimsInfo.repayments = uint128(repayments);
             aggClaimsInfo.collateral = uint128(collateral);
-            loanIdxRangeToAggClaimsInfo[
-                keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
-            ] = aggClaimsInfo;
+            loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx] = aggClaimsInfo;
             emit AggregateClaims(
                 _fromLoanIdx,
                 _toLoanIdx,
@@ -575,9 +571,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _shares
     ) public view returns (uint256, uint256) {
         AggClaimsInfo memory aggClaimsInfo;
-        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[
-            keccak256(abi.encodePacked(_fromLoanIdx, _toLoanIdx))
-        ];
+        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
             revert NothingAggregatedToClaim();
 
