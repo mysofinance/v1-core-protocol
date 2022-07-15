@@ -258,7 +258,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 100);
+    await subPool.connect(addrs[0]).aggregateClaims(1, 100, []);
 
     //lp1 claims individually
     preClaimBal = await testToken.balanceOf(lp1.address);
@@ -334,7 +334,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+    await subPool.connect(addrs[0]).aggregateClaims(1, 3, []);
 
     //lp1 claims
     console.log("totalRepayments", totalRepayments)
@@ -427,7 +427,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 200);
+    await subPool.connect(addrs[0]).aggregateClaims(1, 200, []);
     
     //claim
     await subPool.connect(lp1).claimFromAggregated(1, 200);
@@ -482,7 +482,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+    await subPool.connect(addrs[0]).aggregateClaims(1, 3, []);
     
     //claim
     await subPool.connect(lp1).claimFromAggregated(1, 3);
