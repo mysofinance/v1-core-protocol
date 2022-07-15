@@ -1,20 +1,21 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("WETH-USDC SubPool Testing", function () {
+describe("PAXG-USDC SubPool Testing", function () {
 
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
   const ONE_USDC = ethers.BigNumber.from("1000000");
-  const ONE_ETH = MONE;
-  const _collCcyToken = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+  const ONE_PAXG = MONE;
+  const _collCcyToken = "0x45804880De22913dAFE09f4980848ECE6EcbAf78";
   const _loanTenor = 86400;
-  const _maxLoanPerColl = ONE_USDC.mul(500);
+  const _maxLoanPerColl = ONE_USDC.mul(1000);
   const _r1 = MONE.mul(2).div(10)
   const _r2 = MONE.mul(2).div(100)
   const _tvl1 = ONE_USDC.mul(100000);
   const _tvl2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(300);
   const MIN_LIQUIDITY = ONE_USDC.mul(100);
+  const SUPPLY_CONTROLLER = "0xE25a329d385f77df5D4eD56265babe2b99A5436e";
 
   beforeEach( async () => {
     [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
@@ -24,9 +25,19 @@ describe("WETH-USDC SubPool Testing", function () {
     usdc = await USDC.deploy("USDC", "USDC", 6);
     const _loanCcyToken = usdc.address;
 
-    WETH = await ethers.getContractAt("IWETH", _collCcyToken);
+    PAXG = await ethers.getContractAt("IPAXG", _collCcyToken);
+    await ethers.provider.send("hardhat_setBalance", [
+      SUPPLY_CONTROLLER,
+      "0x56BC75E2D63100000",
+    ]);
+    await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [SUPPLY_CONTROLLER],
+    });
+    supplyController = await ethers.getSigner(SUPPLY_CONTROLLER);
 
-    await WETH.connect(borrower).deposit({value: ONE_ETH.mul(100)});
+    await PAXG.connect(supplyController).increaseSupply("800000000000000000000000000");
+    await PAXG.connect(supplyController).transfer(borrower.address, "800000000000000000000000000");
 
     await usdc.connect(deployer).mint(lp1.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     await usdc.connect(deployer).mint(lp2.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -41,7 +52,7 @@ describe("WETH-USDC SubPool Testing", function () {
     subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan);
     await subPool.deployed();
 
-    WETH.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    PAXG.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     usdc.connect(lp1).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     usdc.connect(lp2).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     usdc.connect(lp3).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -59,7 +70,7 @@ describe("WETH-USDC SubPool Testing", function () {
   });
 
   it("Should fail on loan terms without LPs", async function () {
-    await expect(subPool.loanTerms(ONE_ETH)).to.be.reverted;
+    await expect(subPool.loanTerms(ONE_PAXG)).to.be.reverted;
   });
 
   it("Should allow LPs to add liquidity", async function () {
@@ -79,20 +90,20 @@ describe("WETH-USDC SubPool Testing", function () {
     await expect(subPool.loanTerms(subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0))).to.be.reverted;
   });
 
-  it("Should allow borrowing with ETH", async function () {
+  it("Should allow borrowing with PAXG", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
     await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(10000), timestamp+60, 0);
     await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(100000), timestamp+60, 0);
 
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await subPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
   });
   
   it("Should not allow new LPs to claim on unentitled previous loans", async function () {
@@ -107,24 +118,24 @@ describe("WETH-USDC SubPool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
 
     //borrow & repay
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await subPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
     await subPool.connect(borrower).repay(1);
-
+    
     //borrow & repay
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await subPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
     await subPool.connect(borrower).repay(2);
 
     //borrow & default
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await subPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -160,11 +171,11 @@ describe("WETH-USDC SubPool Testing", function () {
 
     for (let i = 0; i < 7; i++) {
       totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
+      loanTerms = await subPool.loanTerms(ONE_PAXG);
       if(loanTerms[0].sub(_minLoan).gte(MONE.mul(0))) {
-        await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+        await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       } else {
-        await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
+        await expect(subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
         break;
       }
       console.log("totalLiquidity: ", totalLiquidity);
@@ -177,17 +188,17 @@ describe("WETH-USDC SubPool Testing", function () {
     await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
     for (let i = 0; i < 7; i++) {
       totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
+      loanTerms = await subPool.loanTerms(ONE_PAXG);
       if(loanTerms[0].sub(_minLoan).gte(MONE.mul(0))) {
-        await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+        await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       } else {
-        await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
+        await expect(subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
         break;
       }
       console.log("totalLiquidity: ", totalLiquidity);
       console.log("loanTerms: ", loanTerms);
     }
-    await expect(subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
+    await expect(subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
   });
 
   it("Should allow LPs to claim individually", async function () {
@@ -199,8 +210,8 @@ describe("WETH-USDC SubPool Testing", function () {
 
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+      loanTerms = await subPool.loanTerms(ONE_PAXG);
+      await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       await subPool.connect(borrower).repay(i+1);
     }
     loanIds = Array.from(Array(100), (_, index) => index + 1);
@@ -225,7 +236,7 @@ describe("WETH-USDC SubPool Testing", function () {
     totalRepayments = ethers.BigNumber.from(0);
     totalInterestCosts = ethers.BigNumber.from(0);
     preBorrBal = await usdc.balanceOf(borrower.address);
-    pledgeAmount = ONE_ETH.mul(2);
+    pledgeAmount = ONE_PAXG.mul(2);
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       //indicative repayment
@@ -304,20 +315,20 @@ describe("WETH-USDC SubPool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
     await subPool.connect(borrower).repay(1);
 
     //2nd borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
     await subPool.connect(borrower).repay(2);
 
     //3rd borrow & default
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
-    totalLeftColl = totalLeftColl.add(ONE_ETH);
+    await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    totalLeftColl = totalLeftColl.add(ONE_PAXG);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -328,13 +339,13 @@ describe("WETH-USDC SubPool Testing", function () {
 
     //lp1 claims
     console.log("totalRepayments", totalRepayments)
-    preClaimEthBal = await WETH.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
+    preClaimEthBal = await PAXG.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await usdc.balanceOf(lp1.address);
     await subPool.connect(lp1).claimFromAggregated(1, 3);
-    postClaimEthBal = await WETH.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
+    postClaimEthBal = await PAXG.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await usdc.balanceOf(lp1.address);
 
-    //WETH diffs
+    //PAXG diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
     expEthDiff = totalLeftColl.mul(5).div(10);
     pctEthDiff = expEthDiff.mul(10000).div(ethDiff)
@@ -349,13 +360,13 @@ describe("WETH-USDC SubPool Testing", function () {
 
     //lp2 claims
     console.log("totalRepayments", totalRepayments)
-    preClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
+    preClaimEthBal = await PAXG.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     preClaimTokenBal = await usdc.balanceOf(lp2.address);
     await subPool.connect(lp2).claimFromAggregated(1, 3);
-    postClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
+    postClaimEthBal = await PAXG.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     postClaimTokenBal = await usdc.balanceOf(lp2.address);
 
-    //ETH diffs
+    //PAXG diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
     expEthDiff = totalLeftColl.mul(3).div(10);
     pctEthDiff = expEthDiff.mul(10000).div(ethDiff)
@@ -370,13 +381,13 @@ describe("WETH-USDC SubPool Testing", function () {
 
     //lp3 claims
     console.log("totalRepayments", totalRepayments)
-    preClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
+    preClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await usdc.balanceOf(lp3.address);
     await subPool.connect(lp3).claimFromAggregated(1, 3);
-    postClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
+    postClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await usdc.balanceOf(lp3.address);
 
-    //ETH diffs
+    //PAXG diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
     expEthDiff = totalLeftColl.mul(2).div(10);
     pctEthDiff = expEthDiff.mul(10000).div(ethDiff)
@@ -400,14 +411,14 @@ describe("WETH-USDC SubPool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     for (let i = 0; i < 100; i++) {
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+      await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await subPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
       await subPool.connect(borrower).repay(i+1);
     }
 
     for (let i = 0; i < 100; i++) {
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+      await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await subPool.loanIdxToLoanInfo(i+101);
       totalRepayments = totalRepayments.add(loanInfo[0]);
     }
@@ -428,7 +439,7 @@ describe("WETH-USDC SubPool Testing", function () {
     await subPool.connect(lp2).removeLiquidity();
     await subPool.connect(lp3).removeLiquidity();
 
-    balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
+    balEth = await PAXG.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
     balTestToken = await usdc.balanceOf(subPool.address);
     totalLiquidity = await subPool.totalLiquidity();
     totalLpShares = await subPool.totalLpShares();
@@ -452,20 +463,20 @@ describe("WETH-USDC SubPool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
     await subPool.connect(borrower).repay(1);
 
     //2nd borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
     await subPool.connect(borrower).repay(2);
 
     //3rd borrow & default
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
-    totalLeftColl = totalLeftColl.add(ONE_ETH);
+    await subPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    totalLeftColl = totalLeftColl.add(ONE_PAXG);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -484,7 +495,7 @@ describe("WETH-USDC SubPool Testing", function () {
     await subPool.connect(lp2).removeLiquidity();
     await subPool.connect(lp3).removeLiquidity();
 
-    balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
+    balEth = await PAXG.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
     balTestToken = await usdc.balanceOf(subPool.address);
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
@@ -508,14 +519,7 @@ describe("WETH-USDC SubPool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1001), timestamp+60, 0);
 
-    //prepare large borrower
-    await ethers.provider.send("hardhat_setBalance", [
-      borrower.address,
-      "0x204FCE5E3E25026110000000",
-    ]);
-    await WETH.connect(borrower).deposit({value: "0x33B2E3C9FD0803CE8000000"});
-
-    await subPool.connect(borrower).borrow(ONE_ETH.mul(10000), 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(ONE_PAXG.mul(10000), 0, MONE, timestamp+1000000000, 0);
     
     //check total liquidity & balance
     totalLiquidity = await subPool.totalLiquidity();
@@ -531,7 +535,7 @@ describe("WETH-USDC SubPool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+60, 0);
 
-    pledgeAmount = ONE_ETH;
+    pledgeAmount = ONE_PAXG;
     await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
 
@@ -545,17 +549,10 @@ describe("WETH-USDC SubPool Testing", function () {
     expect(expRollCost).to.be.equal(actRollCost);
   })
   
-  it("Shouldn't overflow even after 5x rounds of LPing USDC 100mn and borrowing against 120,000,000 ETH", async function () {
-    //prepare large borrower
-    await ethers.provider.send("hardhat_setBalance", [
-      borrower.address,
-      "0x204FCE5E3E25026110000000",
-    ]);
-    await WETH.connect(borrower).deposit({value: "0x33B2E3C9FD0803CE8000000"});
-
+  it("Shouldn't overflow even after 5x rounds of LPing USDC 100mn and borrowing against 100,000,000 PAXG", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    pledgeAmount = ONE_ETH.mul(120000000);
+    pledgeAmount = ONE_PAXG.mul(100000000);
 
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await subPool.loanTerms(pledgeAmount);

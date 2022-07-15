@@ -19,19 +19,19 @@ describe("ETH-USDC SubPool Testing", function () {
   beforeEach( async () => {
     [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
 
-    TestToken = await ethers.getContractFactory("TestToken");
-    TestToken = await TestToken.connect(deployer);
-    testToken = await TestToken.deploy("USDC", "USDC", 6);
-    const _loanCcyToken = testToken.address;
+    USDC = await ethers.getContractFactory("USDC");
+    USDC = await USDC.connect(deployer);
+    usdc = await USDC.deploy("USDC", "USDC", 6);
+    const _loanCcyToken = usdc.address;
 
     WETH = await ethers.getContractAt("IWETH", _collCcyToken);
 
-    await testToken.connect(deployer).mint(lp1.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await testToken.connect(deployer).mint(lp2.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await testToken.connect(deployer).mint(lp3.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await testToken.connect(deployer).mint(lp4.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await testToken.connect(deployer).mint(lp5.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await testToken.connect(deployer).mint(borrower.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await usdc.connect(deployer).mint(lp1.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await usdc.connect(deployer).mint(lp2.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await usdc.connect(deployer).mint(lp3.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await usdc.connect(deployer).mint(lp4.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await usdc.connect(deployer).mint(lp5.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await usdc.connect(deployer).mint(borrower.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
     SubPool = await ethers.getContractFactory("SubPoolV1");
     SubPool = await SubPool.connect(deployer);
@@ -39,12 +39,12 @@ describe("ETH-USDC SubPool Testing", function () {
     subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan);
     await subPool.deployed();
 
-    testToken.connect(lp1).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    testToken.connect(lp2).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    testToken.connect(lp3).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    testToken.connect(lp4).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    testToken.connect(lp5).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    testToken.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    usdc.connect(lp1).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    usdc.connect(lp2).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    usdc.connect(lp3).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    usdc.connect(lp4).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    usdc.connect(lp5).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    usdc.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
   });
   
   it("Should have correct initial values", async function () {
@@ -234,7 +234,7 @@ describe("ETH-USDC SubPool Testing", function () {
     totalRepaymentsIndicative = ethers.BigNumber.from(0);
     totalRepayments = ethers.BigNumber.from(0);
     totalInterestCosts = ethers.BigNumber.from(0);
-    preBorrBal = await testToken.balanceOf(borrower.address);
+    preBorrBal = await usdc.balanceOf(borrower.address);
     pledgeAmount = ONE_ETH.mul(2);
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
@@ -254,17 +254,17 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect(totalRepaymentsIndicative).to.be.equal(totalRepayments);
     console.log("totalRepayments", totalRepayments)
     //total interest cost
-    postBorrBal = await testToken.balanceOf(borrower.address);
+    postBorrBal = await usdc.balanceOf(borrower.address);
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
     //aggregate claims
     await subPool.connect(addrs[0]).aggregateClaims(1, 100);
 
     //lp1 claims individually
-    preClaimBal = await testToken.balanceOf(lp1.address);
+    preClaimBal = await usdc.balanceOf(lp1.address);
     loanIds = Array.from(Array(100), (_, index) => index + 1);
     await subPool.connect(lp1).claim(loanIds);
-    postClaimBal = await testToken.balanceOf(lp1.address);
+    postClaimBal = await usdc.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
     pct = actClaim.mul(10000).div(actClaim)
@@ -275,9 +275,9 @@ describe("ETH-USDC SubPool Testing", function () {
     
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
-    preClaimBal = await testToken.balanceOf(lp2.address);
+    preClaimBal = await usdc.balanceOf(lp2.address);
     await subPool.connect(lp2).claimFromAggregated(1, 100);
-    postClaimBal = await testToken.balanceOf(lp2.address);
+    postClaimBal = await usdc.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
@@ -285,18 +285,18 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect(subPool.connect(lp2).claimFromAggregated(1, 100)).to.be.reverted;
 
     //lp3 claims
-    preClaimBal = await testToken.balanceOf(lp3.address);
+    preClaimBal = await usdc.balanceOf(lp3.address);
     await subPool.connect(lp3).claimFromAggregated(1,100);
-    postClaimBal = await testToken.balanceOf(lp3.address);
+    postClaimBal = await usdc.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
     pct = actClaim.mul(10000).div(actClaim)
     await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
 
     //lp4 claims
-    preClaimBal = await testToken.balanceOf(lp4.address);
+    preClaimBal = await usdc.balanceOf(lp4.address);
     await subPool.connect(lp4).claimFromAggregated(1,100);
-    postClaimBal = await testToken.balanceOf(lp4.address);
+    postClaimBal = await usdc.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
     pct = actClaim.mul(10000).div(actClaim)
@@ -339,10 +339,10 @@ describe("ETH-USDC SubPool Testing", function () {
     //lp1 claims
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
-    preClaimTokenBal = await testToken.balanceOf(lp1.address);
+    preClaimTokenBal = await usdc.balanceOf(lp1.address);
     await subPool.connect(lp1).claimFromAggregated(1, 3);
     postClaimEthBal = await WETH.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
-    postClaimTokenBal = await testToken.balanceOf(lp1.address);
+    postClaimTokenBal = await usdc.balanceOf(lp1.address);
 
     //WETH diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
@@ -360,10 +360,10 @@ describe("ETH-USDC SubPool Testing", function () {
     //lp2 claims
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
-    preClaimTokenBal = await testToken.balanceOf(lp2.address);
+    preClaimTokenBal = await usdc.balanceOf(lp2.address);
     await subPool.connect(lp2).claimFromAggregated(1, 3);
     postClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
-    postClaimTokenBal = await testToken.balanceOf(lp2.address);
+    postClaimTokenBal = await usdc.balanceOf(lp2.address);
 
     //ETH diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
@@ -381,10 +381,10 @@ describe("ETH-USDC SubPool Testing", function () {
     //lp3 claims
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
-    preClaimTokenBal = await testToken.balanceOf(lp3.address);
+    preClaimTokenBal = await usdc.balanceOf(lp3.address);
     await subPool.connect(lp3).claimFromAggregated(1, 3);
     postClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
-    postClaimTokenBal = await testToken.balanceOf(lp3.address);
+    postClaimTokenBal = await usdc.balanceOf(lp3.address);
 
     //ETH diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
@@ -439,7 +439,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp3).removeLiquidity();
 
     balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
-    balTestToken = await testToken.balanceOf(subPool.address);
+    balTestToken = await usdc.balanceOf(subPool.address);
     totalLiquidity = await subPool.totalLiquidity();
     totalLpShares = await subPool.totalLpShares();
 
@@ -495,7 +495,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp3).removeLiquidity();
 
     balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
-    balTestToken = await testToken.balanceOf(subPool.address);
+    balTestToken = await usdc.balanceOf(subPool.address);
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
 
@@ -505,7 +505,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000, 0);
 
     //check dust was transferred to treasury
-    balTreasury = await testToken.balanceOf("0x0000000000000000000000000000000000000001");
+    balTreasury = await usdc.balanceOf("0x0000000000000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
@@ -527,7 +527,7 @@ describe("ETH-USDC SubPool Testing", function () {
     
     //check total liquidity & balance
     totalLiquidity = await subPool.totalLiquidity();
-    balance = await testToken.balanceOf(subPool.address);
+    balance = await usdc.balanceOf(subPool.address);
     console.log("totalLiquidity:", totalLiquidity);
     console.log("balance:", balance)
     expect(totalLiquidity).to.be.equal(balance);
@@ -544,9 +544,9 @@ describe("ETH-USDC SubPool Testing", function () {
     loanInfo = await subPool.loanIdxToLoanInfo(1);
 
     loanTerms = await subPool.loanTerms(pledgeAmount);
-    balTestTokenPre = await testToken.balanceOf(borrower.address);
+    balTestTokenPre = await usdc.balanceOf(borrower.address);
     await subPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0);
-    balTestTokenPost = await testToken.balanceOf(borrower.address);
+    balTestTokenPost = await usdc.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
     actRollCost = balTestTokenPre.sub(balTestTokenPost);

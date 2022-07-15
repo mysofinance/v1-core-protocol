@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract TestToken is ERC20 {
+contract USDC is ERC20 {
     uint8 public _decimals;
     address public admin;
 

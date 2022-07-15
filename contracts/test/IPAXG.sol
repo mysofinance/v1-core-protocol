@@ -1,0 +1,7 @@
+pragma solidity 0.8.15;
+
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+interface IPAXG is IERC20Metadata {
+    function increaseSupply(uint256 _value) external returns (bool success);
+}
