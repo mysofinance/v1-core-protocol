@@ -535,7 +535,7 @@ describe("WETH-USDC SubPool Testing", function () {
     await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
 
-    loanTerms = await subPool.loanTerms(pledgeAmount);
+    loanTerms = await subPool.loanTerms(loanInfo.collateral);
     balTestTokenPre = await usdc.balanceOf(borrower.address);
     await subPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0);
     balTestTokenPost = await usdc.balanceOf(borrower.address);
