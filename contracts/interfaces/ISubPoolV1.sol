@@ -3,6 +3,20 @@
 pragma solidity 0.8.15;
 
 interface ISubPoolV1 {
+
+    struct LoanInfo {
+        uint128 repayment;
+        uint128 collateral;
+        uint128 totalLpShares;
+        uint32 expiry;
+        bool repaid;
+    }
+
+    struct AggClaimsInfo {
+        uint128 repayments;
+        uint128 collateral;
+    }
+
     event NewSubPool(
         address collCcyToken,
         address loanCcyToken,
@@ -100,4 +114,16 @@ interface ISubPoolV1 {
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(uint256 _fromLoanIdx, uint256[] calldata _endAggIdxs)
         external;
+
+    // function loanIdxToLoanInfo(uint256 loanIdx)
+    //     external
+    //     view
+    //     returns(LoanInfo memory _loanInfo);
+
+    function getLoanExpiry(uint256 _loanIdx) external view returns(uint32 expiry);
+
+    function getAggClaimInfo(uint256 startIndex, uint256 endIndex, bool isBase)
+        external
+        view
+        returns(AggClaimsInfo memory _claimInfo);
 }
