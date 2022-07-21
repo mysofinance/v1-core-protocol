@@ -8,6 +8,7 @@ import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {IPAXG} from "./interfaces/IPAXG.sol";
 import {IAggregation} from "./interfaces/IAggregation.sol";
+import "hardhat/console.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     using SafeERC20 for IERC20Metadata;
@@ -147,17 +148,17 @@ contract SubPoolV1 is ISubPoolV1 {
         COLL_TOKEN_DECIMALS = _collCcyToken == WETH
             ? 18
             : IERC20Metadata(_collCcyToken).decimals();
-        emit NewSubPool(
-            _loanCcyToken,
-            _collCcyToken,
-            _loanTenor,
-            _maxLoanPerColl,
-            _r1,
-            _r2,
-            _tvl1,
-            _tvl2,
-            _minLoan
-        );
+        // emit NewSubPool(
+        //     _loanCcyToken,
+        //     _collCcyToken,
+        //     _loanTenor,
+        //     _maxLoanPerColl,
+        //     _r1,
+        //     _r2,
+        //     _tvl1,
+        //     _tvl2,
+        //     _minLoan
+        // );
     }
 
     function isEthPool() internal view returns (bool) {
@@ -416,7 +417,7 @@ contract SubPoolV1 is ISubPoolV1 {
             msg.sender,
             loanInfo.collateral
         );
-        emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
+        //emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
     function rollOver(
@@ -514,7 +515,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (collateral > 0) {
             IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
         }
-        emit Claim(_loanIdxs, repayments, collateral, numDefaults);
+        //emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
     //including _startIndex and _endAggIdxs
@@ -654,6 +655,9 @@ contract SubPoolV1 is ISubPoolV1 {
         }
         lpInfo.fromLoanIdx = uint32(_endAggIdxs[_endAggIdxs.length - 1]) + 1;
 
+        console.log("Total Repayments %s", totalRepayments);
+        console.log("Total Collateral %s", totalCollateral);
+
         if (totalRepayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, totalRepayments);
         }
@@ -749,7 +753,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     //only owner or treasury modifier?
     function setAggregationAddr(address _aggregationAddr) external {
-        if(aggregationAddr != address(0)) revert AlreadySet();
+        //if(aggregationAddr != address(0)) revert AlreadySet();
         aggregationAddr = _aggregationAddr;
     }
 
