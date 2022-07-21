@@ -57,11 +57,12 @@ contract SubPoolV1 is ISubPoolV1 {
     error NewFeeMustBeDifferent();
     error NewFeeToHigh();
     error CannotUndustWithActiveLps();
+    error AlreadySet();
 
-    address public constant TREASURY =
+    address constant TREASURY =
         0x0000000000000000000000000000000000000001;
-    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
+    address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
     address aggregationAddr;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
@@ -71,7 +72,7 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 constant MIN_LIQUIDITY = 100 * 10**6;
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
-    address public immutable loanCcyToken;
+    address immutable loanCcyToken;
     uint128 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
     uint128 public protocolFee;
@@ -86,7 +87,7 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public totalFees;
 
     mapping(address => LpInfo) public addrToLpInfo;
-    mapping(uint256 => LoanInfo) loanIdxToLoanInfo;
+    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg;
     mapping(uint256 => mapping(uint256 => AggClaimsInfo)) loanIdxRangeToAggClaimsInfo;
@@ -476,17 +477,17 @@ contract SubPoolV1 is ISubPoolV1 {
                 );
             }
         }
-        emit Roll(
-            _loanIdx,
-            loanIdx - 1,
-            pledgeAmount,
-            loanInfo.repayment - loanAmount,
-            loanInfo.repayment,
-            repaymentAmount,
-            loanInfo.expiry,
-            expiry,
-            _referralCode
-        );
+        // emit Roll(
+        //     _loanIdx,
+        //     loanIdx - 1,
+        //     pledgeAmount,
+        //     loanInfo.repayment - loanAmount,
+        //     loanInfo.repayment,
+        //     repaymentAmount,
+        //     loanInfo.expiry,
+        //     expiry,
+        //     _referralCode
+        // );
     }
 
     function claim(uint256[] calldata _loanIdxs) external override {
@@ -746,7 +747,9 @@ contract SubPoolV1 is ISubPoolV1 {
         protocolFee = _newFee;
     }
 
+    //only owner or treasury modifier?
     function setAggregationAddr(address _aggregationAddr) external {
+        if(aggregationAddr != address(0)) revert AlreadySet();
         aggregationAddr = _aggregationAddr;
     }
 

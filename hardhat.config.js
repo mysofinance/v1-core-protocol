@@ -32,6 +32,9 @@ module.exports = {
       }
     }
   },
+  mocha: {
+    timeout: 1000000
+  },
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
