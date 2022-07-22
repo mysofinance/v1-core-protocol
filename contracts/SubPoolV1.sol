@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
+import {IPAXG} from "./interfaces/IPAXG.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     using SafeERC20 for IERC20Metadata;
@@ -30,6 +31,7 @@ contract SubPoolV1 is ISubPoolV1 {
     error InconsistentMsgValue();
     error InsufficientLiquidity();
     error InvalidPledgeAmount();
+    error InvalidPledgeAfterTransferFee();
     error TooSmallLoan();
     error LoanBelowLimit();
     error ErroneousLoanTerms();
@@ -56,6 +58,7 @@ contract SubPoolV1 is ISubPoolV1 {
     address public constant TREASURY =
         0x0000000000000000000000000000000000000001;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -299,23 +302,41 @@ contract SubPoolV1 is ISubPoolV1 {
             uint32 expiry,
             uint128 fee
         ) = _borrow(inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
-        if (wrapToWeth) {
-            IWETH(collCcyToken).deposit{value: inAmount}();
-        } else {
-            IERC20Metadata(collCcyToken).safeTransferFrom(
-                msg.sender,
-                address(this),
-                pledgeAmount - fee
-            );
-        }
-        if (fee > 0) {
-            IERC20Metadata(collCcyToken).safeTransferFrom(
-                msg.sender,
-                TREASURY,
-                fee
-            );
-        }
+        loanIdxToBorrower[loanIdx] = msg.sender;
+        LoanInfo memory loanInfo;
+        loanInfo.expiry = expiry;
+        loanInfo.totalLpShares = totalLpShares;
+        loanInfo.repayment = repaymentAmount;
+        totalLiquidity -= loanAmount;
+        totalFees += fee;
 
+        {
+            uint256 transferFee;
+            if (wrapToWeth) {
+                IWETH(collCcyToken).deposit{value: inAmount}();
+            } else {
+                if (collCcyToken == PAXG) {
+                    transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
+                }
+                if (pledgeAmount - uint128(transferFee) == 0)
+                    revert InvalidPledgeAfterTransferFee();
+                IERC20Metadata(collCcyToken).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    pledgeAmount
+                );
+            }
+            loanInfo.collateral = pledgeAmount - uint128(transferFee);
+            loanIdxToLoanInfo[loanIdx] = loanInfo;
+            loanIdx += 1;
+            if (fee > 0) {
+                IERC20Metadata(collCcyToken).safeTransferFrom(
+                    msg.sender,
+                    TREASURY,
+                    fee
+                );
+            }
+        }
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
         emit Borrow(
             loanIdx - 1,
@@ -335,6 +356,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline
     )
         internal
+        view
         returns (
             uint128,
             uint128,
@@ -356,23 +378,12 @@ contract SubPoolV1 is ISubPoolV1 {
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
-        LoanInfo memory loanInfo;
-        loanInfo.expiry = uint32(timestamp) + LOAN_TENOR;
-        loanInfo.totalLpShares = totalLpShares;
-        loanInfo.repayment = repaymentAmount;
-        loanInfo.collateral = pledgeAmount;
-        loanIdxToLoanInfo[loanIdx] = loanInfo;
-        loanIdxToBorrower[loanIdx] = msg.sender;
-        loanIdx += 1;
-        totalLiquidity -= loanAmount;
-
         uint128 fee = _inAmount - pledgeAmount;
-        totalFees += fee;
         return (
             pledgeAmount,
             loanAmount,
             repaymentAmount,
-            loanInfo.expiry,
+            uint32(timestamp) + LOAN_TENOR,
             fee
         );
     }
@@ -431,13 +442,17 @@ contract SubPoolV1 is ISubPoolV1 {
             );
         {
             loanInfo.repaid = true;
+            loanIdxToBorrower[loanIdx] = msg.sender;
             LoanInfo memory loanInfoNew;
             loanInfoNew.expiry = expiry;
             loanInfoNew.totalLpShares = totalLpShares;
             loanInfoNew.repayment = repaymentAmount;
             loanInfoNew.collateral = pledgeAmount;
             loanIdxToLoanInfo[loanIdx] = loanInfoNew;
-            loanIdxToBorrower[loanIdx] = msg.sender;
+            loanIdx += 1;
+            totalLiquidity -= loanAmount;
+            totalFees += fee;
+
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
