@@ -234,7 +234,7 @@ describe("WETH-USDC SubPool Testing", function () {
     totalInterestCosts = ethers.BigNumber.from(0);
     preBorrBal = await usdc.balanceOf(borrower.address);
     pledgeAmount = ONE_ETH.mul(2);
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 99; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       //indicative repayment
       loanTerms = await subPool.loanTerms(pledgeAmount);
@@ -256,11 +256,11 @@ describe("WETH-USDC SubPool Testing", function () {
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 100);
+    await expect(subPool.connect(addrs[0]).aggregateClaims(0, [99])).to.be.reverted;
 
     //lp1 claims individually
     preClaimBal = await usdc.balanceOf(lp1.address);
-    loanIds = Array.from(Array(100), (_, index) => index + 1);
+    loanIds = Array.from(Array(99), (_, index) => index + 1);
     await subPool.connect(lp1).claim(loanIds);
     postClaimBal = await usdc.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
@@ -269,22 +269,25 @@ describe("WETH-USDC SubPool Testing", function () {
     await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
 
     //cannot claim twice
-    await expect(subPool.connect(lp1).claimFromAggregated(1, 100)).to.be.reverted;
+    await expect(subPool.connect(lp1).claimFromAggregated(0, [99])).to.be.reverted;
+
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_mine");
     
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await usdc.balanceOf(lp2.address);
-    await subPool.connect(lp2).claimFromAggregated(1, 100);
+    await subPool.connect(lp2).claimFromAggregated(0, [99]);
     postClaimBal = await usdc.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
     //cannot claim twice
-    await expect(subPool.connect(lp2).claimFromAggregated(1, 100)).to.be.reverted;
+    await expect(subPool.connect(lp2).claimFromAggregated(0, [99])).to.be.reverted;
 
     //lp3 claims
     preClaimBal = await usdc.balanceOf(lp3.address);
-    await subPool.connect(lp3).claimFromAggregated(1,100);
+    await subPool.connect(lp3).claimFromAggregated(0, [99]);
     postClaimBal = await usdc.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -293,7 +296,7 @@ describe("WETH-USDC SubPool Testing", function () {
 
     //lp4 claims
     preClaimBal = await usdc.balanceOf(lp4.address);
-    await subPool.connect(lp4).claimFromAggregated(1,100);
+    await subPool.connect(lp4).claimFromAggregated(0, [99]);
     postClaimBal = await usdc.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -332,13 +335,14 @@ describe("WETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+    await expect(subPool.connect(addrs[0]).aggregateClaims(1, [3])).to.be.reverted;
 
     //lp1 claims
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await usdc.balanceOf(lp1.address);
-    await subPool.connect(lp1).claimFromAggregated(1, 3);
+    await expect(subPool.connect(lp1).claimFromAggregated(1, [3])).to.be.reverted;
+    await subPool.connect(lp1).claim([1,2,3]);
     postClaimEthBal = await WETH.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await usdc.balanceOf(lp1.address);
 
@@ -359,7 +363,7 @@ describe("WETH-USDC SubPool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     preClaimTokenBal = await usdc.balanceOf(lp2.address);
-    await subPool.connect(lp2).claimFromAggregated(1, 3);
+    await subPool.connect(lp2).claim([1,2,3]);
     postClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     postClaimTokenBal = await usdc.balanceOf(lp2.address);
 
@@ -380,7 +384,7 @@ describe("WETH-USDC SubPool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await usdc.balanceOf(lp3.address);
-    await subPool.connect(lp3).claimFromAggregated(1, 3);
+    await subPool.connect(lp3).claim([1, 2, 3]);
     postClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await usdc.balanceOf(lp3.address);
 
@@ -414,7 +418,7 @@ describe("WETH-USDC SubPool Testing", function () {
       await subPool.connect(borrower).repay(i+1);
     }
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 99; i++) {
       await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await subPool.loanIdxToLoanInfo(i+101);
       totalRepayments = totalRepayments.add(loanInfo[0]);
@@ -425,11 +429,14 @@ describe("WETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 200);
+    //await subPool.connect(addrs[0]).aggregateClaims(0, [199]);
     
+    //aggregate only allowed per 100 loans or multiples of 1000 not per 200
+    await expect(subPool.connect(lp1).claimFromAggregated(0, [199])).to.be.reverted;
+
     //claim
-    await subPool.connect(lp1).claimFromAggregated(1, 200);
-    await subPool.connect(lp2).claimFromAggregated(1, 200);
+    await subPool.connect(lp1).claimFromAggregated(0, [99, 199]);
+    await subPool.connect(lp2).claimFromAggregated(0, [99, 199]);
 
     //remove liquidity
     await subPool.connect(lp1).removeLiquidity();
@@ -480,12 +487,12 @@ describe("WETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(1, 3);
+    //await subPool.connect(addrs[0]).aggregateClaims(1, 3);
     
     //claim
-    await subPool.connect(lp1).claimFromAggregated(1, 3);
-    await subPool.connect(lp2).claimFromAggregated(1, 3);
-    await subPool.connect(lp3).claimFromAggregated(1, 3);
+    await subPool.connect(lp1).claim([1, 2, 3]);
+    await subPool.connect(lp2).claim([1, 2, 3]);
+    await subPool.connect(lp3).claim([1, 2, 3]);
 
     //remove liquidity
     await subPool.connect(lp1).removeLiquidity();
