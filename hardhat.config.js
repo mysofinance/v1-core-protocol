@@ -28,12 +28,12 @@ module.exports = {
       chainId: 31337,
       forking: {
         url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-        //blockNumber: 14000000
+        blockNumber: 14000000
       }
     }
   },
   mocha: {
-    timeout: 1000000
+    timeout: 10000000
   },
   contractSizer: {
     alphaSort: true,

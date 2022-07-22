@@ -414,26 +414,26 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
   });
 
-  it("Should allow removing liquidity", async function () {
+  it("Should allow removing liquidity test", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(600000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(400000), timestamp+60, 0);
+    await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(10000000), timestamp+60, 0);
+    await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(6000000), timestamp+60, 0);
+    await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(4000000), timestamp+60, 0);
 
     totalRepayments = ethers.BigNumber.from(0);
     totalLeftColl = ethers.BigNumber.from(0);
 
-    for (let i = 0; i < 2000; i++) {
+    for (let i = 0; i < 3000; i++) {
       await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: ONE_ETH});
       loanInfo = await subPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
       await subPool.connect(borrower).repay(i+1);
     }
 
-    for (let i = 0; i < 999; i++) {
+    for (let i = 0; i < 2999; i++) {
       await subPool.connect(borrower).borrow(0, 0, MONE, timestamp+1000000000, 0, {value: ONE_ETH});
-      loanInfo = await subPool.loanIdxToLoanInfo(i+2001);
+      loanInfo = await subPool.loanIdxToLoanInfo(i+3001);
       totalRepayments = totalRepayments.add(loanInfo[0]);
     }
 
@@ -442,12 +442,13 @@ describe("ETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await subPool.connect(addrs[0]).aggregateClaims(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999, 1099, 1199, 1299, 1399, 1499, 1599, 1699, 1799, 1899, 1999]);
+    //await subPool.connect(addrs[0]).aggregateClaims(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999, 1099, 1199, 1299, 1399, 1499, 1599, 1699, 1799, 1899, 1999]);
     
     //claim
-    await subPool.connect(lp1).claimFromAggregated(0, [1999]);
-    await subPool.connect(lp2).claimFromAggregated(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999]);
-    await subPool.connect(lp3).claimFromAggregated(0, [1999, 2099, 2199, 2299, 2399, 2499, 2599, 2699, 2799, 2899, 2999]);
+    await subPool.connect(lp1).claimFromAggregated(0, [999, 1999]);
+    //await subPool.connect(lp2).claimFromAggregated(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999]);
+    await subPool.connect(lp2).claimFromAggregated(0, [999]);
+    await subPool.connect(lp3).claimFromAggregated(0, [999, 1999, 2999, 3999, 4999, 5999]);
 
     //remove liquidity
     await subPool.connect(lp1).removeLiquidity();

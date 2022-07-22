@@ -12,10 +12,10 @@ interface IAggregation {
         uint256 collateral
     );
 
-    function aggregrateClaimsHelper(uint256 startLoanIndex, uint256[] memory endAggIdxs)
-        external
-        view
-        returns (ISubPoolV1.AggClaimsInfo[] memory);
+    function aggregrateClaimsHelper(
+        uint256 startLoanIndex,
+        uint256[] memory endAggIdxs
+    ) external view returns (ISubPoolV1.AggClaimsInfo[] memory);
 
     function getClaimsFromAggregated(
         uint256 _fromLoanIdx,
