@@ -251,7 +251,7 @@ describe("ETH-DAI SubPool Testing", function () {
     totalInterestCosts = ethers.BigNumber.from(0);
     preBorrBal = await DAI.balanceOf(borrower.address);
     pledgeAmount = ONE_ETH.mul(2);
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 99; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       //indicative repayment
       loanTerms = await subPool.loanTerms(pledgeAmount);
@@ -274,7 +274,7 @@ describe("ETH-DAI SubPool Testing", function () {
 
     //lp1 claims individually
     preClaimBal = await DAI.balanceOf(lp1.address);
-    loanIds = Array.from(Array(100), (_, index) => index + 1);
+    loanIds = Array.from(Array(99), (_, index) => index + 1);
     await subPool.connect(lp1).claim(loanIds);
     postClaimBal = await DAI.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
@@ -283,7 +283,10 @@ describe("ETH-DAI SubPool Testing", function () {
     await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
 
     //cannot claim twice
-    await expect(subPool.connect(lp1).claimFromAggregated(1, [100])).to.be.reverted;
+    await expect(subPool.connect(lp1).claimFromAggregated(0, [99])).to.be.reverted;
+
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_mine");
     
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
