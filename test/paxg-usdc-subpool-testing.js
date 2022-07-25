@@ -49,16 +49,8 @@ describe("PAXG-USDC SubPool Testing", function () {
     SubPool = await ethers.getContractFactory("SubPoolV1");
     SubPool = await SubPool.connect(deployer);
 
-    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan);
+    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
     await subPool.deployed();
-
-    Aggregation = await ethers.getContractFactory("Aggregation");
-    Aggregation = await Aggregation.connect(deployer);
-
-    aggregation = await Aggregation.deploy(subPool.address);
-    await aggregation.deployed();
-
-    await subPool.setAggregationAddr(aggregation.address);
 
     PAXG.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     usdc.connect(lp1).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -270,7 +262,7 @@ describe("PAXG-USDC SubPool Testing", function () {
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
     //aggregate claims only allowed per 1000, per 100 is automatic
-    await expect(subPool.connect(addrs[0]).aggregateClaims(0, [99])).to.be.reverted;
+    //await expect(subPool.connect(addrs[0]).aggregateClaims(0, [99])).to.be.reverted;
 
     //lp1 claims individually
     preClaimBal = await usdc.balanceOf(lp1.address);
@@ -350,7 +342,7 @@ describe("PAXG-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //aggregate claims
-    await expect(subPool.connect(addrs[0]).aggregateClaims(1, [3])).to.be.reverted;
+    //await expect(subPool.connect(addrs[0]).aggregateClaims(1, [3])).to.be.reverted;
 
     //lp1 claims
     preClaimEthBal = await PAXG.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);

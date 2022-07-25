@@ -36,16 +36,8 @@ describe("ETH-USDC SubPool Testing", function () {
     SubPool = await ethers.getContractFactory("SubPoolV1");
     SubPool = await SubPool.connect(deployer);
 
-    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan);
+    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
     await subPool.deployed();
-
-    Aggregation = await ethers.getContractFactory("Aggregation");
-    Aggregation = await Aggregation.connect(deployer);
-
-    aggregation = await Aggregation.deploy(subPool.address);
-    await aggregation.deployed();
-
-    await subPool.setAggregationAddr(aggregation.address);
 
     usdc.connect(lp1).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     usdc.connect(lp2).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -414,7 +406,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
   });
 
-  it("Should allow removing liquidity test", async function () {
+  it("Should allow removing liquidity", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(10000000), timestamp+60, 0);
@@ -441,13 +433,10 @@ describe("ETH-USDC SubPool Testing", function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
 
-    //aggregate claims
-    //await subPool.connect(addrs[0]).aggregateClaims(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999, 1099, 1199, 1299, 1399, 1499, 1599, 1699, 1799, 1899, 1999]);
-    
     //claim
     await subPool.connect(lp1).claimFromAggregated(0, [999, 1999]);
     //await subPool.connect(lp2).claimFromAggregated(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999]);
-    await subPool.connect(lp2).claimFromAggregated(0, [999]);
+    await subPool.connect(lp2).claimFromAggregated(0, [99,199, 299, 399, 499, 599, 699, 799, 899, 999, 1999, 2999, 3999, 4999]);
     await subPool.connect(lp3).claimFromAggregated(0, [999, 1999, 2999, 3999, 4999, 5999]);
 
     //remove liquidity
