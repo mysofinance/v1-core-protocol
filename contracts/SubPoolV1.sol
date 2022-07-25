@@ -229,7 +229,6 @@ contract SubPoolV1 is ISubPoolV1 {
     function removeLiquidity() external override {
         // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        // verify sender eligability
         if (lpInfo.shares == 0) revert NothingToRemove();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
@@ -313,13 +312,13 @@ contract SubPoolV1 is ISubPoolV1 {
         // update state
         totalLiquidity -= loanAmount;
         totalFees += fee;
+        // set borrower address
+        loanIdxToBorrower[loanIdx] = msg.sender;
         // set loan info and transfer collateral
         LoanInfo memory loanInfo;
         loanInfo.repayment = repaymentAmount;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.expiry = expiry;
-        // set borrower
-        loanIdxToBorrower[loanIdx] = msg.sender;
         {
             uint256 transferFee;
             if (wrapToWeth) {
@@ -397,7 +396,6 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (loanIdxToBorrower[_loanIdx] != msg.sender)
             revert UnauthorizedRepay();
-        // retrieve loan info and check eligability to repay
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         if (block.timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
         if (loanInfo.repaid) revert AlreadyRepaid();
@@ -497,7 +495,6 @@ contract SubPoolV1 is ISubPoolV1 {
     function claim(uint256[] calldata _loanIdxs) external override {
         // verify lp info and eligibility
         uint256 arrayLen = _loanIdxs.length;
-        // retrieve and verify lp info
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (arrayLen == 0 || lpInfo.shares == 0) revert NothingToClaim();
         if (_loanIdxs[0] == 0 || _loanIdxs[arrayLen - 1] >= loanIdx)
@@ -534,7 +531,6 @@ contract SubPoolV1 is ISubPoolV1 {
         // verify aggregated claims info and eligibility
         if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
         if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
-        // retrieve aggregated claims info
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0) {
