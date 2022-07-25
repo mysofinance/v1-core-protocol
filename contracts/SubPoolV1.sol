@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {IPAXG} from "./interfaces/IPAXG.sol";
+import "hardhat/console.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     using SafeERC20 for IERC20Metadata;
@@ -37,6 +38,8 @@ contract SubPoolV1 is ISubPoolV1 {
     error ErroneousLoanTerms();
     error RepaymentAboveLimit();
     error InvalidLoanIdx();
+    error InvalidSubAggregation();
+    error EmptyAggregationArray();
     error UnauthorizedRepay();
     error CannotRepayAfterExpiry();
     error AlreadyRepaid();
@@ -45,6 +48,7 @@ contract SubPoolV1 is ISubPoolV1 {
     error UnentitledFromLoanIdx();
     error UnentitledToLoanIdx();
     error InvalidFromToAggregation();
+    error InvalidClaimArray();
     error CannotAggregateWithUnsettledLoan();
     error AggregatedAlready();
     error NothingAggregatedToClaim();
@@ -54,6 +58,7 @@ contract SubPoolV1 is ISubPoolV1 {
     error NewFeeMustBeDifferent();
     error NewFeeToHigh();
     error CannotUndustWithActiveLps();
+    error AlreadySet();
 
     address public constant TREASURY =
         0x1234567890000000000000000000000000000001;
@@ -81,9 +86,18 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public minLoan;
     uint256 public totalFees;
 
+    // first entry must be a multiple of 100 and second and third entries
+    // need to be also multiples of 100 and at least 10x the previous
+    uint256[3] lengthsPerClaimIntervals;
+
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
+
+    mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg1;
+    mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg2;
+    mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg3;
+
     mapping(uint256 => mapping(uint256 => AggClaimsInfo)) loanIdxRangeToAggClaimsInfo;
 
     struct LpInfo {
@@ -116,7 +130,8 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _r2,
         uint256 _tvl1,
         uint256 _tvl2,
-        uint256 _minLoan
+        uint256 _minLoan,
+        uint256 _firstLengthPerClaimInterval
     ) {
         if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
         if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
@@ -128,6 +143,10 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_tvl2 <= _tvl1 || _tvl1 == 0) revert InvalidTvlParams();
         if (_minLoan == 0) revert InvalidMinLoan();
         assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
+        if (
+            _firstLengthPerClaimInterval < 100 ||
+            _firstLengthPerClaimInterval % 100 != 0
+        ) revert InvalidClaimArray();
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -141,6 +160,9 @@ contract SubPoolV1 is ISubPoolV1 {
         COLL_TOKEN_DECIMALS = _collCcyToken == WETH
             ? 18
             : IERC20Metadata(_collCcyToken).decimals();
+        lengthsPerClaimIntervals[0] = _firstLengthPerClaimInterval;
+        lengthsPerClaimIntervals[1] = 10 * _firstLengthPerClaimInterval;
+        lengthsPerClaimIntervals[2] = 100 * _firstLengthPerClaimInterval;
         emit NewSubPool(
             _loanCcyToken,
             _collCcyToken,
@@ -338,6 +360,14 @@ contract SubPoolV1 is ISubPoolV1 {
             }
             loanInfo.collateral = pledgeAmount - uint128(transferFee);
             loanIdxToLoanInfo[loanIdx] = loanInfo;
+            collAndRepayTotalBaseAgg1[loanIdx / lengthsPerClaimIntervals[0] + 1]
+                .collateral += uint128(
+                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
+            );
+            collAndRepayTotalBaseAgg2[loanIdx / lengthsPerClaimIntervals[1] + 1]
+                .collateral += uint128(
+                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
+            );
             loanIdx += 1;
             if (fee > 0) {
                 IERC20Metadata(collCcyToken).safeTransferFrom(
@@ -403,6 +433,24 @@ contract SubPoolV1 is ISubPoolV1 {
             revert CannotRepayInSameBlock();
         // update loan info
         loanInfo.repaid = true;
+
+        collAndRepayTotalBaseAgg1[_loanIdx / lengthsPerClaimIntervals[0] + 1]
+            .collateral -= uint128(
+            (loanInfo.collateral * BASE) / loanInfo.totalLpShares
+        );
+        collAndRepayTotalBaseAgg1[_loanIdx / lengthsPerClaimIntervals[0] + 1]
+            .repayments += uint128(
+            (loanInfo.repayment * BASE) / loanInfo.totalLpShares
+        );
+        collAndRepayTotalBaseAgg2[_loanIdx / lengthsPerClaimIntervals[1] + 1]
+            .collateral -= uint128(
+            (loanInfo.collateral * BASE) / loanInfo.totalLpShares
+        );
+        collAndRepayTotalBaseAgg2[_loanIdx / lengthsPerClaimIntervals[1] + 1]
+            .repayments += uint128(
+            (loanInfo.repayment * BASE) / loanInfo.totalLpShares
+        );
+         
         // transfer collateral
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
@@ -450,6 +498,22 @@ contract SubPoolV1 is ISubPoolV1 {
                 _maxRepayLimit,
                 _deadline
             );
+        collAndRepayTotalBaseAgg1[_loanIdx / lengthsPerClaimIntervals[0] + 1]
+            .collateral -= uint128(
+            (loanInfo.collateral * BASE) / loanInfo.totalLpShares
+        );
+        collAndRepayTotalBaseAgg1[_loanIdx / lengthsPerClaimIntervals[0] + 1]
+            .repayments += uint128(
+            (loanInfo.repayment * BASE) / loanInfo.totalLpShares
+        );
+        collAndRepayTotalBaseAgg2[_loanIdx / lengthsPerClaimIntervals[1] + 1]
+            .collateral -= uint128(
+            (loanInfo.collateral * BASE) / loanInfo.totalLpShares
+        );
+        collAndRepayTotalBaseAgg2[_loanIdx / lengthsPerClaimIntervals[1] + 1]
+            .repayments += uint128(
+            (loanInfo.repayment * BASE) / loanInfo.totalLpShares
+        );
         {
             // set new loan info
             loanInfo.repaid = true;
@@ -522,106 +586,76 @@ contract SubPoolV1 is ISubPoolV1 {
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
-    //including _fromLoanIdx and _toLoanIdx
-    function aggregateClaims(
+    
+    function claimFromAggregated(
         uint256 _fromLoanIdx,
-        uint256 _toLoanIdx,
-        uint256[] calldata _prevAggIdxs
-    ) public {
-        // verify aggregated claims info and eligibility
-        if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
-        if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
-        AggClaimsInfo memory aggClaimsInfo;
-        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
-        if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0) {
-            // aggregate claims (as uint256)
-            uint256 repayments;
-            uint256 collateral;
-            uint256 numDefaults;
-            LoanInfo memory loanInfo;
-            for (uint256 i = _fromLoanIdx; i <= _toLoanIdx; ) {
-                loanInfo = loanIdxToLoanInfo[i];
-                if (loanInfo.repaid) {
-                    repayments +=
-                        (loanInfo.repayment * BASE) /
-                        loanInfo.totalLpShares;
-                } else if (loanInfo.expiry < block.timestamp) {
-                    collateral +=
-                        (loanInfo.collateral * BASE) /
-                        loanInfo.totalLpShares;
-                    numDefaults += 1;
-                } else {
-                    revert CannotAggregateWithUnsettledLoan();
-                }
-                unchecked {
-                    i++;
-                }
-            }
-            // set claims (as uint128)
-            aggClaimsInfo.repayments = uint128(repayments);
-            aggClaimsInfo.collateral = uint128(collateral);
-            loanIdxRangeToAggClaimsInfo[_fromLoanIdx][
-                _toLoanIdx
-            ] = aggClaimsInfo;
-            // spawn event
-            emit AggregateClaims(
-                _fromLoanIdx,
-                _toLoanIdx,
-                repayments,
-                collateral,
-                numDefaults
-            );
-        }
-    }
-
-    //including _fromLoanIdx and _toLoanIdx
-    function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
-        external
-        override
-    {
-        // verify lp info and eligibility
+        uint256[] calldata _endAggIdxs
+    ) external override {
+        if (_endAggIdxs.length == 0) revert EmptyAggregationArray();
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToClaim();
-        if (_fromLoanIdx < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
-        if (lpInfo.toLoanIdx != 0 && _toLoanIdx >= lpInfo.toLoanIdx)
-            revert UnentitledToLoanIdx();
-        // get aggregated claims
-        (uint256 repayments, uint256 collateral) = getClaimsFromAggregated(
-            _fromLoanIdx,
-            _toLoanIdx,
-            lpInfo.shares
-        );
-        lpInfo.fromLoanIdx = uint32(_toLoanIdx) + 1;
-        // transfer liquidity
-        if (repayments > 0) {
-            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
+        if (
+            _fromLoanIdx < lpInfo.fromLoanIdx &&
+            !(_fromLoanIdx == 0 && lpInfo.fromLoanIdx == 1)
+        ) revert UnentitledFromLoanIdx();
+        if (
+            lpInfo.toLoanIdx != 0 &&
+            _endAggIdxs[_endAggIdxs.length - 1] >= lpInfo.toLoanIdx
+        ) revert UnentitledToLoanIdx();
+        uint256 totalRepayments;
+        uint256 totalCollateral;
+        uint256 index = 0;
+        uint256 startIndex = _fromLoanIdx;
+        uint256 endIndex = _endAggIdxs.length == 0 ? 0 : _endAggIdxs[0];
+        uint256 repayments;
+        uint256 collateral;
+
+        while (index < _endAggIdxs.length) {
+            if (startIndex % 100 != 0 || endIndex % 100 != 99) {
+                revert InvalidFromToAggregation();
+            }
+            if (index != _endAggIdxs.length - 1) {
+                if (_endAggIdxs[index] >= _endAggIdxs[index + 1])
+                    revert NonAscendingLoanIdxs();
+            }
+            (repayments, collateral) = getClaimsFromAggregated(
+                startIndex,
+                endIndex,
+                lpInfo.shares
+            );
+            totalRepayments += repayments;
+            totalCollateral += collateral;
+            unchecked {
+                startIndex = endIndex + 1;
+                index++;
+                if (index != _endAggIdxs.length) {
+                    endIndex = _endAggIdxs[index];
+                }
+            }
         }
-        // transfer collateral
-        if (collateral > 0) {
-            IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
+        lpInfo.fromLoanIdx = uint32(_endAggIdxs[_endAggIdxs.length - 1]) + 1;
+
+        // console.log("Total Repayments %s", totalRepayments);
+        // console.log("Total Collateral %s", totalCollateral);
+
+        if (totalRepayments > 0) {
+            IERC20Metadata(loanCcyToken).safeTransfer(
+                msg.sender,
+                totalRepayments
+            );
         }
-        // spawn event
+        if (totalCollateral > 0) {
+            IERC20Metadata(collCcyToken).safeTransfer(
+                msg.sender,
+                totalCollateral
+            );
+        }
         emit ClaimFromAggregated(
             _fromLoanIdx,
-            _toLoanIdx,
-            repayments,
-            collateral
+            _endAggIdxs[_endAggIdxs.length - 1],
+            totalRepayments,
+            totalCollateral
         );
-    }
-
-    function getClaimsFromAggregated(
-        uint256 _fromLoanIdx,
-        uint256 _toLoanIdx,
-        uint256 _shares
-    ) public view returns (uint256 repayments, uint256 collateral) {
-        // retrieve aggregated claims info iff any
-        AggClaimsInfo memory aggClaimsInfo;
-        aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
-        if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
-            revert NothingAggregatedToClaim();
-        // return claims
-        repayments = (aggClaimsInfo.repayments * _shares) / BASE;
-        collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
 
     function getClaimsFromList(
@@ -674,5 +708,39 @@ contract SubPoolV1 is ISubPoolV1 {
         emit FeeUpdate(protocolFee, _newFee);
         // set new fee
         protocolFee = _newFee;
+    }
+
+    function getClaimsFromAggregated(
+        uint256 _fromLoanIdx,
+        uint256 _toLoanIdx,
+        uint256 _shares
+    ) public view returns (uint256, uint256) {
+        if (
+            !(_toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[0] - 1 ||
+                _toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[1] - 1)
+        ) revert InvalidSubAggregation();
+        AggClaimsInfo memory aggClaimsInfo;
+        if (_toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[0] - 1) {
+            aggClaimsInfo = collAndRepayTotalBaseAgg1[
+                _fromLoanIdx / lengthsPerClaimIntervals[0] + 1
+            ];
+        } else {
+            aggClaimsInfo = collAndRepayTotalBaseAgg2[
+                _fromLoanIdx / lengthsPerClaimIntervals[1] + 1
+            ];
+        }
+
+        if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
+            revert NothingAggregatedToClaim();
+
+        uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
+        if (expiryCheck > block.timestamp + 1) {
+            revert InvalidSubAggregation();
+        }
+
+        uint256 repayments = (aggClaimsInfo.repayments * _shares) / BASE;
+        uint256 collateral = (aggClaimsInfo.collateral * _shares) / BASE;
+
+        return (repayments, collateral);
     }
 }

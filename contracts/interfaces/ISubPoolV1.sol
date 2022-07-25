@@ -52,8 +52,7 @@ interface ISubPoolV1 {
         uint256 fromLoanIdx,
         uint256 toLoanIdx,
         uint256 repayments,
-        uint256 collateral,
-        uint256 numDefaults
+        uint256 collateral
     );
     event ClaimFromAggregated(
         uint256 fromLoanIdx,
@@ -99,6 +98,8 @@ interface ISubPoolV1 {
     function claim(uint256[] calldata _loanIdxs) external;
 
     //including _fromLoanIdx and _toLoanIdx
-    function claimFromAggregated(uint256 _fromLoanIdx, uint256 _toLoanIdx)
-        external;
+    function claimFromAggregated(
+        uint256 _fromLoanIdx,
+        uint256[] calldata _endAggIdxs
+    ) external;
 }
