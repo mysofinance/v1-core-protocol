@@ -627,7 +627,7 @@ contract SubPoolV1 is ISubPoolV1 {
             unchecked {
                 startIndex = endIndex + 1;
                 index++;
-                if (index != _endAggIdxs.length) {
+                if (index < _endAggIdxs.length) {
                     endIndex = _endAggIdxs[index];
                 }
             }
