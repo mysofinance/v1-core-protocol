@@ -450,7 +450,7 @@ contract SubPoolV1 is ISubPoolV1 {
             .repayments += uint128(
             (loanInfo.repayment * BASE) / loanInfo.totalLpShares
         );
-         
+
         // transfer collateral
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
@@ -586,7 +586,6 @@ contract SubPoolV1 is ISubPoolV1 {
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
-    
     function claimFromAggregated(
         uint256 _fromLoanIdx,
         uint256[] calldata _endAggIdxs
@@ -650,6 +649,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 totalCollateral
             );
         }
+        //spawn event
         emit ClaimFromAggregated(
             _fromLoanIdx,
             _endAggIdxs[_endAggIdxs.length - 1],
@@ -714,7 +714,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _fromLoanIdx,
         uint256 _toLoanIdx,
         uint256 _shares
-    ) public view returns (uint256, uint256) {
+    ) public view returns (uint256 repayments, uint256 collateral) {
         if (
             !(_toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[0] - 1 ||
                 _toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[1] - 1)
@@ -738,9 +738,7 @@ contract SubPoolV1 is ISubPoolV1 {
             revert InvalidSubAggregation();
         }
 
-        uint256 repayments = (aggClaimsInfo.repayments * _shares) / BASE;
-        uint256 collateral = (aggClaimsInfo.collateral * _shares) / BASE;
-
-        return (repayments, collateral);
+        repayments = (aggClaimsInfo.repayments * _shares) / BASE;
+        collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
 }
