@@ -603,13 +603,13 @@ contract SubPoolV1 is ISubPoolV1 {
         ) revert UnentitledToLoanIdx();
         uint256 totalRepayments;
         uint256 totalCollateral;
-        uint256 index = 0;
         uint256 startIndex = _fromLoanIdx;
         uint256 endIndex = _endAggIdxs.length == 0 ? 0 : _endAggIdxs[0];
         uint256 repayments;
         uint256 collateral;
+        uint256 lengthArr = _endAggIdxs.length;
 
-        while (index < _endAggIdxs.length) {
+        for (uint256 index = 0; index < lengthArr;) {
             if (startIndex % 100 != 0 || endIndex % 100 != 99) {
                 revert InvalidFromToAggregation();
             }
@@ -627,7 +627,7 @@ contract SubPoolV1 is ISubPoolV1 {
             unchecked {
                 startIndex = endIndex + 1;
                 index++;
-                if (index < _endAggIdxs.length) {
+                if (index < lengthArr) {
                     endIndex = _endAggIdxs[index];
                 }
             }
