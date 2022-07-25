@@ -163,14 +163,13 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external override {
-        // verify deadline and amount
+        // verify lp info and eligibility
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
         if (_amount < MIN_LIQUIDITY || _amount + totalLiquidity < minLoan)
             revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        // verify sender eligability
         if (lpInfo.activeLp || (lpInfo.toLoanIdx != lpInfo.fromLoanIdx))
             revert CannotAddWhileActiveOrWithOpenClaims();
         // update state of pool
@@ -198,7 +197,7 @@ contract SubPoolV1 is ISubPoolV1 {
             0
         ) revert TooBigAddToLaterClaimColl();
         totalLiquidity += _amount;
-        // update lpInfo
+        // update lp info
         lpInfo.fromLoanIdx = uint32(loanIdx);
         if (lpInfo.toLoanIdx != 0) {
             lpInfo.toLoanIdx = 0;
@@ -228,7 +227,7 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function removeLiquidity() external override {
-        // retrieve lpInfo of sender
+        // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         // verify sender eligability
         if (lpInfo.shares == 0) revert NothingToRemove();
@@ -262,7 +261,7 @@ contract SubPoolV1 is ISubPoolV1 {
             uint128 pledgeAmount
         )
     {
-        // compute terms (in uint256)
+        // compute terms (as uint256)
         uint256 pledge = _inAmount - (_inAmount * protocolFee) / BASE;
         uint256 loan = (pledge *
             maxLoanPerColl *
@@ -281,7 +280,7 @@ contract SubPoolV1 is ISubPoolV1 {
             rate = r2;
         }
         uint256 repayment = (loan * (BASE + rate)) / BASE;
-        // return terms (in uint128)
+        // return terms (as uint128)
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
         pledgeAmount = uint128(pledge);
@@ -294,7 +293,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external payable override {
-        // verify collateral
+        // verify eligibility of collateral
         bool wrapToWeth = isEthPool() && _inAmount == 0 && msg.value > 0;
         {
             bool isWeth = isEthPool() && _inAmount > 0 && msg.value == 0;
@@ -305,9 +304,9 @@ contract SubPoolV1 is ISubPoolV1 {
         // get borrow terms
         uint128 inAmount = wrapToWeth ? uint128(msg.value) : _inAmount;
         (
-            uint128 pledgeAmount,
             uint128 loanAmount,
             uint128 repaymentAmount,
+            uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee
         ) = _borrow(inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
@@ -319,6 +318,8 @@ contract SubPoolV1 is ISubPoolV1 {
         loanInfo.repayment = repaymentAmount;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.expiry = expiry;
+        // set borrower
+        loanIdxToBorrower[loanIdx] = msg.sender;
         {
             uint256 transferFee;
             if (wrapToWeth) {
@@ -370,9 +371,9 @@ contract SubPoolV1 is ISubPoolV1 {
         internal
         view
         returns (
-            uint128 pledgeAmount,
             uint128 loanAmount,
             uint128 repaymentAmount,
+            uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee
         )
@@ -392,7 +393,7 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function repay(uint256 _loanIdx) external override {
-        // verify loan
+        // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (loanIdxToBorrower[_loanIdx] != msg.sender)
             revert UnauthorizedRepay();
@@ -426,7 +427,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external override {
-        // retrieve and verify loan info
+        // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (loanIdxToBorrower[_loanIdx] != msg.sender)
             revert UnauthorizedRepay();
@@ -440,9 +441,9 @@ contract SubPoolV1 is ISubPoolV1 {
         }
         // get terms for new borrow
         (
-            uint128 pledgeAmount,
             uint128 loanAmount,
             uint128 repaymentAmount,
+            uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee
         ) = _borrow(
@@ -452,7 +453,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 _deadline
             );
         {
-            // compute delta
+            // set new loan info
             loanInfo.repaid = true;
             loanIdxToBorrower[loanIdx] = msg.sender;
             LoanInfo memory loanInfoNew;
@@ -494,6 +495,7 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function claim(uint256[] calldata _loanIdxs) external override {
+        // verify lp info and eligibility
         uint256 arrayLen = _loanIdxs.length;
         // retrieve and verify lp info
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
@@ -505,8 +507,11 @@ contract SubPoolV1 is ISubPoolV1 {
             lpInfo.toLoanIdx != 0 && _loanIdxs[arrayLen - 1] >= lpInfo.toLoanIdx
         ) revert UnentitledToLoanIdx();
         // get claims
-        (uint256 repayments, uint256 collateral, uint256 numDefaults) =
-            getClaimsFromList(_loanIdxs, arrayLen, lpInfo.shares);
+        (
+            uint256 repayments,
+            uint256 collateral,
+            uint256 numDefaults
+        ) = getClaimsFromList(_loanIdxs, arrayLen, lpInfo.shares);
         lpInfo.fromLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
         // transfer liquidity
         if (repayments > 0) {
@@ -526,15 +531,14 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _toLoanIdx,
         uint256[] calldata _prevAggIdxs
     ) public {
-        // verify loan indices
-        if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx)
-            revert InvalidLoanIdx();
+        // verify aggregated claims info and eligibility
+        if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
         if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
         // retrieve aggregated claims info
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0) {
-            // sum repayments and collateral from defaults, and count number of defaults
+            // aggregate claims (as uint256)
             uint256 repayments;
             uint256 collateral;
             uint256 numDefaults;
@@ -557,11 +561,12 @@ contract SubPoolV1 is ISubPoolV1 {
                     i++;
                 }
             }
-            // set aggregated claims info
+            // set claims (as uint128)
             aggClaimsInfo.repayments = uint128(repayments);
             aggClaimsInfo.collateral = uint128(collateral);
-            loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx] =
-                aggClaimsInfo;
+            loanIdxRangeToAggClaimsInfo[_fromLoanIdx][
+                _toLoanIdx
+            ] = aggClaimsInfo;
             // spawn event
             emit AggregateClaims(
                 _fromLoanIdx,
@@ -578,13 +583,13 @@ contract SubPoolV1 is ISubPoolV1 {
         external
         override
     {
-        // retrieve and verify lp info
+        // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToClaim();
         if (_fromLoanIdx < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
         if (lpInfo.toLoanIdx != 0 && _toLoanIdx >= lpInfo.toLoanIdx)
             revert UnentitledToLoanIdx();
-        // get cached aggregated
+        // get aggregated claims
         (uint256 repayments, uint256 collateral) = getClaimsFromAggregated(
             _fromLoanIdx,
             _toLoanIdx,
@@ -612,19 +617,13 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _fromLoanIdx,
         uint256 _toLoanIdx,
         uint256 _shares
-    )
-        public
-        view
-        returns (
-            uint256 repayments,
-            uint256 collateral
-        )
-    {
-        // use aggregated claims info for computing repayments and collateral
+    ) public view returns (uint256 repayments, uint256 collateral) {
+        // retrieve aggregated claims info iff any
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
             revert NothingAggregatedToClaim();
+        // return claims
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
@@ -642,7 +641,7 @@ contract SubPoolV1 is ISubPoolV1 {
             uint256 numDefaults
         )
     {
-        // sum repayments and collateral from defaults, and count number of defaults
+        // aggregate claims from list
         for (uint256 i = 0; i < arrayLen; ) {
             LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
             if (i > 0) {
@@ -665,6 +664,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 i++;
             }
         }
+        // return claims
         repayments = (repayments * _shares) / BASE;
         collateral = (collateral * _shares) / BASE;
     }
