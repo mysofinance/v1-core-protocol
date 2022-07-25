@@ -261,9 +261,6 @@ describe("PAXG-USDC SubPool Testing", function () {
     postBorrBal = await usdc.balanceOf(borrower.address);
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
-    //aggregate claims only allowed per 1000, per 100 is automatic
-    //await expect(subPool.connect(addrs[0]).aggregateClaims(0, [99])).to.be.reverted;
-
     //lp1 claims individually
     preClaimBal = await usdc.balanceOf(lp1.address);
     loanIds = Array.from(Array(99), (_, index) => index + 1);
@@ -340,9 +337,6 @@ describe("PAXG-USDC SubPool Testing", function () {
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
-
-    //aggregate claims
-    //await expect(subPool.connect(addrs[0]).aggregateClaims(1, [3])).to.be.reverted;
 
     //lp1 claims
     preClaimEthBal = await PAXG.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
@@ -437,9 +431,6 @@ describe("PAXG-USDC SubPool Testing", function () {
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
-
-    //aggregate claims
-    //await subPool.connect(addrs[0]).aggregateClaims(0, [99, 199]);
     
     //aggregate only allowed per 100 loans or multiples of 1000 not per 200
     await expect(subPool.connect(lp1).claimFromAggregated(0, [199])).to.be.reverted;
@@ -496,9 +487,6 @@ describe("PAXG-USDC SubPool Testing", function () {
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
-
-    //aggregate claims
-    //await subPool.connect(addrs[0]).aggregateClaims(1, 3);
     
     //claim
     await subPool.connect(lp1).claim([1, 2, 3]);
@@ -521,7 +509,7 @@ describe("PAXG-USDC SubPool Testing", function () {
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000, 0);
 
     //check dust was transferred to treasury
-    balTreasury = await usdc.balanceOf("0x0000000000000000000000000000000000000001");
+    balTreasury = await usdc.balanceOf("0x1234567890000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares

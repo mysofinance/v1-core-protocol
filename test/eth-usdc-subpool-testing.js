@@ -257,9 +257,6 @@ describe("ETH-USDC SubPool Testing", function () {
     postBorrBal = await usdc.balanceOf(borrower.address);
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
-    //aggregate claims
-    //await subPool.connect(addrs[0]).aggregateClaims(1, 100);
-
     //lp1 claims individually
     preClaimBal = await usdc.balanceOf(lp1.address);
     loanIds = Array.from(Array(99), (_, index) => index + 1);
@@ -336,9 +333,6 @@ describe("ETH-USDC SubPool Testing", function () {
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
-
-    //aggregate claims
-    //await subPool.connect(addrs[0]).aggregateClaims(1, 3);
 
     //lp1 claims
     console.log("totalRepayments", totalRepayments)
@@ -486,9 +480,6 @@ describe("ETH-USDC SubPool Testing", function () {
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
-
-    //aggregate claims
-    //await subPool.connect(addrs[0]).aggregateClaims(1, [3]);
     
     //claim
     await subPool.connect(lp1).claim([1, 2, 3]);
@@ -511,7 +502,7 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000, 0);
 
     //check dust was transferred to treasury
-    balTreasury = await usdc.balanceOf("0x0000000000000000000000000000000000000001");
+    balTreasury = await usdc.balanceOf("0x1234567890000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
