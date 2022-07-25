@@ -609,7 +609,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 collateral;
         uint256 lengthArr = _endAggIdxs.length;
 
-        for (uint256 index = 0; index < lengthArr;) {
+        for (uint256 index = 0; index < lengthArr; ) {
             if (startIndex % 100 != 0 || endIndex % 100 != 99) {
                 revert InvalidFromToAggregation();
             }
