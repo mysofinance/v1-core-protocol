@@ -47,6 +47,7 @@ describe("ETH-DAI SubPool Testing", function () {
     SubPool = await SubPool.connect(deployer);
 
     subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
+
     await subPool.deployed();
 
     DAI.connect(lp1).approve(subPool.address, MAX_UINT128);
@@ -251,6 +252,7 @@ describe("ETH-DAI SubPool Testing", function () {
     totalInterestCosts = ethers.BigNumber.from(0);
     preBorrBal = await DAI.balanceOf(borrower.address);
     pledgeAmount = ONE_ETH.mul(2);
+
     for (let i = 0; i < 99; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       //indicative repayment
@@ -275,6 +277,7 @@ describe("ETH-DAI SubPool Testing", function () {
     //lp1 claims individually
     preClaimBal = await DAI.balanceOf(lp1.address);
     loanIds = Array.from(Array(99), (_, index) => index + 1);
+
     await subPool.connect(lp1).claim(loanIds);
     postClaimBal = await DAI.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
