@@ -56,7 +56,7 @@ contract SubPoolV1 is ISubPoolV1 {
     error CannotUndustWithActiveLps();
 
     address public constant TREASURY =
-        0x0000000000000000000000000000000000000001;
+        0x1234567890000000000000000000000000000001;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
     uint24 immutable LOAN_TENOR;
