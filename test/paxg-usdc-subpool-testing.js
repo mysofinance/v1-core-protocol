@@ -511,7 +511,7 @@ describe("PAXG-USDC SubPool Testing", function () {
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(500000), timestamp+1000, 0);
 
     //check dust was transferred to treasury
-    balTreasury = await usdc.balanceOf("0x0000000000000000000000000000000000000001");
+    balTreasury = await usdc.balanceOf("0x1234567890000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
