@@ -13,7 +13,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     error LoanCcyCannotBeZeroAddress();
     error CollCcyCannotBeZeroAddress();
-    error CollAndLoanCcyCannoteBeEqual();
+    error CollAndLoanCcyCannotBeEqual();
     error InvalidLoanTenor();
     error InvalidMaxLoanPerColl();
     error InvalidRateParams();
@@ -121,7 +121,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
         if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
         if (_collCcyToken == _loanCcyToken)
-            revert CollAndLoanCcyCannoteBeEqual();
+            revert CollAndLoanCcyCannotBeEqual();
         if (_loanTenor < 86400) revert InvalidLoanTenor();
         if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
@@ -163,15 +163,16 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external override {
+        // verify lp info and eligibility
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
         if (_amount < MIN_LIQUIDITY || _amount + totalLiquidity < minLoan)
             revert InvalidAddAmount();
+        // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        if (
-            lpInfo.activeLp ||
-            (!lpInfo.activeLp && lpInfo.toLoanIdx - lpInfo.fromLoanIdx != 0)
-        ) revert CannotAddWhileActiveOrWithOpenClaims();
+        if (lpInfo.activeLp || (lpInfo.toLoanIdx != lpInfo.fromLoanIdx))
+            revert CannotAddWhileActiveOrWithOpenClaims();
+        // update state of pool
         uint128 newLpShares;
         uint256 dust;
         if (totalLiquidity == 0 && totalLpShares == 0) {
@@ -196,22 +197,25 @@ contract SubPoolV1 is ISubPoolV1 {
             0
         ) revert TooBigAddToLaterClaimColl();
         totalLiquidity += _amount;
-        lpInfo.shares = newLpShares;
+        // update lp info
         lpInfo.fromLoanIdx = uint32(loanIdx);
         if (lpInfo.toLoanIdx != 0) {
             lpInfo.toLoanIdx = 0;
         }
         lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
+        lpInfo.shares = newLpShares;
         lpInfo.activeLp = true;
-
+        // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
             _amount
         );
+        // transfer dust to treasury iff any
         if (dust > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(TREASURY, dust);
         }
+        // spawn event
         emit AddLiquidity(
             _amount,
             newLpShares,
@@ -223,19 +227,22 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function removeLiquidity() external override {
+        // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToRemove();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
         if (!lpInfo.activeLp) revert MustBeActiveLp();
+        // update state of pool
         uint256 liquidityRemoved = (lpInfo.shares *
             (totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
         totalLpShares -= lpInfo.shares;
         totalLiquidity -= liquidityRemoved;
         lpInfo.toLoanIdx = uint32(loanIdx);
         lpInfo.activeLp = false;
-
+        // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
+        // spawn event
         emit RemoveLiquidity(
             liquidityRemoved,
             lpInfo.shares,
@@ -248,36 +255,34 @@ contract SubPoolV1 is ISubPoolV1 {
         public
         view
         returns (
-            uint128,
-            uint128,
-            uint128
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount
         )
     {
-        uint256 fee = (_inAmount * protocolFee) / BASE;
-        uint256 pledgeAmount = _inAmount - fee;
-        uint256 loanAmount = (pledgeAmount *
+        // compute terms (as uint256)
+        uint256 pledge = _inAmount - (_inAmount * protocolFee) / BASE;
+        uint256 loan = (pledge *
             maxLoanPerColl *
             (totalLiquidity - MIN_LIQUIDITY)) /
-            (pledgeAmount *
+            (pledge *
                 maxLoanPerColl +
                 (totalLiquidity - MIN_LIQUIDITY) *
                 10**COLL_TOKEN_DECIMALS);
-
         uint256 rate;
-        uint256 x = totalLiquidity - loanAmount;
+        uint256 x = totalLiquidity - loan;
         if (x < tvl1) {
-            rate = (r1 * tvl1) / (x);
+            rate = (r1 * tvl1) / x;
         } else if (x < tvl2) {
             rate = ((r1 - r2) * (tvl2 - x)) / (tvl2 - tvl1) + r2;
         } else {
             rate = r2;
         }
-        uint256 repaymentAmount = (loanAmount * (BASE + rate)) / BASE;
-        return (
-            uint128(loanAmount),
-            uint128(repaymentAmount),
-            uint128(pledgeAmount)
-        );
+        uint256 repayment = (loan * (BASE + rate)) / BASE;
+        // return terms (as uint128)
+        loanAmount = uint128(loan);
+        repaymentAmount = uint128(repayment);
+        pledgeAmount = uint128(pledge);
     }
 
     function borrow(
@@ -287,6 +292,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external payable override {
+        // verify eligibility of collateral
         bool wrapToWeth = isEthPool() && _inAmount == 0 && msg.value > 0;
         {
             bool isWeth = isEthPool() && _inAmount > 0 && msg.value == 0;
@@ -294,25 +300,29 @@ contract SubPoolV1 is ISubPoolV1 {
             if (!wrapToWeth && !isWeth && !isErc20)
                 revert InconsistentMsgValue();
         }
+        // get borrow terms
         uint128 inAmount = wrapToWeth ? uint128(msg.value) : _inAmount;
         (
-            uint128 pledgeAmount,
             uint128 loanAmount,
             uint128 repaymentAmount,
+            uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee
         ) = _borrow(inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
-        loanIdxToBorrower[loanIdx] = msg.sender;
-        LoanInfo memory loanInfo;
-        loanInfo.expiry = expiry;
-        loanInfo.totalLpShares = totalLpShares;
-        loanInfo.repayment = repaymentAmount;
+        // update state
         totalLiquidity -= loanAmount;
         totalFees += fee;
-
+        // set borrower address
+        loanIdxToBorrower[loanIdx] = msg.sender;
+        // set loan info and transfer collateral
+        LoanInfo memory loanInfo;
+        loanInfo.repayment = repaymentAmount;
+        loanInfo.totalLpShares = totalLpShares;
+        loanInfo.expiry = expiry;
         {
             uint256 transferFee;
             if (wrapToWeth) {
+                // wrap to Weth
                 IWETH(collCcyToken).deposit{value: inAmount}();
             } else {
                 if (collCcyToken == PAXG) {
@@ -337,7 +347,9 @@ contract SubPoolV1 is ISubPoolV1 {
                 );
             }
         }
+        // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
+        // spawn event
         emit Borrow(
             loanIdx - 1,
             pledgeAmount,
@@ -358,37 +370,29 @@ contract SubPoolV1 is ISubPoolV1 {
         internal
         view
         returns (
-            uint128,
-            uint128,
-            uint128,
-            uint32,
-            uint128
-        )
-    {
-        uint256 timestamp = block.timestamp;
-        if (timestamp > _deadline) revert PastDeadline();
-        (
             uint128 loanAmount,
             uint128 repaymentAmount,
-            uint128 pledgeAmount
-        ) = loanTerms(_inAmount);
+            uint128 pledgeAmount,
+            uint32 expiry,
+            uint128 fee
+        )
+    {
+        // get and verify loan terms
+        uint256 timestamp = block.timestamp;
+        if (timestamp > _deadline) revert PastDeadline();
+        (loanAmount, repaymentAmount, pledgeAmount) = loanTerms(_inAmount);
         assert(totalLiquidity - loanAmount >= MIN_LIQUIDITY);
         if (pledgeAmount == 0) revert InvalidPledgeAmount();
         if (loanAmount < minLoan) revert TooSmallLoan();
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
-        uint128 fee = _inAmount - pledgeAmount;
-        return (
-            pledgeAmount,
-            loanAmount,
-            repaymentAmount,
-            uint32(timestamp) + LOAN_TENOR,
-            fee
-        );
+        expiry = uint32(timestamp) + LOAN_TENOR;
+        fee = _inAmount - pledgeAmount;
     }
 
     function repay(uint256 _loanIdx) external override {
+        // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (loanIdxToBorrower[_loanIdx] != msg.sender)
             revert UnauthorizedRepay();
@@ -397,16 +401,20 @@ contract SubPoolV1 is ISubPoolV1 {
         if (loanInfo.repaid) revert AlreadyRepaid();
         if (block.timestamp == loanInfo.expiry - LOAN_TENOR)
             revert CannotRepayInSameBlock();
+        // update loan info
         loanInfo.repaid = true;
+        // transfer collateral
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
             loanInfo.repayment
         );
+        // transfer liquidity
         IERC20Metadata(collCcyToken).safeTransfer(
             msg.sender,
             loanInfo.collateral
         );
+        // spawn event
         emit Repay(_loanIdx, loanInfo.repayment, loanInfo.collateral);
     }
 
@@ -417,6 +425,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external override {
+        // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (loanIdxToBorrower[_loanIdx] != msg.sender)
             revert UnauthorizedRepay();
@@ -428,10 +437,11 @@ contract SubPoolV1 is ISubPoolV1 {
             if (timestamp == loanInfo.expiry - LOAN_TENOR)
                 revert CannotRepayInSameBlock();
         }
+        // get terms for new borrow
         (
-            uint128 pledgeAmount,
             uint128 loanAmount,
             uint128 repaymentAmount,
+            uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee
         ) = _borrow(
@@ -441,6 +451,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 _deadline
             );
         {
+            // set new loan info
             loanInfo.repaid = true;
             loanIdxToBorrower[loanIdx] = msg.sender;
             LoanInfo memory loanInfoNew;
@@ -452,12 +463,13 @@ contract SubPoolV1 is ISubPoolV1 {
             loanIdx += 1;
             totalLiquidity -= loanAmount;
             totalFees += fee;
-
+            // transfer liquidity
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
                 loanInfo.repayment - loanAmount
             );
+            // transfer collateral
             if (fee > 0) {
                 IERC20Metadata(collCcyToken).safeTransferFrom(
                     msg.sender,
@@ -466,6 +478,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 );
             }
         }
+        // spawn event
         emit Roll(
             _loanIdx,
             loanIdx - 1,
@@ -480,6 +493,7 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function claim(uint256[] calldata _loanIdxs) external override {
+        // verify lp info and eligibility
         uint256 arrayLen = _loanIdxs.length;
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (arrayLen == 0 || lpInfo.shares == 0) revert NothingToClaim();
@@ -489,20 +503,22 @@ contract SubPoolV1 is ISubPoolV1 {
         if (
             lpInfo.toLoanIdx != 0 && _loanIdxs[arrayLen - 1] >= lpInfo.toLoanIdx
         ) revert UnentitledToLoanIdx();
-
+        // get claims
         (
             uint256 repayments,
             uint256 collateral,
             uint256 numDefaults
         ) = getClaimsFromList(_loanIdxs, arrayLen, lpInfo.shares);
         lpInfo.fromLoanIdx = uint32(_loanIdxs[arrayLen - 1]) + 1;
-
+        // transfer liquidity
         if (repayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
         }
+        // transfer collateral
         if (collateral > 0) {
             IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
         }
+        // spawn event
         emit Claim(_loanIdxs, repayments, collateral, numDefaults);
     }
 
@@ -512,11 +528,13 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _toLoanIdx,
         uint256[] calldata _prevAggIdxs
     ) public {
+        // verify aggregated claims info and eligibility
         if (_fromLoanIdx == 0 || _toLoanIdx >= loanIdx) revert InvalidLoanIdx();
         if (_fromLoanIdx >= _toLoanIdx) revert InvalidFromToAggregation();
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0) {
+            // aggregate claims (as uint256)
             uint256 repayments;
             uint256 collateral;
             uint256 numDefaults;
@@ -539,11 +557,13 @@ contract SubPoolV1 is ISubPoolV1 {
                     i++;
                 }
             }
+            // set claims (as uint128)
             aggClaimsInfo.repayments = uint128(repayments);
             aggClaimsInfo.collateral = uint128(collateral);
             loanIdxRangeToAggClaimsInfo[_fromLoanIdx][
                 _toLoanIdx
             ] = aggClaimsInfo;
+            // spawn event
             emit AggregateClaims(
                 _fromLoanIdx,
                 _toLoanIdx,
@@ -559,25 +579,28 @@ contract SubPoolV1 is ISubPoolV1 {
         external
         override
     {
+        // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToClaim();
         if (_fromLoanIdx < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
         if (lpInfo.toLoanIdx != 0 && _toLoanIdx >= lpInfo.toLoanIdx)
             revert UnentitledToLoanIdx();
-
+        // get aggregated claims
         (uint256 repayments, uint256 collateral) = getClaimsFromAggregated(
             _fromLoanIdx,
             _toLoanIdx,
             lpInfo.shares
         );
         lpInfo.fromLoanIdx = uint32(_toLoanIdx) + 1;
-
+        // transfer liquidity
         if (repayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
         }
+        // transfer collateral
         if (collateral > 0) {
             IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
         }
+        // spawn event
         emit ClaimFromAggregated(
             _fromLoanIdx,
             _toLoanIdx,
@@ -590,16 +613,15 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _fromLoanIdx,
         uint256 _toLoanIdx,
         uint256 _shares
-    ) public view returns (uint256, uint256) {
+    ) public view returns (uint256 repayments, uint256 collateral) {
+        // retrieve aggregated claims info iff any
         AggClaimsInfo memory aggClaimsInfo;
         aggClaimsInfo = loanIdxRangeToAggClaimsInfo[_fromLoanIdx][_toLoanIdx];
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
             revert NothingAggregatedToClaim();
-
-        uint256 repayments = (aggClaimsInfo.repayments * _shares) / BASE;
-        uint256 collateral = (aggClaimsInfo.collateral * _shares) / BASE;
-
-        return (repayments, collateral);
+        // return claims
+        repayments = (aggClaimsInfo.repayments * _shares) / BASE;
+        collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
 
     function getClaimsFromList(
@@ -610,14 +632,12 @@ contract SubPoolV1 is ISubPoolV1 {
         internal
         view
         returns (
-            uint256,
-            uint256,
-            uint256
+            uint256 repayments,
+            uint256 collateral,
+            uint256 numDefaults
         )
     {
-        uint256 repayments;
-        uint256 collateral;
-        uint256 numDefaults;
+        // aggregate claims from list
         for (uint256 i = 0; i < arrayLen; ) {
             LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
             if (i > 0) {
@@ -640,17 +660,19 @@ contract SubPoolV1 is ISubPoolV1 {
                 i++;
             }
         }
+        // return claims
         repayments = (repayments * _shares) / BASE;
         collateral = (collateral * _shares) / BASE;
-
-        return (repayments, collateral, numDefaults);
     }
 
     function setProtocolFee(uint128 _newFee) external {
+        // verify new fee
         if (msg.sender != TREASURY) revert UnauthorizedFeeUpdate();
         if (_newFee == protocolFee) revert NewFeeMustBeDifferent();
         if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeToHigh();
+        // spawn event
         emit FeeUpdate(protocolFee, _newFee);
+        // set new fee
         protocolFee = _newFee;
     }
 }
