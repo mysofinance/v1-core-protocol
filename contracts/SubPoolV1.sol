@@ -586,7 +586,8 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _fromLoanIdx,
         uint256[] calldata _endAggIdxs
     ) external override {
-        if (_endAggIdxs.length == 0) revert EmptyAggregationArray();
+        uint256 lengthArr = _endAggIdxs.length;
+        if (lengthArr == 0) revert EmptyAggregationArray();
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToClaim();
         if (
@@ -595,7 +596,7 @@ contract SubPoolV1 is ISubPoolV1 {
         ) revert UnentitledFromLoanIdx();
         if (
             lpInfo.toLoanIdx != 0 &&
-            _endAggIdxs[_endAggIdxs.length - 1] >= lpInfo.toLoanIdx
+            _endAggIdxs[lengthArr - 1] >= lpInfo.toLoanIdx
         ) revert UnentitledToLoanIdx();
         uint256 totalRepayments;
         uint256 totalCollateral;
@@ -603,7 +604,6 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 endIndex = _endAggIdxs[0];
         uint256 repayments;
         uint256 collateral;
-        uint256 lengthArr = _endAggIdxs.length;
 
         for (uint256 index = 0; index < lengthArr; ) {
             if (startIndex % 100 != 0 || endIndex % 100 != 99) {
@@ -714,6 +714,10 @@ contract SubPoolV1 is ISubPoolV1 {
                 _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval*10 - 1 ||
                 (useThirdAggregation && _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval*100 - 1))
         ) revert InvalidSubAggregation();
+        uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
+        if (expiryCheck > block.timestamp + 1) {
+            revert InvalidSubAggregation();
+        }
         AggClaimsInfo memory aggClaimsInfo;
         if (_toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval - 1) {
             aggClaimsInfo = collAndRepayTotalBaseAgg1[
@@ -732,10 +736,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
             revert NothingAggregatedToClaim();
 
-        uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
-        if (expiryCheck > block.timestamp + 1) {
-            revert InvalidSubAggregation();
-        }
+        
 
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
