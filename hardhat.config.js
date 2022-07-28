@@ -33,7 +33,7 @@ module.exports = {
     }
   },
   mocha: {
-    timeout: 10000000
+    timeout: 100000000
   },
   contractSizer: {
     alphaSort: true,

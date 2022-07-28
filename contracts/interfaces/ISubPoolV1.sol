@@ -41,19 +41,10 @@ interface ISubPoolV1 {
         uint256 oldLoanIdx,
         uint256 newLoanIdx,
         uint256 collateral,
-        uint256 refinancingCost,
-        uint256 oldRepaymentAmount,
-        uint256 newRepaymentAmount,
-        uint256 oldExpiry,
-        uint256 newExpiry,
+        uint256 refinancingCost,        
         uint16 referralCode
     );
-    event AggregateClaims(
-        uint256 fromLoanIdx,
-        uint256 toLoanIdx,
-        uint256 repayments,
-        uint256 collateral
-    );
+    
     event ClaimFromAggregated(
         uint256 fromLoanIdx,
         uint256 toLoanIdx,
@@ -63,17 +54,16 @@ interface ISubPoolV1 {
     event Claim(
         uint256[] loanIdxs,
         uint256 repayments,
-        uint256 collateral,
-        uint256 numDefaults
+        uint256 collateral
     );
     event FeeUpdate(uint128 oldFee, uint128 newFee);
-    event Repay(uint256 loanIdx, uint256 repayment, uint256 collateral);
+    event Repay(uint256 loanIdx);
 
     function addLiquidity(
         uint128 _amount,
         uint256 _deadline,
         uint16 _referralCode
-    ) external;
+    ) external payable;
 
     function removeLiquidity() external;
 

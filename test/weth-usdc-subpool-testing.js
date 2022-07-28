@@ -38,7 +38,7 @@ describe("WETH-USDC SubPool Testing", function () {
     SubPool = await ethers.getContractFactory("SubPoolV1");
     SubPool = await SubPool.connect(deployer);
 
-    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
+    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, false);
     await subPool.deployed();
 
     WETH.connect(borrower).approve(subPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
