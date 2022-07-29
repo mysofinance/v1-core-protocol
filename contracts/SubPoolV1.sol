@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {IPAXG} from "./interfaces/IPAXG.sol";
-import "hardhat/console.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     using SafeERC20 for IERC20Metadata;
@@ -23,14 +22,12 @@ contract SubPoolV1 is ISubPoolV1 {
     error PastDeadline();
     error InvalidAddAmount();
     error CannotAddWhileActiveOrWithOpenClaims();
-    error CannotAddWithZeroLiquidityAndOtherLps();
     error TooBigAddToLaterClaimOnRepay();
     error TooBigAddToLaterClaimColl();
     error NothingToRemove();
     error BeforeEarliestRemove();
     error MustBeActiveLp();
     error InconsistentMsgValue();
-    error InsufficientLiquidity();
     error InvalidPledgeAmount();
     error InvalidPledgeAfterTransferFee();
     error TooSmallLoan();
@@ -56,8 +53,7 @@ contract SubPoolV1 is ISubPoolV1 {
     error CannotClaimWithUnsettledLoan();
     error UnauthorizedFeeUpdate();
     error NewFeeMustBeDifferent();
-    error NewFeeToHigh();
-    error CannotUndustWithActiveLps();
+    error NewFeeTooHigh();
 
     address public constant TREASURY =
         0x1234567890000000000000000000000000000001;
@@ -630,8 +626,6 @@ contract SubPoolV1 is ISubPoolV1 {
         }
         lpInfo.fromLoanIdx = uint32(_endAggIdxs[_endAggIdxs.length - 1]) + 1;
 
-        // console.log("Total Repayments %s", totalRepayments);
-        // console.log("Total Collateral %s", totalCollateral);
 
         if (totalRepayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(
@@ -697,7 +691,7 @@ contract SubPoolV1 is ISubPoolV1 {
         // verify new fee
         if (msg.sender != TREASURY) revert UnauthorizedFeeUpdate();
         if (_newFee == protocolFee) revert NewFeeMustBeDifferent();
-        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeToHigh();
+        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeTooHigh();
         // spawn event
         emit FeeUpdate(protocolFee, _newFee);
         // set new fee
