@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {IPAXG} from "./interfaces/IPAXG.sol";
-import "hardhat/console.sol";
 
 contract SubPoolV1 is ISubPoolV1 {
     using SafeERC20 for IERC20Metadata;
@@ -23,14 +22,12 @@ contract SubPoolV1 is ISubPoolV1 {
     error PastDeadline();
     error InvalidAddAmount();
     error CannotAddWhileActiveOrWithOpenClaims();
-    error CannotAddWithZeroLiquidityAndOtherLps();
     error TooBigAddToLaterClaimOnRepay();
     error TooBigAddToLaterClaimColl();
     error NothingToRemove();
     error BeforeEarliestRemove();
     error MustBeActiveLp();
     error InconsistentMsgValue();
-    error InsufficientLiquidity();
     error InvalidPledgeAmount();
     error InvalidPledgeAfterTransferFee();
     error TooSmallLoan();
@@ -56,13 +53,11 @@ contract SubPoolV1 is ISubPoolV1 {
     error CannotClaimWithUnsettledLoan();
     error UnauthorizedFeeUpdate();
     error NewFeeMustBeDifferent();
-    error NewFeeToHigh();
-    error CannotUndustWithActiveLps();
-    error AlreadySet();
+    error NewFeeTooHigh();
 
     address public constant TREASURY =
         0x1234567890000000000000000000000000000001;
-    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
@@ -590,7 +585,8 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _fromLoanIdx,
         uint256[] calldata _endAggIdxs
     ) external override {
-        if (_endAggIdxs.length == 0) revert EmptyAggregationArray();
+        uint256 lengthArr = _endAggIdxs.length;
+        if (lengthArr == 0) revert EmptyAggregationArray();
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.shares == 0) revert NothingToClaim();
         if (
@@ -599,15 +595,15 @@ contract SubPoolV1 is ISubPoolV1 {
         ) revert UnentitledFromLoanIdx();
         if (
             lpInfo.toLoanIdx != 0 &&
-            _endAggIdxs[_endAggIdxs.length - 1] >= lpInfo.toLoanIdx
+            _endAggIdxs[lengthArr - 1] >= lpInfo.toLoanIdx
         ) revert UnentitledToLoanIdx();
         uint256 totalRepayments;
         uint256 totalCollateral;
         uint256 startIndex = _fromLoanIdx;
-        uint256 endIndex = _endAggIdxs.length == 0 ? 0 : _endAggIdxs[0];
+        uint256 endIndex = _endAggIdxs[0];
         uint256 repayments;
         uint256 collateral;
-        uint256 lengthArr = _endAggIdxs.length;
+        
 
         for (uint256 index = 0; index < lengthArr; ) {
             if (startIndex % 100 != 0 || endIndex % 100 != 99) {
@@ -633,9 +629,6 @@ contract SubPoolV1 is ISubPoolV1 {
             }
         }
         lpInfo.fromLoanIdx = uint32(_endAggIdxs[_endAggIdxs.length - 1]) + 1;
-
-        // console.log("Total Repayments %s", totalRepayments);
-        // console.log("Total Collateral %s", totalCollateral);
 
         if (totalRepayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(
@@ -703,7 +696,7 @@ contract SubPoolV1 is ISubPoolV1 {
         // verify new fee
         if (msg.sender != TREASURY) revert UnauthorizedFeeUpdate();
         if (_newFee == protocolFee) revert NewFeeMustBeDifferent();
-        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeToHigh();
+        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeTooHigh();
         // spawn event
         emit FeeUpdate(protocolFee, _newFee);
         // set new fee
@@ -719,6 +712,10 @@ contract SubPoolV1 is ISubPoolV1 {
             !(_toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[0] - 1 ||
                 _toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[1] - 1)
         ) revert InvalidSubAggregation();
+        uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
+        if (expiryCheck > block.timestamp + 1) {
+            revert InvalidSubAggregation();
+        }
         AggClaimsInfo memory aggClaimsInfo;
         if (_toLoanIdx - _fromLoanIdx == lengthsPerClaimIntervals[0] - 1) {
             aggClaimsInfo = collAndRepayTotalBaseAgg1[
@@ -733,10 +730,6 @@ contract SubPoolV1 is ISubPoolV1 {
         if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
             revert NothingAggregatedToClaim();
 
-        uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
-        if (expiryCheck > block.timestamp + 1) {
-            revert InvalidSubAggregation();
-        }
 
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
