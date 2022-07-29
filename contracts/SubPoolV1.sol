@@ -46,7 +46,6 @@ contract SubPoolV1 is ISubPoolV1 {
     error UnentitledToLoanIdx();
     error InvalidFromToAggregation();
     error InvalidFirstLengthPerClaimInterval();
-    error CannotAggregateWithUnsettledLoan();
     error AggregatedAlready();
     error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
