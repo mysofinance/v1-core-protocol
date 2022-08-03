@@ -60,7 +60,6 @@ contract SubPoolV1 is ISubPoolV1 {
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
-    bool immutable useThirdAggregation;
 
     uint256 constant BASE = 10**18;
     uint256 constant MIN_LIQUIDITY = 100 * 10**6;
@@ -124,8 +123,7 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _tvl1,
         uint256 _tvl2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval,
-        bool _useThirdAggregation
+        uint256 _firstLengthPerClaimInterval
     ) {
         if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
         if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
@@ -155,7 +153,6 @@ contract SubPoolV1 is ISubPoolV1 {
             ? 18
             : IERC20Metadata(_collCcyToken).decimals();
         firstLengthPerClaimInterval = _firstLengthPerClaimInterval;
-        useThirdAggregation = _useThirdAggregation;
         emit NewSubPool(
             _loanCcyToken,
             _collCcyToken,
@@ -382,12 +379,11 @@ contract SubPoolV1 is ISubPoolV1 {
                 .collateral += uint128(
                 ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
             );
-            if(useThirdAggregation){
-                collAndRepayTotalBaseAgg3[loanIdx / firstLengthPerClaimInterval*100 + 1]
-                    .collateral += uint128(
-                    ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
-                );
-            }
+            collAndRepayTotalBaseAgg3[loanIdx / firstLengthPerClaimInterval*100 + 1]
+                .collateral += uint128(
+                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
+            );
+            
             loanIdx += 1;
             if (fee > 0) {
                 IERC20Metadata(collCcyToken).safeTransferFrom(
@@ -703,7 +699,7 @@ contract SubPoolV1 is ISubPoolV1 {
         if (
             !(_toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval - 1 ||
                 _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval*10 - 1 ||
-                (useThirdAggregation && _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval*100 - 1))
+                _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval*100 - 1)
         ) revert InvalidSubAggregation();
         uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
         if (expiryCheck == 0 || expiryCheck > block.timestamp + 1) {
@@ -734,31 +730,25 @@ contract SubPoolV1 is ISubPoolV1 {
     }
 
     function updateAggregations(uint256 _loanIdx, uint128 _collateral, uint128 _repayment, uint128 _totalLpShares) internal {
-        collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
-            .collateral -= uint128(
+        uint128 collateralUpdate = uint128(
             (_collateral * BASE) / _totalLpShares
         );
+        uint128 repaymentUpdate = uint128(
+            (_repayment * BASE) / _totalLpShares
+        );
+        
         collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
-            .repayments += uint128(
-            (_repayment * BASE) / _totalLpShares
-        );
+            .collateral -= collateralUpdate;
+        collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
+            .repayments += repaymentUpdate;
         collAndRepayTotalBaseAgg2[_loanIdx / firstLengthPerClaimInterval*10 + 1]
-            .collateral -= uint128(
-            (_collateral * BASE) / _totalLpShares
-        );
+            .collateral -= collateralUpdate;
         collAndRepayTotalBaseAgg2[_loanIdx / firstLengthPerClaimInterval*10 + 1]
-            .repayments += uint128(
-            (_repayment * BASE) / _totalLpShares
-        );
-        if(useThirdAggregation){
-            collAndRepayTotalBaseAgg3[_loanIdx / firstLengthPerClaimInterval*100 + 1]
-                .collateral -= uint128(
-                (_collateral * BASE) / _totalLpShares
-            );
-            collAndRepayTotalBaseAgg3[_loanIdx / firstLengthPerClaimInterval*100 + 1]
-                .repayments += uint128(
-                (_repayment * BASE) / _totalLpShares
-            );
-        }
+            .repayments += repaymentUpdate;
+        collAndRepayTotalBaseAgg3[_loanIdx / firstLengthPerClaimInterval*100 + 1]
+            .collateral -= collateralUpdate;
+        collAndRepayTotalBaseAgg3[_loanIdx / firstLengthPerClaimInterval*100 + 1]
+            .repayments += repaymentUpdate;
+        
     }
 }
