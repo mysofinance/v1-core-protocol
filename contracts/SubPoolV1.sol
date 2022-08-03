@@ -46,7 +46,6 @@ contract SubPoolV1 is ISubPoolV1 {
     error UnentitledToLoanIdx();
     error InvalidFromToAggregation();
     error InvalidFirstLengthPerClaimInterval();
-    error AggregatedAlready();
     error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
@@ -81,8 +80,7 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public minLoan;
     uint256 public totalFees;
 
-    // first entry must be a multiple of 100 and second and third entries
-    // need to be also multiples of 100 and at least 10x the previous
+    //must be a multiple of 100
     uint256 firstLengthPerClaimInterval;
 
     mapping(address => LpInfo) public addrToLpInfo;
@@ -604,7 +602,7 @@ contract SubPoolV1 is ISubPoolV1 {
             if (startIndex % 100 != 0 || endIndex % 100 != 99) {
                 revert InvalidFromToAggregation();
             }
-            if (index != _endAggIdxs.length - 1) {
+            if (index != lengthArr - 1) {
                 if (_endAggIdxs[index] >= _endAggIdxs[index + 1])
                     revert NonAscendingLoanIdxs();
             }
@@ -623,7 +621,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 }
             }
         }
-        lpInfo.fromLoanIdx = uint32(_endAggIdxs[_endAggIdxs.length - 1]) + 1;
+        lpInfo.fromLoanIdx = uint32(_endAggIdxs[lengthArr - 1]) + 1;
 
 
         if (totalRepayments > 0) {
@@ -641,7 +639,7 @@ contract SubPoolV1 is ISubPoolV1 {
         //spawn event
         emit ClaimFromAggregated(
             _fromLoanIdx,
-            _endAggIdxs[_endAggIdxs.length - 1],
+            _endAggIdxs[lengthArr - 1],
             totalRepayments,
             totalCollateral
         );
@@ -708,7 +706,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 (useThirdAggregation && _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval*100 - 1))
         ) revert InvalidSubAggregation();
         uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx].expiry;
-        if (expiryCheck > block.timestamp + 1) {
+        if (expiryCheck == 0 || expiryCheck > block.timestamp + 1) {
             revert InvalidSubAggregation();
         }
         AggClaimsInfo memory aggClaimsInfo;
