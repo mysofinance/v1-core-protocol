@@ -146,11 +146,14 @@ describe("ETH-USDC SubPool Testing", function () {
     await expect(subPool.connect(lp1).claim([1,2,3], false)).to.be.reverted;
 
     //remove liquidity
-    const lp_1_info = await subPool.getlpInfo(lp1.address);
+    let lp_1_info = await subPool.getlpArrInfo(lp1.address, 0, 0);
 
     await subPool.connect(lp1).removeLiquidity(lp_1_info[0]);
     //cannot remove twice
     await expect(subPool.connect(lp1).removeLiquidity(lp_1_info[0])).to.be.reverted;
+
+    lp_1_info = await subPool.getlpArrInfo(lp1.address, 1, 1);
+    await expect(lp_1_info[0]).to.be.equal(0);
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
@@ -436,9 +439,9 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp3).claimFromAggregated(0, [999, 1999, 2999, 3999, 4999, 5999], false);
 
     //remove liquidity
-    const lp_1_info = await subPool.getlpInfo(lp1.address);
-    const lp_2_info = await subPool.getlpInfo(lp2.address);
-    const lp_3_info = await subPool.getlpInfo(lp3.address);
+    const lp_1_info = await subPool.getlpArrInfo(lp1.address, 0, 0);
+    const lp_2_info = await subPool.getlpArrInfo(lp2.address, 0, 0);
+    const lp_3_info = await subPool.getlpArrInfo(lp3.address, 0, 0);
 
     await subPool.connect(lp1).removeLiquidity(lp_1_info[0]);
     await subPool.connect(lp2).removeLiquidity(lp_2_info[0]);
@@ -493,9 +496,9 @@ describe("ETH-USDC SubPool Testing", function () {
     await subPool.connect(lp3).claim([1, 2, 3], false);
 
     //remove liquidity
-    const lp_1_info = await subPool.getlpInfo(lp1.address);
-    const lp_2_info = await subPool.getlpInfo(lp2.address);
-    const lp_3_info = await subPool.getlpInfo(lp3.address);
+    const lp_1_info = await subPool.getlpArrInfo(lp1.address, 0, 0);
+    const lp_2_info = await subPool.getlpArrInfo(lp2.address, 0, 0);
+    const lp_3_info = await subPool.getlpArrInfo(lp3.address, 0, 0);
 
     await subPool.connect(lp1).removeLiquidity(lp_1_info[0]);
     await subPool.connect(lp2).removeLiquidity(lp_2_info[0]);

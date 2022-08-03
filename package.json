@@ -20,7 +20,8 @@
   "devDependencies": {
     "hardhat": "^2.9.9",
     "prettier": "^2.7.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.19"
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "solidity-coverage": "^0.7.21"
   },
   "dependencies": {
     "@nomiclabs/hardhat-waffle": "^2.0.3",
