@@ -564,7 +564,6 @@ contract SubPoolV1 is ISubPoolV1 {
         );
     }
 
-    //option to re-invest?
     function claim(uint256[] calldata _loanIdxs, bool _isReinvested)
         external
         override
@@ -613,7 +612,6 @@ contract SubPoolV1 is ISubPoolV1 {
         emit Claim(_loanIdxs, repayments, collateral);
     }
 
-    //option to re-invest?
     function claimFromAggregated(
         uint256 _fromLoanIdx,
         uint256[] calldata _endAggIdxs,
@@ -664,6 +662,14 @@ contract SubPoolV1 is ISubPoolV1 {
             }
         }
         lpInfo.fromLoanIdx = uint32(_endAggIdxs[lengthArr - 1]) + 1;
+        if (
+            claimIndex != sharesLength - 1 &&
+            _endAggIdxs[lengthArr - 1] + 1 == currToLoanIdx
+        ) {
+            unchecked {
+                claimIndex++;
+            }
+        }
 
         if (totalRepayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(
