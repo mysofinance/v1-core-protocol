@@ -85,11 +85,12 @@ interface ISubPoolV1 {
         uint16 _referralCode
     ) external;
 
-    function claim(uint256[] calldata _loanIdxs) external;
+    function claim(uint256[] calldata _loanIdxs, bool _isReinvested) external;
 
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(
         uint256 _fromLoanIdx,
-        uint256[] calldata _endAggIdxs
+        uint256[] calldata _endAggIdxs,
+        bool _isReinvested
     ) external;
 }
