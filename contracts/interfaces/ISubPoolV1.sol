@@ -65,7 +65,7 @@ interface ISubPoolV1 {
         uint16 _referralCode
     ) external payable;
 
-    function removeLiquidity() external;
+    function removeLiquidity(uint256 numSharesRemove) external;
 
     function borrow(
         uint128 _pledgeAmount,
