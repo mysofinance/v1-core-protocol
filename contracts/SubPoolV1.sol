@@ -217,12 +217,12 @@ contract SubPoolV1 is ISubPoolV1 {
             );
         }
         totalLpShares += uint128(newLpShares);
-        if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
+        if (((minLoan * BASE * newLpShares) / totalLpShares) == 0)
             revert TooBigAddToLaterClaimOnRepay();
         if (
-            ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
-                totalLpShares) *
-                newLpShares ==
+            (((10**COLL_TOKEN_DECIMALS * minLoan *
+                newLpShares) / maxLoanPerColl) * BASE /
+                totalLpShares)  ==
             0
         ) revert TooBigAddToLaterClaimColl();
         totalLiquidity += _amount;
@@ -233,9 +233,9 @@ contract SubPoolV1 is ISubPoolV1 {
 
         lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
         uint256 shareLength = lpInfo.shares.length;
-        shareLength == 0
-            ? lpInfo.shares.push(newLpShares)
-            : lpInfo.shares.push(newLpShares + lpInfo.shares[shareLength - 1]);
+        shareLength > 0
+            ? lpInfo.shares.push(newLpShares + lpInfo.shares[shareLength - 1])
+            : lpInfo.shares.push(newLpShares);
         lpInfo.loanIdxs.push(loanIdx);
 
         if (wrapToWeth) {
@@ -386,12 +386,12 @@ contract SubPoolV1 is ISubPoolV1 {
                 ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
             );
             collAndRepayTotalBaseAgg2[
-                (loanIdx / firstLengthPerClaimInterval) * 10 + 1
+                (loanIdx / (firstLengthPerClaimInterval * 10)) + 1
             ].collateral += uint128(
                 ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
             );
             collAndRepayTotalBaseAgg3[
-                (loanIdx / firstLengthPerClaimInterval) * 100 + 1
+                (loanIdx / (firstLengthPerClaimInterval * 100)) + 1
             ].collateral += uint128(
                 ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
             );
@@ -763,11 +763,11 @@ contract SubPoolV1 is ISubPoolV1 {
             _toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval * 10 - 1
         ) {
             aggClaimsInfo = collAndRepayTotalBaseAgg2[
-                (_fromLoanIdx / firstLengthPerClaimInterval) * 10 + 1
+                (_fromLoanIdx / (firstLengthPerClaimInterval * 10)) + 1
             ];
         } else {
             aggClaimsInfo = collAndRepayTotalBaseAgg3[
-                (_fromLoanIdx / firstLengthPerClaimInterval) * 100 + 1
+                (_fromLoanIdx / (firstLengthPerClaimInterval * 100)) + 1
             ];
         }
 
@@ -794,16 +794,16 @@ contract SubPoolV1 is ISubPoolV1 {
         collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
             .repayments += repaymentUpdate;
         collAndRepayTotalBaseAgg2[
-            (_loanIdx / firstLengthPerClaimInterval) * 10 + 1
+            (_loanIdx / (firstLengthPerClaimInterval * 10)) + 1
         ].collateral -= collateralUpdate;
         collAndRepayTotalBaseAgg2[
-            (_loanIdx / firstLengthPerClaimInterval) * 10 + 1
+            (_loanIdx / (firstLengthPerClaimInterval * 10)) + 1
         ].repayments += repaymentUpdate;
         collAndRepayTotalBaseAgg3[
-            (_loanIdx / firstLengthPerClaimInterval) * 100 + 1
+            (_loanIdx / (firstLengthPerClaimInterval * 100)) + 1
         ].collateral -= collateralUpdate;
         collAndRepayTotalBaseAgg3[
-            (_loanIdx / firstLengthPerClaimInterval) * 100 + 1
+            (_loanIdx / (firstLengthPerClaimInterval * 100)) + 1
         ].repayments += repaymentUpdate;
     }
 
