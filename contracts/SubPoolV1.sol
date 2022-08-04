@@ -53,7 +53,7 @@ contract SubPoolV1 is ISubPoolV1 {
     error NewFeeMustBeDifferent();
     error NewFeeTooHigh();
 
-    address public constant TREASURY =
+    address constant TREASURY =
         0x1234567890000000000000000000000000000001;
     address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
@@ -364,20 +364,12 @@ contract SubPoolV1 is ISubPoolV1 {
         loanInfo.expiry = expiry;
         {
             uint256 transferFee;
-            if (wrapToWeth) {
-                // wrap to Weth
-                IWETH(collCcyToken).deposit{value: inAmount}();
-            } else {
+            if (!wrapToWeth) {
                 if (collCcyToken == PAXG) {
                     transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
                 }
                 if (pledgeAmount - uint128(transferFee) == 0)
                     revert InvalidPledgeAfterTransferFee();
-                IERC20Metadata(collCcyToken).safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    pledgeAmount
-                );
             }
             loanInfo.collateral = pledgeAmount - uint128(transferFee);
             loanIdxToLoanInfo[loanIdx] = loanInfo;
@@ -396,6 +388,18 @@ contract SubPoolV1 is ISubPoolV1 {
                 ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
             );
             loanIdx += 1;
+            if(wrapToWeth){
+                // wrap to Weth
+                IWETH(collCcyToken).deposit{value: inAmount}();
+            }
+            else{
+                IERC20Metadata(collCcyToken).safeTransferFrom(
+                        msg.sender,
+                        address(this),
+                        pledgeAmount
+                    );
+            }
+                
             if (fee > 0) {
                 IERC20Metadata(collCcyToken).safeTransferFrom(
                     msg.sender,
