@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.15;
 
-interface ISubPoolV1 {
+interface IBasePool {
     event NewSubPool(
         address collCcyToken,
         address loanCcyToken,
@@ -70,6 +70,16 @@ interface ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external payable;
+
+    function loanTerms(uint128 _inAmount)
+        external
+        view
+        returns (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount,
+            uint256 _totalLiquidity
+        );
 
     function repay(uint256 _loanIdx) external;
 

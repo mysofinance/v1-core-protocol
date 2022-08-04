@@ -4,11 +4,10 @@ pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ISubPoolV1} from "./interfaces/ISubPoolV1.sol";
+import {IBasePool} from "./interfaces/IBasePool.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
-import {IPAXG} from "./interfaces/IPAXG.sol";
 
-contract SubPoolV1 is ISubPoolV1 {
+abstract contract BasePool is IBasePool {
     using SafeERC20 for IERC20Metadata;
 
     error LoanCcyCannotBeZeroAddress();
@@ -55,8 +54,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     address constant TREASURY =
         0x1234567890000000000000000000000000000001;
-    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -70,7 +68,7 @@ contract SubPoolV1 is ISubPoolV1 {
 
     uint128 public protocolFee;
     uint128 public totalLpShares;
-    uint256 public totalLiquidity;
+    uint256 totalLiquidity;
     uint256 public loanIdx;
     uint256 public r1;
     uint256 public r2;
@@ -176,6 +174,14 @@ contract SubPoolV1 is ISubPoolV1 {
         return loanCcyToken == WETH;
     }
 
+    function getTotalLiquidity() public view virtual returns (uint256);
+
+    function getTransferFee(uint128 pledgeAmount)
+        internal
+        view
+        virtual
+        returns (uint128);
+
     function addLiquidity(
         uint128 _inAmount,
         uint256 _deadline,
@@ -194,7 +200,8 @@ contract SubPoolV1 is ISubPoolV1 {
         }
         // get loanAmount
         uint128 _amount = wrapToWeth ? uint128(msg.value) : _inAmount;
-        if (_amount < MIN_LIQUIDITY || _amount + totalLiquidity < minLoan)
+        uint256 _totalLiquidity = getTotalLiquidity();
+        if (_amount < MIN_LIQUIDITY || _amount + _totalLiquidity < minLoan)
             revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
@@ -204,16 +211,16 @@ contract SubPoolV1 is ISubPoolV1 {
         // update state of pool
         uint256 newLpShares;
         uint256 dust;
-        if (totalLiquidity == 0 && totalLpShares == 0) {
+        if (_totalLiquidity == 0 && totalLpShares == 0) {
             newLpShares = _amount;
-        } else if (totalLiquidity > 0 && totalLpShares == 0) {
-            dust = totalLiquidity;
-            totalLiquidity = 0;
+        } else if (_totalLiquidity > 0 && totalLpShares == 0) {
+            dust = _totalLiquidity;
+            _totalLiquidity = 0;
             newLpShares = _amount;
         } else {
-            assert(totalLiquidity > 0 && totalLpShares > 0);
+            assert(_totalLiquidity > 0 && totalLpShares > 0);
             newLpShares = uint128(
-                (uint256(_amount) * uint256(totalLpShares)) / totalLiquidity
+                (uint256(_amount) * uint256(totalLpShares)) / _totalLiquidity
             );
         }
         totalLpShares += uint128(newLpShares);
@@ -225,7 +232,7 @@ contract SubPoolV1 is ISubPoolV1 {
                 totalLpShares)  ==
             0
         ) revert TooBigAddToLaterClaimColl();
-        totalLiquidity += _amount;
+        totalLiquidity = _totalLiquidity + _amount;
         // update lp info
         if (lpInfo.fromLoanIdx == 0) {
             lpInfo.fromLoanIdx = uint32(loanIdx);
@@ -300,20 +307,22 @@ contract SubPoolV1 is ISubPoolV1 {
         returns (
             uint128 loanAmount,
             uint128 repaymentAmount,
-            uint128 pledgeAmount
+            uint128 pledgeAmount,
+            uint256 _totalLiquidity
         )
     {
         // compute terms (as uint256)
         uint256 pledge = _inAmount - (_inAmount * protocolFee) / BASE;
+        _totalLiquidity = getTotalLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
-            (totalLiquidity - MIN_LIQUIDITY)) /
+            (_totalLiquidity - MIN_LIQUIDITY)) /
             (pledge *
                 maxLoanPerColl +
-                (totalLiquidity - MIN_LIQUIDITY) *
+                (_totalLiquidity - MIN_LIQUIDITY) *
                 10**COLL_TOKEN_DECIMALS);
         uint256 rate;
-        uint256 x = totalLiquidity - loan;
+        uint256 x = _totalLiquidity - loan;
         if (x < tvl1) {
             rate = (r1 * tvl1) / x;
         } else if (x < tvl2) {
@@ -335,25 +344,17 @@ contract SubPoolV1 is ISubPoolV1 {
         uint256 _deadline,
         uint16 _referralCode
     ) external payable override {
-        // verify eligibility of collateral
-        bool wrapToWeth = isEthPool() && _inAmount == 0 && msg.value > 0;
-        {
-            bool isWeth = isEthPool() && _inAmount > 0 && msg.value == 0;
-            bool isErc20 = !isEthPool() && _inAmount > 0 && msg.value == 0;
-            if (!wrapToWeth && !isWeth && !isErc20)
-                revert InconsistentMsgValue();
-        }
         // get borrow terms
-        uint128 inAmount = wrapToWeth ? uint128(msg.value) : _inAmount;
         (
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 fee
-        ) = _borrow(inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
+            uint128 fee,
+            uint256 _totalLiquidity
+        ) = _borrow(_inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
         // update state
-        totalLiquidity -= loanAmount;
+        totalLiquidity = _totalLiquidity - loanAmount;
         totalFees += fee;
         // set borrower address
         loanIdxToBorrower[loanIdx] = msg.sender;
@@ -363,30 +364,28 @@ contract SubPoolV1 is ISubPoolV1 {
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.expiry = expiry;
         {
-            uint256 transferFee;
-            if (!wrapToWeth) {
-                if (collCcyToken == PAXG) {
-                    transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
-                }
-                if (pledgeAmount - uint128(transferFee) == 0)
-                    revert InvalidPledgeAfterTransferFee();
-            }
-            loanInfo.collateral = pledgeAmount - uint128(transferFee);
+            uint128 transferFee = getTransferFee(pledgeAmount);
+            if (pledgeAmount - transferFee == 0)
+                revert InvalidPledgeAfterTransferFee();
+            IERC20Metadata(collCcyToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                pledgeAmount
+            );
+            loanInfo.collateral = pledgeAmount - transferFee;
             loanIdxToLoanInfo[loanIdx] = loanInfo;
+            uint128 collateral = uint128(
+                ((pledgeAmount - transferFee) * BASE) / totalLpShares
+            );
             collAndRepayTotalBaseAgg1[loanIdx / firstLengthPerClaimInterval + 1]
-                .collateral += uint128(
-                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
-            );
+                .collateral += collateral;
             collAndRepayTotalBaseAgg2[
-                (loanIdx / (firstLengthPerClaimInterval * 10)) + 1
-            ].collateral += uint128(
-                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
-            );
+                (loanIdx / firstLengthPerClaimInterval) * 10 + 1
+            ].collateral += collateral;
             collAndRepayTotalBaseAgg3[
-                (loanIdx / (firstLengthPerClaimInterval * 100)) + 1
-            ].collateral += uint128(
-                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
-            );
+                (loanIdx / firstLengthPerClaimInterval) * 100 + 1
+            ].collateral += collateral;
+
             loanIdx += 1;
             if(wrapToWeth){
                 // wrap to Weth
@@ -435,14 +434,20 @@ contract SubPoolV1 is ISubPoolV1 {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 fee
+            uint128 fee,
+            uint256 _totalLiquidity
         )
     {
         // get and verify loan terms
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        (loanAmount, repaymentAmount, pledgeAmount) = loanTerms(_inAmount);
-        assert(totalLiquidity - loanAmount >= MIN_LIQUIDITY);
+        (
+            loanAmount,
+            repaymentAmount,
+            pledgeAmount,
+            _totalLiquidity
+        ) = loanTerms(_inAmount);
+        assert(_totalLiquidity - loanAmount >= MIN_LIQUIDITY);
         if (pledgeAmount == 0) revert InvalidPledgeAmount();
         if (loanAmount < minLoan) revert TooSmallLoan();
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
@@ -513,7 +518,8 @@ contract SubPoolV1 is ISubPoolV1 {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 fee
+            uint128 fee,
+            uint256 _totalLiquidity
         ) = _borrow(
                 loanInfo.collateral,
                 _minLoanLimit,
@@ -540,7 +546,7 @@ contract SubPoolV1 is ISubPoolV1 {
             loanInfoNew.collateral = pledgeAmount;
             loanIdxToLoanInfo[loanIdx] = loanInfoNew;
             loanIdx += 1;
-            totalLiquidity -= loanAmount;
+            totalLiquidity = _totalLiquidity - loanAmount;
             totalFees += fee;
             // transfer liquidity
             IERC20Metadata(loanCcyToken).safeTransferFrom(
