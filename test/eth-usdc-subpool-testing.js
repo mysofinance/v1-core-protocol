@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("ETH-USDC SubPool Testing", function () {
+describe("ETH-USDC Pool Testing", function () {
 
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
   const ONE_USDC = ethers.BigNumber.from("1000000");

@@ -71,6 +71,16 @@ interface IBasePool {
         uint16 _referralCode
     ) external payable;
 
+    function loanTerms(uint128 _inAmount)
+        external
+        view
+        returns (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount,
+            uint256 _totalLiquidity
+        );
+
     function repay(uint256 _loanIdx) external;
 
     function rollOver(

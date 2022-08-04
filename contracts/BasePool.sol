@@ -297,12 +297,13 @@ abstract contract BasePool is IBasePool {
         returns (
             uint128 loanAmount,
             uint128 repaymentAmount,
-            uint128 pledgeAmount
+            uint128 pledgeAmount,
+            uint256 _totalLiquidity
         )
     {
         // compute terms (as uint256)
         uint256 pledge = _inAmount - (_inAmount * protocolFee) / BASE;
-        uint256 _totalLiquidity = getTotalLiquidity();
+        _totalLiquidity = getTotalLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
             (_totalLiquidity - MIN_LIQUIDITY)) /
@@ -418,8 +419,12 @@ abstract contract BasePool is IBasePool {
         // get and verify loan terms
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        (loanAmount, repaymentAmount, pledgeAmount) = loanTerms(_inAmount);
-        _totalLiquidity = getTotalLiquidity();
+        (
+            loanAmount,
+            repaymentAmount,
+            pledgeAmount,
+            _totalLiquidity
+        ) = loanTerms(_inAmount);
         assert(_totalLiquidity - loanAmount >= MIN_LIQUIDITY);
         if (pledgeAmount == 0) revert InvalidPledgeAmount();
         if (loanAmount < minLoan) revert TooSmallLoan();
