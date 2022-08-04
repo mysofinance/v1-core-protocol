@@ -367,11 +367,6 @@ abstract contract BasePool is IBasePool {
             uint128 transferFee = getTransferFee(pledgeAmount);
             if (pledgeAmount - transferFee == 0)
                 revert InvalidPledgeAfterTransferFee();
-            IERC20Metadata(collCcyToken).safeTransferFrom(
-                msg.sender,
-                address(this),
-                pledgeAmount
-            );
             loanInfo.collateral = pledgeAmount - transferFee;
             loanIdxToLoanInfo[loanIdx] = loanInfo;
             uint128 collateral = uint128(
@@ -380,24 +375,22 @@ abstract contract BasePool is IBasePool {
             collAndRepayTotalBaseAgg1[loanIdx / firstLengthPerClaimInterval + 1]
                 .collateral += collateral;
             collAndRepayTotalBaseAgg2[
-                (loanIdx / firstLengthPerClaimInterval) * 10 + 1
-            ].collateral += collateral;
+                (loanIdx / (firstLengthPerClaimInterval * 10)) + 1
+            ].collateral += uint128(
+                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
+            );
             collAndRepayTotalBaseAgg3[
-                (loanIdx / firstLengthPerClaimInterval) * 100 + 1
-            ].collateral += collateral;
+                (loanIdx / (firstLengthPerClaimInterval * 100)) + 1
+            ].collateral += uint128(
+                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
+            );
 
             loanIdx += 1;
-            if(wrapToWeth){
-                // wrap to Weth
-                IWETH(collCcyToken).deposit{value: inAmount}();
-            }
-            else{
-                IERC20Metadata(collCcyToken).safeTransferFrom(
-                        msg.sender,
-                        address(this),
-                        pledgeAmount
-                    );
-            }
+            IERC20Metadata(collCcyToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                pledgeAmount
+            );
                 
             if (fee > 0) {
                 IERC20Metadata(collCcyToken).safeTransferFrom(
