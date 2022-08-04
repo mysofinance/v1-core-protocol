@@ -79,7 +79,7 @@ contract SubPoolV1 is ISubPoolV1 {
     uint256 public minLoan;
     uint256 public totalFees;
 
-    //entry must be a multiple of 100
+    //must be a multiple of 100
     uint256 firstLengthPerClaimInterval;
 
     mapping(address => LpInfo) public addrToLpInfo;
@@ -395,7 +395,6 @@ contract SubPoolV1 is ISubPoolV1 {
             ].collateral += uint128(
                 ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
             );
-
             loanIdx += 1;
             if (fee > 0) {
                 IERC20Metadata(collCcyToken).safeTransferFrom(
@@ -788,7 +787,6 @@ contract SubPoolV1 is ISubPoolV1 {
             (_collateral * BASE) / _totalLpShares
         );
         uint128 repaymentUpdate = uint128((_repayment * BASE) / _totalLpShares);
-
         collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
             .collateral -= collateralUpdate;
         collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
