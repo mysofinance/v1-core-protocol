@@ -90,12 +90,10 @@ abstract contract BasePool is IBasePool {
 
     struct LpInfo {
         uint32 fromLoanIdx;
-        //uint32 toLoanIdx;
         uint32 earliestRemove;
         uint32 claimIndex;
         uint256[] shares;
         uint256[] loanIdxs;
-        //bool activeLp;
     }
 
     struct LoanInfo {
@@ -613,7 +611,7 @@ abstract contract BasePool is IBasePool {
         uint256 lengthArr = _endAggIdxs.length;
         uint256 sharesLength = lpInfo.shares.length;
         uint256 claimedShareIdx = lpInfo.claimIndex;
-        if (sharesLength == 0 || lengthArr == 0) revert NothingToClaim();
+        if (sharesLength * lengthArr == 0) revert NothingToClaim();
         if (
             _fromLoanIdx < lpInfo.fromLoanIdx &&
             !(_fromLoanIdx == 0 && lpInfo.fromLoanIdx == 1)
