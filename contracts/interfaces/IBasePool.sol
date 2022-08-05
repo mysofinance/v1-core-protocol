@@ -99,4 +99,10 @@ interface IBasePool {
         uint256[] calldata _endAggIdxs,
         bool _isReinvested
     ) external;
+
+    function getlpArrInfo(
+        address _lpAddr,
+        uint256 index1,
+        uint256 index2
+    ) external view returns (uint256, uint256);
 }
