@@ -106,29 +106,29 @@ interface IBasePool {
         uint256 index2
     ) external view returns (uint256, uint256);
 
-    function collCcyToken() external view returns(address);
+    function collCcyToken() external view returns (address);
 
-    function loanCcyToken() external view returns(address);
+    function loanCcyToken() external view returns (address);
 
-    function maxLoanPerColl() external view returns(uint256);
+    function maxLoanPerColl() external view returns (uint256);
 
-    function protocolFee() external view returns(uint128);
+    function protocolFee() external view returns (uint128);
 
-    function totalLpShares() external view returns(uint128);
+    function totalLpShares() external view returns (uint128);
 
-    function loanIdx() external view returns(uint256);
+    function loanIdx() external view returns (uint256);
 
-    function r1() external view returns(uint256);
+    function r1() external view returns (uint256);
 
-    function r2() external view returns(uint256);
+    function r2() external view returns (uint256);
 
-    function tvl1() external view returns(uint256);
+    function tvl1() external view returns (uint256);
 
-    function tvl2() external view returns(uint256);
+    function tvl2() external view returns (uint256);
 
-    function minLoan() external view returns(uint256);
+    function minLoan() external view returns (uint256);
 
-    function totalFees() external view returns(uint256);
+    function totalFees() external view returns (uint256);
 
-    function loanIdxToBorrower(uint256) external view returns(address);
+    function loanIdxToBorrower(uint256) external view returns (address);
 }
