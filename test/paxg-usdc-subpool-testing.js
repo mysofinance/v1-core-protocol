@@ -287,7 +287,7 @@ describe("PAXG-USDC Pool Testing", function () {
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await usdc.balanceOf(lp2.address);
     await expect(paxgPool.connect(lp2).claimFromAggregated(1, [99], false)).to.be.reverted;
-    await subPool.connect(lp2).claimFromAggregated(0, [99], false);
+    await paxgPool.connect(lp2).claimFromAggregated(0, [99], false);
     postClaimBal = await usdc.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);

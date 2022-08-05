@@ -205,9 +205,7 @@ abstract contract BasePool is IBasePool {
             revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        //why is this important?
-        // if (lpInfo.activeLp || (lpInfo.toLoanIdx != lpInfo.fromLoanIdx))
-        //     revert CannotAddWhileActiveOrWithOpenClaims();
+        
         // update state of pool
         uint256 newLpShares;
         uint256 dust;
@@ -281,7 +279,6 @@ abstract contract BasePool is IBasePool {
             revert InvalidRemovalAmount();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
-        //if (!lpInfo.activeLp) revert MustBeActiveLp();
         // update state of pool
         uint256 liquidityRemoved = (numShares *
             (totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
@@ -376,16 +373,12 @@ abstract contract BasePool is IBasePool {
                 .collateral += collateral;
             collAndRepayTotalBaseAgg2[
                 (loanIdx / (firstLengthPerClaimInterval * 10)) + 1
-            ].collateral += uint128(
-                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
-            );
+            ].collateral += collateral;
             collAndRepayTotalBaseAgg3[
                 (loanIdx / (firstLengthPerClaimInterval * 100)) + 1
-            ].collateral += uint128(
-                ((pledgeAmount - uint128(transferFee)) * BASE) / totalLpShares
-            );
-
+            ].collateral += collateral;
             loanIdx += 1;
+            
             IERC20Metadata(collCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
