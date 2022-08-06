@@ -104,7 +104,7 @@ interface IBasePool {
         address _lpAddr,
         uint256 index1,
         uint256 index2
-    ) external view returns (uint256, uint256);
+    ) external view returns (uint256, uint256, uint256);
 
     function collCcyToken() external view returns (address);
 
