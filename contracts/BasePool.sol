@@ -47,11 +47,7 @@ abstract contract BasePool is IBasePool {
     error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
-    error UnauthorizedFeeUpdate();
-    error NewFeeMustBeDifferent();
-    error NewFeeTooHigh();
 
-    address constant TREASURY = 0x1234567890000000000000000000000000000001;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
@@ -62,11 +58,11 @@ abstract contract BasePool is IBasePool {
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
     address public immutable loanCcyToken;
-    uint128 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
     uint128 public protocolFee;
     uint128 public totalLpShares;
     uint256 totalLiquidity;
+    uint256 totalClaimable;
     uint256 public loanIdx;
     uint256 public r1;
     uint256 public r2;
@@ -170,7 +166,7 @@ abstract contract BasePool is IBasePool {
         return loanCcyToken == WETH;
     }
 
-    function getTotalLiquidity() public view virtual returns (uint256);
+    function getBalances() public view virtual returns (uint256 _totalLiquidity, uint256 _totalClaimable);
 
     function getTransferFee(uint128 pledgeAmount)
         internal
@@ -196,7 +192,7 @@ abstract contract BasePool is IBasePool {
         }
         // get loanAmount
         uint128 _amount = wrapToWeth ? uint128(msg.value) : _inAmount;
-        uint256 _totalLiquidity = getTotalLiquidity();
+        (uint256 _totalLiquidity, uint256 _totalClaimable) = getBalances();
         if (_amount < MIN_LIQUIDITY || _amount + _totalLiquidity < minLoan)
             revert InvalidAddAmount();
         // retrieve lpInfo of sender
@@ -224,7 +220,9 @@ abstract contract BasePool is IBasePool {
             ((((10**COLL_TOKEN_DECIMALS * minLoan * newLpShares) /
                 maxLoanPerColl) * BASE) / totalLpShares) == 0
         ) revert TooBigAddToLaterClaimColl();
+        // update potentially scaling pool balances
         totalLiquidity = _totalLiquidity + _amount;
+        totalClaimable = _totalClaimable;
         // update lp info
         if (lpInfo.fromLoanIdx == 0) {
             lpInfo.fromLoanIdx = uint32(loanIdx);
@@ -248,10 +246,6 @@ abstract contract BasePool is IBasePool {
                 _amount
             );
         }
-        // transfer dust to treasury if any
-        if (dust > 0) {
-            IERC20Metadata(loanCcyToken).safeTransfer(TREASURY, dust);
-        }
         // spawn event
         emit AddLiquidity(
             _amount,
@@ -273,12 +267,16 @@ abstract contract BasePool is IBasePool {
             revert InvalidRemovalAmount();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
-        uint256 _totalLiquidity = getTotalLiquidity();
+        (uint256 _totalLiquidity, uint256 _totalClaimable) = getBalances();
         // update state of pool
         uint256 liquidityRemoved = (numShares *
             (_totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
-        totalLpShares -= uint128(numShares);
+        // update potentially scaling pool balances
         totalLiquidity = _totalLiquidity - liquidityRemoved;
+        totalClaimable = _totalClaimable;
+
+        totalLpShares -= uint128(numShares);
+        totalClaimable = _totalClaimable;
         lpInfo.shares.push(lpInfo.shares[shareLength - 1] - numShares);
         lpInfo.loanIdxs.push(loanIdx);
 
@@ -300,12 +298,13 @@ abstract contract BasePool is IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint256 _totalLiquidity
+            uint256 _totalLiquidity,
+            uint256 _totalClaimable
         )
     {
         // compute terms (as uint256)
-        uint256 pledge = _inAmount - (_inAmount * protocolFee) / BASE;
-        _totalLiquidity = getTotalLiquidity();
+        uint256 pledge = _inAmount;
+        (_totalLiquidity, _totalClaimable) = getBalances();
         uint256 loan = (pledge *
             maxLoanPerColl *
             (_totalLiquidity - MIN_LIQUIDITY)) /
@@ -343,10 +342,12 @@ abstract contract BasePool is IBasePool {
             uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee,
-            uint256 _totalLiquidity
+            uint256 _totalLiquidity,
+            uint256 _totalClaimable
         ) = _borrow(_inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
         // update state
         totalLiquidity = _totalLiquidity - loanAmount;
+        totalClaimable = _totalClaimable;
         totalFees += fee;
         // set borrower address
         loanIdxToBorrower[loanIdx] = msg.sender;
@@ -379,14 +380,6 @@ abstract contract BasePool is IBasePool {
                 address(this),
                 pledgeAmount
             );
-
-            if (fee > 0) {
-                IERC20Metadata(collCcyToken).safeTransferFrom(
-                    msg.sender,
-                    TREASURY,
-                    fee
-                );
-            }
         }
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
@@ -416,7 +409,8 @@ abstract contract BasePool is IBasePool {
             uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee,
-            uint256 _totalLiquidity
+            uint256 _totalLiquidity,
+            uint256 _totalClaimable
         )
     {
         // get and verify loan terms
@@ -426,7 +420,8 @@ abstract contract BasePool is IBasePool {
             loanAmount,
             repaymentAmount,
             pledgeAmount,
-            _totalLiquidity
+            _totalLiquidity,
+            _totalClaimable
         ) = loanTerms(_inAmount);
         assert(_totalLiquidity - loanAmount >= MIN_LIQUIDITY);
         if (pledgeAmount == 0) revert InvalidPledgeAmount();
@@ -451,7 +446,12 @@ abstract contract BasePool is IBasePool {
         // update loan info
         loanInfo.repaid = true;
 
-        //update the aggregation mappings
+        // update pool balances
+        (uint256 _totalLiquidity, uint256 _totalClaimable) = getBalances();
+        totalLiquidity = _totalLiquidity;
+        totalClaimable = _totalClaimable + loanInfo.repayment;
+
+        // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             loanInfo.collateral,
@@ -500,7 +500,8 @@ abstract contract BasePool is IBasePool {
             uint128 pledgeAmount,
             uint32 expiry,
             uint128 fee,
-            uint256 _totalLiquidity
+            uint256 _totalLiquidity,
+            uint256 _totalClaimable
         ) = _borrow(
                 loanInfo.collateral,
                 _minLoanLimit,
@@ -508,7 +509,7 @@ abstract contract BasePool is IBasePool {
                 _deadline
             );
 
-        //update the aggregation mappings
+        // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             loanInfo.collateral,
@@ -517,6 +518,11 @@ abstract contract BasePool is IBasePool {
         );
 
         {
+            // update pool balances
+            (uint256 _totalLiquidity, uint256 _totalClaimable) = getBalances();
+            totalLiquidity = _totalLiquidity;
+            totalClaimable = _totalClaimable + loanInfo.repayment;   
+
             // set new loan info
             loanInfo.repaid = true;
             loanIdxToBorrower[loanIdx] = msg.sender;
@@ -535,14 +541,6 @@ abstract contract BasePool is IBasePool {
                 address(this),
                 loanInfo.repayment - loanAmount
             );
-            // transfer collateral
-            if (fee > 0) {
-                IERC20Metadata(collCcyToken).safeTransferFrom(
-                    msg.sender,
-                    TREASURY,
-                    fee
-                );
-            }
         }
         // spawn event
         emit Roll(
@@ -587,6 +585,12 @@ abstract contract BasePool is IBasePool {
                 lpInfo.claimIndex++;
             }
         }
+
+        // update pool balances
+        (uint256 _totalLiquidity, uint256 _totalClaimable) = getBalances();
+        totalLiquidity = _totalLiquidity;
+        totalClaimable = _totalClaimable - repayments;   
+        
         // transfer liquidity or reinvest
         if (repayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
@@ -661,6 +665,13 @@ abstract contract BasePool is IBasePool {
             }
         }
 
+        {
+            // update pool balances
+            (uint256 _totalLiquidity, uint256 _totalClaimable) = getBalances();
+            totalLiquidity = _totalLiquidity;
+            totalClaimable = _totalClaimable - totalRepayments;   
+        }
+
         if (totalRepayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(
                 msg.sender,
@@ -676,7 +687,7 @@ abstract contract BasePool is IBasePool {
                 totalCollateral
             );
         }
-        //spawn event
+        // spawn event
         emit ClaimFromAggregated(
             _fromLoanIdx,
             _endAggIdxs[lengthArr - 1],
@@ -689,7 +700,7 @@ abstract contract BasePool is IBasePool {
         uint256[] calldata _loanIdxs,
         uint256 arrayLen,
         uint256 _shares
-    ) internal view returns (uint256 repayments, uint256 collateral) {
+    ) internal virtual view returns (uint256 repayments, uint256 collateral) {
         // aggregate claims from list
         for (uint256 i = 0; i < arrayLen; ) {
             LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
@@ -717,22 +728,11 @@ abstract contract BasePool is IBasePool {
         collateral = (collateral * _shares) / BASE;
     }
 
-    function setProtocolFee(uint128 _newFee) external {
-        // verify new fee
-        if (msg.sender != TREASURY) revert UnauthorizedFeeUpdate();
-        if (_newFee == protocolFee) revert NewFeeMustBeDifferent();
-        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeTooHigh();
-        // spawn event
-        emit FeeUpdate(protocolFee, _newFee);
-        // set new fee
-        protocolFee = _newFee;
-    }
-
     function getClaimsFromAggregated(
         uint256 _fromLoanIdx,
         uint256 _toLoanIdx,
         uint256 _shares
-    ) public view returns (uint256 repayments, uint256 collateral) {
+    ) public virtual view returns (uint256 repayments, uint256 collateral) {
         if (
             !(_toLoanIdx - _fromLoanIdx == firstLengthPerClaimInterval - 1 ||
                 _toLoanIdx - _fromLoanIdx ==

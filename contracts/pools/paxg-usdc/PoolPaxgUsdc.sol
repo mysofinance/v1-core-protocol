@@ -33,8 +33,9 @@ contract PoolPaxgUsdc is BasePool {
         )
     {}
 
-    function getTotalLiquidity() public view override returns (uint256) {
-        return totalLiquidity;
+    function getBalances() public override view returns (uint256 _totalLiquidity, uint256 _totalClaimable) {
+        _totalLiquidity = totalLiquidity;
+        _totalClaimable = totalClaimable;
     }
 
     function getTransferFee(uint128 pledgeAmount)

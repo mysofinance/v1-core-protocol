@@ -33,9 +33,15 @@ contract PoolPaxgAusdc is BasePool {
         )
     {}
 
-    function getTotalLiquidity() public view override returns (uint256) {
-        uint256 balanceOf = IAToken(loanCcyToken).balanceOf(address(this));
-        return balanceOf;
+    function getBalances() public override view returns (uint256 _totalLiquidity, uint256 _totalClaimable) {
+        uint256 totalBalanceWithoutInterest = totalLiquidity + totalClaimable;
+        uint256 totalBalanceWithInterest = IAToken(loanCcyToken).balanceOf(address(this));
+        _totalLiquidity = totalLiquidity;
+        _totalClaimable = totalClaimable;
+        if (totalBalanceWithoutInterest > 0) {
+            _totalLiquidity = _totalLiquidity * totalBalanceWithInterest / totalBalanceWithoutInterest;
+            _totalClaimable = _totalClaimable * totalBalanceWithInterest / totalBalanceWithoutInterest;
+        }
     }
 
     function getTransferFee(uint128 pledgeAmount)
@@ -46,5 +52,31 @@ contract PoolPaxgAusdc is BasePool {
     {
         uint256 transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
         return uint128(transferFee);
+    }
+
+    function getClaimsFromList(
+        uint256[] calldata _loanIdxs,
+        uint256 arrayLen,
+        uint256 _shares
+    ) internal override view returns (uint256 repayments, uint256 collateral) {
+        (repayments, collateral) = super.getClaimsFromList(_loanIdxs, arrayLen, _shares);
+        uint256 totalBalanceWithoutInterest = totalLiquidity + totalClaimable;
+        uint256 totalBalanceWithInterest = IAToken(loanCcyToken).balanceOf(address(this));
+        if (totalBalanceWithoutInterest > 0) {
+            repayments = repayments * totalBalanceWithInterest / totalBalanceWithoutInterest;
+        }
+    }
+
+    function getClaimsFromAggregated(
+        uint256 _fromLoanIdx,
+        uint256 _toLoanIdx,
+        uint256 _shares
+    ) public override view returns (uint256 repayments, uint256 collateral) {
+        (repayments, collateral) = super.getClaimsFromAggregated(_fromLoanIdx, _toLoanIdx, _shares);
+        uint256 totalBalanceWithoutInterest = totalLiquidity + totalClaimable;
+        uint256 totalBalanceWithInterest = IAToken(loanCcyToken).balanceOf(address(this));
+        if (totalBalanceWithoutInterest > 0) {
+            repayments = repayments * totalBalanceWithInterest / totalBalanceWithoutInterest;
+        }
     }
 }

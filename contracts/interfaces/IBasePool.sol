@@ -78,7 +78,8 @@ interface IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint256 _totalLiquidity
+            uint256 _totalLiquidity,
+            uint256 _totalClaimable
         );
 
     function repay(uint256 _loanIdx) external;
