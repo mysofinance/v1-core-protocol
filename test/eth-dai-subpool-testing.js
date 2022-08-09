@@ -157,26 +157,30 @@ describe("ETH-DAI Pool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     //claim
-    await subPool.connect(lp1).claim([1,2,3]);
+    await subPool.connect(lp1).claim([1,2,3], false);
     //cannot claim twice
-    await expect(subPool.connect(lp1).claim([1,2,3])).to.be.reverted;
+    await expect(subPool.connect(lp1).claim([1,2,3], false)).to.be.reverted;
 
+    let lp_1_info = await subPool.getlpArrInfo(lp1.address, 0, 0);
     //remove liquidity
-    await subPool.connect(lp1).removeLiquidity();
+    await subPool.connect(lp1).removeLiquidity(lp_1_info[0]);
     //cannot remove twice
-    await expect(subPool.connect(lp1).removeLiquidity()).to.be.reverted;
+    await expect(subPool.connect(lp1).removeLiquidity(lp_1_info[0])).to.be.reverted;
+
+    lp_1_info = await subPool.getlpArrInfo(lp1.address, 1, 1);
+    await expect(lp_1_info[0]).to.be.equal(0);
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await subPool.connect(lp4).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
-    await expect(subPool.connect(lp4).claim([1])).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([2])).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([3])).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([1,2])).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([2,3])).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([1,3])).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([1,2,3])).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([1], false)).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([2], false)).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([3], false)).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([1,2], false)).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([2,3], false)).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([1,3], false)).to.be.reverted;
+    await expect(subPool.connect(lp4).claim([1,2,3], false)).to.be.reverted;
   });
   
   it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
@@ -231,12 +235,12 @@ describe("ETH-DAI Pool Testing", function () {
     }
     loanIds = Array.from(Array(100), (_, index) => index + 1);
 
-    await subPool.connect(lp1).claim(loanIds);
+    await subPool.connect(lp1).claim(loanIds, false);
     //cannot claim twice
-    await expect(subPool.connect(lp1).claim(loanIds)).to.be.reverted;
+    await expect(subPool.connect(lp1).claim(loanIds, false)).to.be.reverted;
 
-    await subPool.connect(lp2).claim(loanIds);
-    await subPool.connect(lp3).claim(loanIds);
+    await subPool.connect(lp2).claim(loanIds, false);
+    await subPool.connect(lp3).claim(loanIds, false);
   });
   
   it("Should handle aggregate claims correctly (1/2)", async function () {
@@ -278,7 +282,7 @@ describe("ETH-DAI Pool Testing", function () {
     preClaimBal = await DAI.balanceOf(lp1.address);
     loanIds = Array.from(Array(99), (_, index) => index + 1);
 
-    await subPool.connect(lp1).claim(loanIds);
+    await subPool.connect(lp1).claim(loanIds, false);
     postClaimBal = await DAI.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -286,7 +290,7 @@ describe("ETH-DAI Pool Testing", function () {
     await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
 
     //cannot claim twice
-    await expect(subPool.connect(lp1).claimFromAggregated(0, [99])).to.be.reverted;
+    await expect(subPool.connect(lp1).claimFromAggregated(0, [99], false)).to.be.reverted;
 
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
@@ -294,17 +298,17 @@ describe("ETH-DAI Pool Testing", function () {
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await DAI.balanceOf(lp2.address);
-    await subPool.connect(lp2).claimFromAggregated(0, [99]);
+    await subPool.connect(lp2).claimFromAggregated(0, [99], false);
     postClaimBal = await DAI.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
     //cannot claim twice
-    await expect(subPool.connect(lp2).claimFromAggregated(0, [99])).to.be.reverted;
+    await expect(subPool.connect(lp2).claimFromAggregated(0, [99], false)).to.be.reverted;
 
     //lp3 claims
     preClaimBal = await DAI.balanceOf(lp3.address);
-    await subPool.connect(lp3).claimFromAggregated(0, [99]);
+    await subPool.connect(lp3).claimFromAggregated(0, [99], false);
     postClaimBal = await DAI.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -313,7 +317,7 @@ describe("ETH-DAI Pool Testing", function () {
 
     //lp4 claims
     preClaimBal = await DAI.balanceOf(lp4.address);
-    await subPool.connect(lp4).claimFromAggregated(0, [99]);
+    await subPool.connect(lp4).claimFromAggregated(0, [99], false);
     postClaimBal = await DAI.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -355,8 +359,8 @@ describe("ETH-DAI Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await DAI.balanceOf(lp1.address);
-    await expect(subPool.connect(lp1).claimFromAggregated(1, [3])).to.be.reverted;
-    await subPool.connect(lp1).claim([1,2,3]);
+    await expect(subPool.connect(lp1).claimFromAggregated(1, [3], false)).to.be.reverted;
+    await subPool.connect(lp1).claim([1,2,3], false);
     postClaimEthBal = await WETH.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await DAI.balanceOf(lp1.address);
 
@@ -377,8 +381,8 @@ describe("ETH-DAI Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     preClaimTokenBal = await DAI.balanceOf(lp2.address);
-    await expect(subPool.connect(lp2).claimFromAggregated(1, [3])).to.be.reverted;
-    await subPool.connect(lp2).claim([1,2,3]);
+    await expect(subPool.connect(lp2).claimFromAggregated(1, [3], false)).to.be.reverted;
+    await subPool.connect(lp2).claim([1,2,3], false);
     postClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     postClaimTokenBal = await DAI.balanceOf(lp2.address);
 
@@ -399,8 +403,8 @@ describe("ETH-DAI Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await DAI.balanceOf(lp3.address);
-    await expect(subPool.connect(lp3).claimFromAggregated(1, [3])).to.be.reverted;
-    await subPool.connect(lp3).claim([1,2,3]);
+    await expect(subPool.connect(lp3).claimFromAggregated(1, [3], false)).to.be.reverted;
+    await subPool.connect(lp3).claim([1,2,3], false);
     postClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await DAI.balanceOf(lp3.address);
 
@@ -445,13 +449,17 @@ describe("ETH-DAI Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     //claim
-    await subPool.connect(lp1).claimFromAggregated(0, [99,199]);
-    await subPool.connect(lp2).claimFromAggregated(0, [99,199]);
+    await subPool.connect(lp1).claimFromAggregated(0, [99,199], false);
+    await subPool.connect(lp2).claimFromAggregated(0, [99,199], false);
 
     //remove liquidity
-    await subPool.connect(lp1).removeLiquidity();
-    await subPool.connect(lp2).removeLiquidity();
-    await subPool.connect(lp3).removeLiquidity();
+    const lp_1_info = await subPool.getlpArrInfo(lp1.address, 0, 0);
+    const lp_2_info = await subPool.getlpArrInfo(lp2.address, 0, 0);
+    const lp_3_info = await subPool.getlpArrInfo(lp3.address, 0, 0);
+
+    await subPool.connect(lp1).removeLiquidity(lp_1_info[0]);
+    await subPool.connect(lp2).removeLiquidity(lp_2_info[0]);
+    await subPool.connect(lp3).removeLiquidity(lp_3_info[0]);
 
     balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
     balTestToken = await DAI.balanceOf(subPool.address);
@@ -497,14 +505,18 @@ describe("ETH-DAI Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     //claim
-    await subPool.connect(lp1).claim([1, 2, 3]);
-    await subPool.connect(lp2).claim([1, 2, 3]);
-    await subPool.connect(lp3).claim([1, 2, 3]);
+    await subPool.connect(lp1).claim([1, 2, 3], false);
+    await subPool.connect(lp2).claim([1, 2, 3], false);
+    await subPool.connect(lp3).claim([1, 2, 3], false);
 
     //remove liquidity
-    await subPool.connect(lp1).removeLiquidity();
-    await subPool.connect(lp2).removeLiquidity();
-    await subPool.connect(lp3).removeLiquidity();
+    const lp_1_info = await subPool.getlpArrInfo(lp1.address, 0, 0);
+    const lp_2_info = await subPool.getlpArrInfo(lp2.address, 0, 0);
+    const lp_3_info = await subPool.getlpArrInfo(lp3.address, 0, 0);
+
+    await subPool.connect(lp1).removeLiquidity(lp_1_info[0]);
+    await subPool.connect(lp2).removeLiquidity(lp_2_info[0]);
+    await subPool.connect(lp3).removeLiquidity(lp_3_info[0]);
 
     balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
     balTestToken = await DAI.balanceOf(subPool.address);

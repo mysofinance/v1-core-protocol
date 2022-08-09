@@ -61,7 +61,7 @@ interface IBasePool {
         uint16 _referralCode
     ) external payable;
 
-    function removeLiquidity() external;
+    function removeLiquidity(uint256 numSharesRemove) external;
 
     function borrow(
         uint128 _pledgeAmount,
@@ -91,11 +91,44 @@ interface IBasePool {
         uint16 _referralCode
     ) external;
 
-    function claim(uint256[] calldata _loanIdxs) external;
+    function claim(uint256[] calldata _loanIdxs, bool _isReinvested) external;
 
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(
         uint256 _fromLoanIdx,
-        uint256[] calldata _endAggIdxs
+        uint256[] calldata _endAggIdxs,
+        bool _isReinvested
     ) external;
+
+    function getlpArrInfo(
+        address _lpAddr,
+        uint256 index1,
+        uint256 index2
+    ) external view returns (uint256, uint256, uint256);
+
+    function collCcyToken() external view returns (address);
+
+    function loanCcyToken() external view returns (address);
+
+    function maxLoanPerColl() external view returns (uint256);
+
+    function protocolFee() external view returns (uint128);
+
+    function totalLpShares() external view returns (uint128);
+
+    function loanIdx() external view returns (uint256);
+
+    function r1() external view returns (uint256);
+
+    function r2() external view returns (uint256);
+
+    function tvl1() external view returns (uint256);
+
+    function tvl2() external view returns (uint256);
+
+    function minLoan() external view returns (uint256);
+
+    function totalFees() external view returns (uint256);
+
+    function loanIdxToBorrower(uint256) external view returns (address);
 }
