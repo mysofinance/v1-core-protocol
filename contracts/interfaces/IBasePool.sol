@@ -91,7 +91,12 @@ interface IBasePool {
         uint16 _referralCode
     ) external;
 
-    function claim(uint256[] calldata _loanIdxs, bool _isReinvested) external;
+    function claim(
+        uint256[] calldata _loanIdxs,
+        bool _isReinvested,
+        uint256 _deadline,
+        bool _incrCurrSharePtr
+    ) external;
 
     //including _fromLoanIdx and _toLoanIdx
     function claimFromAggregated(
@@ -104,7 +109,14 @@ interface IBasePool {
         address _lpAddr,
         uint256 index1,
         uint256 index2
-    ) external view returns (uint256, uint256, uint256);
+    )
+        external
+        view
+        returns (
+            uint256,
+            uint256,
+            uint256
+        );
 
     function collCcyToken() external view returns (address);
 
