@@ -249,7 +249,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     await expect(paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.reverted;
   });
 
-  it("Should allow LPs to claim individually", async function () {
+  it("Should allow LPs to claim individually test", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+60, 0);

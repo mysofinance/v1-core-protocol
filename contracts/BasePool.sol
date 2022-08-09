@@ -217,12 +217,12 @@ abstract contract BasePool is IBasePool {
             );
         }
         totalLpShares += uint128(newLpShares);
-        if (((minLoan * BASE * newLpShares) / totalLpShares) == 0)
-            revert TooBigAddToLaterClaimOnRepay();
         if (
             ((((10**COLL_TOKEN_DECIMALS * minLoan * newLpShares) /
                 maxLoanPerColl) * BASE) / totalLpShares) == 0
         ) revert TooBigAddToLaterClaimColl();
+        if (((minLoan * BASE * newLpShares) / totalLpShares) == 0)
+            revert TooBigAddToLaterClaimOnRepay();
         totalLiquidity = _totalLiquidity + _amount;
         // update lp info
         if (lpInfo.fromLoanIdx == 0) {
