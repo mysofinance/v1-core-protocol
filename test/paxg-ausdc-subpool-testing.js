@@ -332,7 +332,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     await expect((9900 <= pct) && (pct <= 10010)).to.be.true;
 
     //cannot claim twice
-    await expect(paxgPool.connect(lp1).claimFromAggregated(0, [99], false)).to.be.reverted;
+    await expect(paxgPool.connect(lp1).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
 
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
@@ -340,19 +340,19 @@ describe("PAXG-AUSDC Pool Testing", function () {
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await AUSDC.balanceOf(lp2.address);
-    await expect(paxgPool.connect(lp2).claimFromAggregated(1, [99], false)).to.be.reverted;
-    await paxgPool.connect(lp2).claimFromAggregated(0, [99], false);
+    await expect(paxgPool.connect(lp2).claimFromAggregated([1, 99], false, timestamp+9999999)).to.be.reverted;
+    await paxgPool.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999);
     postClaimBal = await AUSDC.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     pct = benchmarkDiff.mul(10000).div(diff)
     await expect(9999 <= pct && pct <= 10001).to.be.true;
 
     //cannot claim twice
-    await expect(paxgPool.connect(lp2).claimFromAggregated(0, [99], false)).to.be.reverted;
+    await expect(paxgPool.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
 
     //lp3 claims
     preClaimBal = await AUSDC.balanceOf(lp3.address);
-    await paxgPool.connect(lp3).claimFromAggregated(0,[99], false);
+    await paxgPool.connect(lp3).claimFromAggregated([0, 99], false, timestamp+9999999);
     postClaimBal = await AUSDC.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -361,7 +361,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
 
     //lp4 claims
     preClaimBal = await AUSDC.balanceOf(lp4.address);
-    await paxgPool.connect(lp4).claimFromAggregated(0,[99], false);
+    await paxgPool.connect(lp4).claimFromAggregated([0, 99], false, timestamp+9999999);
     postClaimBal = await AUSDC.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -402,7 +402,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     //lp1 claims
     preClaimEthBal = await PAXG.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await AUSDC.balanceOf(lp1.address);
-    await expect(paxgPool.connect(lp1).claimFromAggregated(1, [3], false)).to.be.reverted;
+    await expect(paxgPool.connect(lp1).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
     await paxgPool.connect(lp1).claim([1,2,3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await AUSDC.balanceOf(lp1.address);
@@ -448,7 +448,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await AUSDC.balanceOf(lp3.address);
-    await expect(paxgPool.connect(lp3).claimFromAggregated(1, [3], false)).to.be.reverted;
+    await expect(paxgPool.connect(lp3).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
     await paxgPool.connect(lp3).claim([1, 2, 3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await AUSDC.balanceOf(lp3.address);
@@ -494,12 +494,12 @@ describe("PAXG-AUSDC Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     //aggregate only allowed per 100 loans or multiples of 1000 not per 200
-    await expect(paxgPool.connect(lp1).claimFromAggregated(0, [199], false)).to.be.reverted;
-    await expect(paxgPool.connect(lp2).claimFromAggregated(1, [99, 199], false)).to.be.reverted;
+    await expect(paxgPool.connect(lp1).claimFromAggregated([0, 199], false, timestamp+9999999)).to.be.reverted;
+    await expect(paxgPool.connect(lp2).claimFromAggregated([1, 99, 199], false, timestamp+9999999)).to.be.reverted;
 
     //claim
-    await paxgPool.connect(lp1).claimFromAggregated(0, [99, 199], false);
-    await paxgPool.connect(lp2).claimFromAggregated(0, [99, 199], false);
+    await paxgPool.connect(lp1).claimFromAggregated([0, 99, 199], false, timestamp+9999999);
+    await paxgPool.connect(lp2).claimFromAggregated([0, 99, 199], false, timestamp+9999999);
 
     //remove liquidity
     const lp1NumShares = await paxgPool.getNumShares(lp1.address);

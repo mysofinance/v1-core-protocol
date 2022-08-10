@@ -55,12 +55,26 @@ interface IBasePool {
     event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx);
 
+    /**
+     * @notice Function which adds to an LPs current position
+     * @dev This function will update loanIdxsWhereSharesChanged only if not
+     * the first add
+     * @param _amount Amount of loan currency LP wishes to deposit
+     * @param _deadline Last timestamp after which function will revert
+     * @param _referralCode Will possibly be used later to reward referrals
+     */
     function addLiquidity(
         uint128 _amount,
         uint256 _deadline,
         uint16 _referralCode
     ) external payable;
 
+    /**
+     * @notice Function which removes shares from an LPs
+     * @dev This function will update loanIdxsWhereSharesChanged
+     * and shareOverTime arrays in lpInfo
+     * @param numSharesRemove Amount of LP shares to remove
+     */
     function removeLiquidity(uint256 numSharesRemove) external;
 
     function borrow(
@@ -110,16 +124,32 @@ interface IBasePool {
     /**
      * @notice Function which handles aggregate claiming by LPs
      * @dev This function is much more efficient, but can only be used when LPs position size did not change
-     * over the entire interval LP would like to claim over. _endAggIdxs must be increasing array.
-     * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
-     * @param _endAggIdxs End Indices of the aggregation that he wants to claim
+     * over the entire interval LP would like to claim over. _aggIdxs must be increasing array.
+     * the first index of _aggIdxs is the from loan index to start aggregation, the rest of the
+     * indices are the end loan indexes of the intervals he wants to claim
+     * @param _aggIdxs From index and end indices of the aggregation that LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
+     * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
      */
     function claimFromAggregated(
-        uint256 _fromLoanIdx,
-        uint256[] calldata _endAggIdxs,
-        bool _isReinvested
+        uint256[] calldata _aggIdxs,
+        bool _isReinvested,
+        uint256 _deadline
     ) external;
+
+    /**
+     * @notice Function which returns claims for a given aggregated from and to index and amount of sharesOverTime
+     * @dev This function is called internally, but also can be used by other protocols so has some checks
+     * which are unnecessary if it was solely an internal function
+     * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
+     * @param _toLoanIdx End loan index of the aggregation
+     * @param _shares Amount of sharesOverTime which the Lp owned over this given aggregation period
+     */
+    function getClaimsFromAggregated(
+        uint256 _fromLoanIdx,
+        uint256 _toLoanIdx,
+        uint256 _shares
+    ) external view returns (uint256 repayments, uint256 collateral);
 
     function getNumShares(address _lpAddr)
         external
