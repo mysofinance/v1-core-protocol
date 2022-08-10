@@ -91,33 +91,45 @@ interface IBasePool {
         uint16 _referralCode
     ) external;
 
+    /**
+     * @notice Function which handles individual claiming by LPs
+     * @dev This function is more expensive, but needs to be used when Lp
+     * changes position size in the middle of smallest aggregation block
+     * or if LP wants to claim some of the loans before the expiry time
+     * of the last loan in the aggregation block. _loanIdxs must be increasing array.
+     * @param _loanIdxs Loan indices on which LP wants to claim
+     * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
+     * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
+     */
     function claim(
         uint256[] calldata _loanIdxs,
         bool _isReinvested,
-        uint256 _deadline,
-        bool _incrCurrSharePtr
+        uint256 _deadline
     ) external;
 
-    //including _fromLoanIdx and _toLoanIdx
+    /**
+     * @notice Function which handles aggregate claiming by LPs
+     * @dev This function is much more efficient, but can only be used when LPs position size did not change
+     * over the entire interval LP would like to claim over. _endAggIdxs must be increasing array.
+     * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
+     * @param _endAggIdxs End Indices of the aggregation that he wants to claim
+     * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
+     */
     function claimFromAggregated(
         uint256 _fromLoanIdx,
         uint256[] calldata _endAggIdxs,
         bool _isReinvested
     ) external;
 
-    function getlpArrInfo(
-        address _lpAddr,
-        uint256 index1,
-        uint256 index2
+    function getNumShares(
+        address _lpAddr
     )
         external
         view
         returns (
-            uint256,
-            uint256,
-            uint256
+            uint256 numShares
         );
-
+    
     function collCcyToken() external view returns (address);
 
     function loanCcyToken() external view returns (address);

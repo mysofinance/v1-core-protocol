@@ -39,7 +39,10 @@ abstract contract BasePool is IBasePool {
     error AlreadyRepaid();
     error CannotRepayInSameBlock();
     error NothingToClaim();
+    error MustBeLp();
+    error InvalidNewSharePointer();
     error UnentitledFromLoanIdx();
+    error OutsideNextUpperLoanIdxBnd();
     error UnentitledToLoanIdx();
     error InvalidFromToAggregation();
     error InvalidFirstLengthPerClaimInterval();
@@ -88,11 +91,16 @@ abstract contract BasePool is IBasePool {
     mapping(uint256 => mapping(uint256 => AggClaimsInfo)) loanIdxRangeToAggClaimsInfo;
 
     struct LpInfo {
+        // lower bound loan idx (incl.) from which lp is entitled to claim
         uint32 fromLoanIdx;
+        // timestamp from which on lp is allowed to remove liquidty
         uint32 earliestRemove;
+        // current pointer...
         uint32 currSharePtr;
+        // array of len n, with elements representing number of shares and new elements being added for consecutive adding/removing of liquidity
         uint256[] shares;
-        uint256[] toLoanIdxs;
+        // array of len n-1, with elements representing upper bound loan idx bounds (excl.), where lp can claim until nextUpperLoanIdxBnds[i] with shares[i]; and if index i is outside of bounds of nextUpperLoanIdxBnds[] then lp can claim up until latest loan idx with shares[i]
+        uint256[] nextUpperLoanIdxBnds;
     }
 
     struct LoanInfo {
@@ -217,7 +225,7 @@ abstract contract BasePool is IBasePool {
             );
         }
         totalLpShares += uint128(newLpShares);
-        //purposefully put multiplication after division
+        // purposefully first divide and then multiply to emulate order of operations in claiming 
         if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
             revert TooBigAddToLaterClaimOnRepay();
         if (
@@ -228,16 +236,15 @@ abstract contract BasePool is IBasePool {
         ) revert TooBigAddToLaterClaimColl();
         totalLiquidity = _totalLiquidity + _amount;
         // update lp info
-        if (lpInfo.fromLoanIdx == 0) {
+        bool isFirstAddLiquidity = lpInfo.fromLoanIdx == 0;
+        if (isFirstAddLiquidity) {
             lpInfo.fromLoanIdx = uint32(loanIdx);
+            lpInfo.shares.push(newLpShares);
+        } else {
+            lpInfo.shares.push(newLpShares + lpInfo.shares[lpInfo.shares.length - 1]);
+            lpInfo.nextUpperLoanIdxBnds.push(loanIdx);
         }
-
         lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
-        uint256 shareLength = lpInfo.shares.length;
-        shareLength > 0
-            ? lpInfo.shares.push(newLpShares + lpInfo.shares[shareLength - 1])
-            : lpInfo.shares.push(newLpShares);
-        lpInfo.toLoanIdxs.push(loanIdx);
 
         if (wrapToWeth) {
             // wrap to Weth
@@ -265,7 +272,7 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    //put in number of shares to remove, up to all of them
+    // put in number of shares to remove, up to all of them
     function removeLiquidity(uint256 numShares) external override {
         // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
@@ -282,7 +289,7 @@ abstract contract BasePool is IBasePool {
         totalLpShares -= uint128(numShares);
         totalLiquidity = _totalLiquidity - liquidityRemoved;
         lpInfo.shares.push(lpInfo.shares[shareLength - 1] - numShares);
-        lpInfo.toLoanIdxs.push(loanIdx);
+        lpInfo.nextUpperLoanIdxBnds.push(loanIdx);
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
@@ -381,14 +388,6 @@ abstract contract BasePool is IBasePool {
                 address(this),
                 pledgeAmount
             );
-
-            if (fee > 0) {
-                IERC20Metadata(collCcyToken).safeTransferFrom(
-                    msg.sender,
-                    TREASURY,
-                    fee
-                );
-            }
         }
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
@@ -537,14 +536,6 @@ abstract contract BasePool is IBasePool {
                 address(this),
                 loanInfo.repayment - loanAmount
             );
-            // transfer collateral
-            if (fee > 0) {
-                IERC20Metadata(collCcyToken).safeTransferFrom(
-                    msg.sender,
-                    TREASURY,
-                    fee
-                );
-            }
         }
         // spawn event
         emit Roll(
@@ -556,81 +547,50 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    /**
-     * @notice Function which handles individual claiming by LPs
-     * @dev This function is more expensive, but needs to be used when Lp
-     * changes position size in the middle of smallest aggregation block
-     * or if LP wants to claim some of the loans before the expiry time
-     * of the last loan in the aggregation block. _loanIdxs must be increasing array.
-     * @param _loanIdxs Loan indices on which LP wants to claim
-     * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
-     * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
-     * @param _incrCurrSharePtr Flag to determine if LP wants to increment his share pointer
-     * @dev _incrCurrSharePtr should only be used for LPs with very low (or 0) shares currently or
-     * if they do not want to wait for the last few loans in their left before the next ToLoanIdx kicks
-     * in. This should be used with caution, as an LP who increments their pointer and skips over a large
-     * number of loans misses out on those loans for good.
-     */
     function claim(
         uint256[] calldata _loanIdxs,
         bool _isReinvested,
-        uint256 _deadline,
-        bool _incrCurrSharePtr
+        uint256 _deadline
     ) external override {
-        //check if reinvested is chosen that deadline is valid
+        // if lp wants to reinvest check deadline
         if (_isReinvested && block.timestamp > _deadline) revert PastDeadline();
         // verify lp info and eligibility
-        //length of loanIdxs array lp wants to claim
         uint256 loanIdxsLen = _loanIdxs.length;
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        //length of the shares array
-        uint256 sharesLength = lpInfo.shares.length;
-        //current pointer in the shares array
-        uint256 claimedShareIdx = lpInfo.currSharePtr;
-        //check to increment share pointer
-        if (_incrCurrSharePtr && sharesLength - 1 > claimedShareIdx) {
-            lpInfo.currSharePtr++;
-            claimedShareIdx++;
-            lpInfo.fromLoanIdx = uint32(lpInfo.toLoanIdxs[claimedShareIdx]);
-        }
-        //checks if loanIds passed in are empty or if the shares array is empty
-        // in which case, the Lp has no positions.
-        if (loanIdxsLen * sharesLength == 0) revert NothingToClaim();
-        //sanity check on the low and high extremes of loanIds passed in
+        // check if passed loan idxs or shares array is empty <=> lp has no position
+        if (loanIdxsLen * lpInfo.shares.length == 0) revert NothingToClaim();
+        // sanity check on the low and high extremes of passed loan idxs
         if (_loanIdxs[0] == 0 || _loanIdxs[loanIdxsLen - 1] >= loanIdx)
             revert InvalidLoanIdx();
-        //first loan cannot be less than from loan idx (double-claiming or not entitled since
-        //wasn't invested during that time)
+        // 1st loan idx mustn't be less than 'from loan idx' (double-claiming or not entitled since
+        // wasn't invested during that time)
         if (_loanIdxs[0] < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
-        //set the current max allowed to loan index. If the shares pointer is all the way
-        //at the end of the shares array, then global loanIdx is max to loan index,
-        //else you peek one ahead in the toLoanIdx array
-        uint256 currToLoanIdx = sharesLength - 1 == claimedShareIdx
-            ? loanIdx
-            : lpInfo.toLoanIdxs[claimedShareIdx + 1];
-        //last loan cannot be greater or equal to current to loan index
-        if (_loanIdxs[loanIdxsLen - 1] >= currToLoanIdx)
-            revert UnentitledToLoanIdx();
-        // get claims
+        // get applicable number of shares for pro-rata calculations (given current share pointer position)
+        uint256 applicableShares = lpInfo.shares[lpInfo.currSharePtr];
+        // if shares pointer position is on last element then lp can claim up until current loan idx with applicableShares;
+        // else lp can claim until respective lpInfo.nextUpperLoanIdxBnds element with applicableShares
+        uint256 nextUpperLoanIdxBnd;
+        if (lpInfo.currSharePtr == lpInfo.shares.length - 1) {
+            nextUpperLoanIdxBnd = loanIdx;
+        } else {
+            nextUpperLoanIdxBnd = lpInfo.nextUpperLoanIdxBnds[lpInfo.currSharePtr];
+        }
+        // passed last loan idx mustn't be gte to nextUpperLoanIdxBnd
+        if (_loanIdxs[loanIdxsLen - 1] >= nextUpperLoanIdxBnd)
+            revert OutsideNextUpperLoanIdxBnd();
+        // iterate over loans to get claimable amounts
         (uint256 repayments, uint256 collateral) = getClaimsFromList(
             _loanIdxs,
             loanIdxsLen,
-            lpInfo.shares[claimedShareIdx]
+            applicableShares
         );
-        //update Lps from loan index
+        // update lp's from loan index to prevent double claiming
         lpInfo.fromLoanIdx = uint32(_loanIdxs[loanIdxsLen - 1]) + 1;
-        //if current share pointer is not already at end and
-        //the last loan claimed was exactly one below the currentToLoanIdx
-        //then increment the current share pointer
-        if (
-            claimedShareIdx != sharesLength - 1 &&
-            _loanIdxs[loanIdxsLen - 1] + 1 == currToLoanIdx
-        ) {
-            unchecked {
-                lpInfo.currSharePtr++;
-            }
+        // increment share pointer iff last element in _loanIdxs matches nextUpperLoanIdxBnd
+        if(_loanIdxs[loanIdxsLen - 1] == nextUpperLoanIdxBnd) {
+            lpInfo.currSharePtr++;
         }
-        // transfer liquidity or reinvest
+        // transfer liquidity (and reinvest)
         if (repayments > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, repayments);
             if (_isReinvested) {
@@ -645,14 +605,16 @@ abstract contract BasePool is IBasePool {
         emit Claim(_loanIdxs, repayments, collateral);
     }
 
-    /**
-     * @notice Function which handles aggregate claiming by LPs
-     * @dev This function is much more efficient, but can only be used when LPs position size did not change
-     * over the entire interval LP would like to claim over. _endAggIdxs must be increasing array.
-     * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
-     * @param _endAggIdxs End Indices of the aggregation that he wants to claim
-     * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
-     */
+    function overrideSharePointer(uint256 _newSharePointer) external {
+        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
+        if (lpInfo.fromLoanIdx == 0)
+            revert MustBeLp();
+        if (_newSharePointer == 0 || _newSharePointer <= lpInfo.currSharePtr || _newSharePointer > lpInfo.shares.length - 1 || _newSharePointer > lpInfo.nextUpperLoanIdxBnds.length - 1)
+            revert InvalidNewSharePointer();
+        lpInfo.currSharePtr = uint32(_newSharePointer);
+        lpInfo.fromLoanIdx = uint32(lpInfo.nextUpperLoanIdxBnds[_newSharePointer]);
+    }
+
     function claimFromAggregated(
         uint256 _fromLoanIdx,
         uint256[] calldata _endAggIdxs,
@@ -684,7 +646,7 @@ abstract contract BasePool is IBasePool {
         //else you peek one ahead in the toLoanIdx array
         uint256 currToLoanIdx = sharesLength - 1 == claimedShareIdx
             ? loanIdx
-            : lpInfo.toLoanIdxs[claimedShareIdx + 1];
+            : lpInfo.nextUpperLoanIdxBnds[claimedShareIdx + 1];
         //last loan cannot be greater or equal to current to loan index
         if (_endAggIdxs[lengthArr - 1] >= currToLoanIdx)
             revert UnentitledToLoanIdx();
@@ -802,17 +764,6 @@ abstract contract BasePool is IBasePool {
         collateral = (collateral * _shares) / BASE;
     }
 
-    function setProtocolFee(uint128 _newFee) external {
-        // verify new fee
-        if (msg.sender != TREASURY) revert UnauthorizedFeeUpdate();
-        if (_newFee == protocolFee) revert NewFeeMustBeDifferent();
-        if (_newFee > MAX_PROTOCOL_FEE) revert NewFeeTooHigh();
-        // spawn event
-        emit FeeUpdate(protocolFee, _newFee);
-        // set new fee
-        protocolFee = _newFee;
-    }
-
     /**
      * @notice Function which returns claims for a given aggregated from and to index and amount of shares
      * @dev This function is called internally, but also can be used by other protocols so has some checks
@@ -898,23 +849,19 @@ abstract contract BasePool is IBasePool {
         ].repayments += repaymentUpdate;
     }
 
-    function getlpArrInfo(
-        address _lpAddr,
-        uint256 index1,
-        uint256 index2
+    function getNumShares(
+        address _lpAddr
     )
         external
         view
         returns (
-            uint256,
-            uint256,
-            uint256
+            uint256 numShares
         )
     {
-        return (
-            addrToLpInfo[_lpAddr].shares[index1],
-            addrToLpInfo[_lpAddr].toLoanIdxs[index2],
-            addrToLpInfo[_lpAddr].shares.length
-        );
+        LpInfo memory lpInfo = addrToLpInfo[_lpAddr];
+        uint256 sharesLen = lpInfo.shares.length;
+        if(sharesLen > 0) {
+            numShares = lpInfo.shares[sharesLen-1];
+        }
     }
 }
