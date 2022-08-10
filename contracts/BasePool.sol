@@ -42,7 +42,7 @@ abstract contract BasePool is IBasePool {
     error MustBeLp();
     error InvalidNewSharePointer();
     error UnentitledFromLoanIdx();
-    error PassedLoanIdxsForNonConstantSharesPeriod();
+    error LoanIdxsWithChangingShares();
     error UnentitledToLoanIdx();
     error InvalidFromToAggregation();
     error InvalidFirstLengthPerClaimInterval();
@@ -563,14 +563,16 @@ abstract contract BasePool is IBasePool {
             revert InvalidLoanIdx();
         if (_loanIdxs[0] < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
 
-        // check if reasonable to automatically increment sharepointer for intermediate period with zero shares 
-        if (lpInfo.sharesOverTime[lpInfo.currSharePtr] == 0 && lpInfo.currSharePtr + 1 < lpInfo.sharesOverTime.length - 1) {
+        // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
+        // and push fromLoanIdx forward
+        if (lpInfo.sharesOverTime[lpInfo.currSharePtr] == 0 && lpInfo.currSharePtr < lpInfo.sharesOverTime.length - 1) {
             lpInfo.currSharePtr++;
+            lpInfo.fromLoanIdx = uint32(lpInfo.loanIdxsWhereSharesChanged[lpInfo.currSharePtr]);
         }
 
         // infer applicable upper loan idx for which number of shares didn't change
         uint256 sharesUnchangedUntilLoanIdx;
-        if (lpInfo.currSharePtr == lpInfo.sharesOverTime.length - 1 || lpInfo.loanIdxsWhereSharesChanged.length == 0) {
+        if (lpInfo.currSharePtr == lpInfo.sharesOverTime.length - 1) {
             sharesUnchangedUntilLoanIdx = loanIdx;
         } else {
             sharesUnchangedUntilLoanIdx = lpInfo.loanIdxsWhereSharesChanged[lpInfo.currSharePtr];
@@ -578,7 +580,7 @@ abstract contract BasePool is IBasePool {
 
         // check passed last loan idx is consistent with constant share interval
         if (_loanIdxs[loanIdxsLen - 1] >= sharesUnchangedUntilLoanIdx)
-            revert PassedLoanIdxsForNonConstantSharesPeriod();
+            revert LoanIdxsWithChangingShares();
 
         // get applicable number of shares for pro-rata calculations (given current share pointer position)
         uint256 applicableShares = lpInfo.sharesOverTime[lpInfo.currSharePtr];
@@ -593,8 +595,8 @@ abstract contract BasePool is IBasePool {
         // update lp's from loan index to prevent double claiming
         lpInfo.fromLoanIdx = uint32(_loanIdxs[loanIdxsLen - 1]) + 1;
 
-        // increment share pointer iff last element in _loanIdxs matches sharesUnchangedUntilLoanIdx
-        if(_loanIdxs[loanIdxsLen - 1] == sharesUnchangedUntilLoanIdx) {
+        // increment share pointer iff last element in _loanIdxs matches sharesUnchangedUntilLoanIdx and doesn't exceed array length
+        if(_loanIdxs[loanIdxsLen - 1] == sharesUnchangedUntilLoanIdx - 1 && lpInfo.currSharePtr + 1 < lpInfo.sharesOverTime.length - 1) {
             lpInfo.currSharePtr++;
         }
 
@@ -610,7 +612,7 @@ abstract contract BasePool is IBasePool {
         if (collateral > 0) {
             IERC20Metadata(collCcyToken).safeTransfer(msg.sender, collateral);
         }
-        
+
         // spawn event
         emit Claim(_loanIdxs, repayments, collateral);
     }
