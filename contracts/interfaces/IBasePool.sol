@@ -121,15 +121,11 @@ interface IBasePool {
         bool _isReinvested
     ) external;
 
-    function getNumShares(
-        address _lpAddr
-    )
+    function getNumShares(address _lpAddr)
         external
         view
-        returns (
-            uint256 numShares
-        );
-    
+        returns (uint256 numShares);
+
     function collCcyToken() external view returns (address);
 
     function loanCcyToken() external view returns (address);

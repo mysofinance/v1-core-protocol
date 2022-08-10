@@ -225,7 +225,7 @@ abstract contract BasePool is IBasePool {
             );
         }
         totalLpShares += uint128(newLpShares);
-        // purposefully first divide and then multiply to emulate order of operations in claiming 
+        // purposefully first divide and then multiply to emulate order of operations in claiming
         if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
             revert TooBigAddToLaterClaimOnRepay();
         if (
@@ -241,7 +241,10 @@ abstract contract BasePool is IBasePool {
             lpInfo.fromLoanIdx = uint32(loanIdx);
             lpInfo.sharesOverTime.push(newLpShares);
         } else {
-            lpInfo.sharesOverTime.push(newLpShares + lpInfo.sharesOverTime[lpInfo.sharesOverTime.length - 1]);
+            lpInfo.sharesOverTime.push(
+                newLpShares +
+                    lpInfo.sharesOverTime[lpInfo.sharesOverTime.length - 1]
+            );
             lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
         }
         lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
@@ -288,7 +291,9 @@ abstract contract BasePool is IBasePool {
             (_totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
         totalLpShares -= uint128(numShares);
         totalLiquidity = _totalLiquidity - liquidityRemoved;
-        lpInfo.sharesOverTime.push(lpInfo.sharesOverTime[shareLength - 1] - numShares);
+        lpInfo.sharesOverTime.push(
+            lpInfo.sharesOverTime[shareLength - 1] - numShares
+        );
         lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
 
         // transfer liquidity
@@ -558,16 +563,22 @@ abstract contract BasePool is IBasePool {
 
         // verify lp info and eligibility
         uint256 loanIdxsLen = _loanIdxs.length;
-        if (loanIdxsLen * lpInfo.sharesOverTime.length == 0) revert NothingToClaim();
+        if (loanIdxsLen * lpInfo.sharesOverTime.length == 0)
+            revert NothingToClaim();
         if (_loanIdxs[0] == 0 || _loanIdxs[loanIdxsLen - 1] >= loanIdx)
             revert InvalidLoanIdx();
         if (_loanIdxs[0] < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
 
         // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
         // and push fromLoanIdx forward
-        if (lpInfo.sharesOverTime[lpInfo.currSharePtr] == 0 && lpInfo.currSharePtr < lpInfo.sharesOverTime.length - 1) {
+        if (
+            lpInfo.sharesOverTime[lpInfo.currSharePtr] == 0 &&
+            lpInfo.currSharePtr < lpInfo.sharesOverTime.length - 1
+        ) {
             lpInfo.currSharePtr++;
-            lpInfo.fromLoanIdx = uint32(lpInfo.loanIdxsWhereSharesChanged[lpInfo.currSharePtr]);
+            lpInfo.fromLoanIdx = uint32(
+                lpInfo.loanIdxsWhereSharesChanged[lpInfo.currSharePtr]
+            );
         }
 
         // infer applicable upper loan idx for which number of shares didn't change
@@ -575,7 +586,9 @@ abstract contract BasePool is IBasePool {
         if (lpInfo.currSharePtr == lpInfo.sharesOverTime.length - 1) {
             sharesUnchangedUntilLoanIdx = loanIdx;
         } else {
-            sharesUnchangedUntilLoanIdx = lpInfo.loanIdxsWhereSharesChanged[lpInfo.currSharePtr];
+            sharesUnchangedUntilLoanIdx = lpInfo.loanIdxsWhereSharesChanged[
+                lpInfo.currSharePtr
+            ];
         }
 
         // check passed last loan idx is consistent with constant share interval
@@ -596,7 +609,10 @@ abstract contract BasePool is IBasePool {
         lpInfo.fromLoanIdx = uint32(_loanIdxs[loanIdxsLen - 1]) + 1;
 
         // increment share pointer iff last element in _loanIdxs matches sharesUnchangedUntilLoanIdx and doesn't exceed array length
-        if(_loanIdxs[loanIdxsLen - 1] == sharesUnchangedUntilLoanIdx - 1 && lpInfo.currSharePtr < lpInfo.sharesOverTime.length - 1) {
+        if (
+            _loanIdxs[loanIdxsLen - 1] == sharesUnchangedUntilLoanIdx - 1 &&
+            lpInfo.currSharePtr < lpInfo.sharesOverTime.length - 1
+        ) {
             lpInfo.currSharePtr++;
         }
 
@@ -619,12 +635,17 @@ abstract contract BasePool is IBasePool {
 
     function overrideSharePointer(uint256 _newSharePointer) external {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
-        if (lpInfo.fromLoanIdx == 0)
-            revert MustBeLp();
-        if (_newSharePointer == 0 || _newSharePointer <= lpInfo.currSharePtr || _newSharePointer > lpInfo.sharesOverTime.length - 1 || _newSharePointer > lpInfo.loanIdxsWhereSharesChanged.length - 1)
-            revert InvalidNewSharePointer();
+        if (lpInfo.fromLoanIdx == 0) revert MustBeLp();
+        if (
+            _newSharePointer == 0 ||
+            _newSharePointer <= lpInfo.currSharePtr ||
+            _newSharePointer > lpInfo.sharesOverTime.length - 1 ||
+            _newSharePointer > lpInfo.loanIdxsWhereSharesChanged.length - 1
+        ) revert InvalidNewSharePointer();
         lpInfo.currSharePtr = uint32(_newSharePointer);
-        lpInfo.fromLoanIdx = uint32(lpInfo.loanIdxsWhereSharesChanged[_newSharePointer]);
+        lpInfo.fromLoanIdx = uint32(
+            lpInfo.loanIdxsWhereSharesChanged[_newSharePointer]
+        );
     }
 
     function claimFromAggregated(
@@ -861,19 +882,15 @@ abstract contract BasePool is IBasePool {
         ].repayments += repaymentUpdate;
     }
 
-    function getNumShares(
-        address _lpAddr
-    )
+    function getNumShares(address _lpAddr)
         external
         view
-        returns (
-            uint256 numShares
-        )
+        returns (uint256 numShares)
     {
         LpInfo memory lpInfo = addrToLpInfo[_lpAddr];
         uint256 sharesLen = lpInfo.sharesOverTime.length;
-        if(sharesLen > 0) {
-            numShares = lpInfo.sharesOverTime[sharesLen-1];
+        if (sharesLen > 0) {
+            numShares = lpInfo.sharesOverTime[sharesLen - 1];
         }
     }
 }
