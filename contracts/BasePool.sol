@@ -596,7 +596,7 @@ abstract contract BasePool is IBasePool {
         lpInfo.fromLoanIdx = uint32(_loanIdxs[loanIdxsLen - 1]) + 1;
 
         // increment share pointer iff last element in _loanIdxs matches sharesUnchangedUntilLoanIdx and doesn't exceed array length
-        if(_loanIdxs[loanIdxsLen - 1] == sharesUnchangedUntilLoanIdx - 1 && lpInfo.currSharePtr + 1 < lpInfo.sharesOverTime.length - 1) {
+        if(_loanIdxs[loanIdxsLen - 1] == sharesUnchangedUntilLoanIdx - 1 && lpInfo.currSharePtr < lpInfo.sharesOverTime.length - 1) {
             lpInfo.currSharePtr++;
         }
 
