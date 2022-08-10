@@ -524,6 +524,45 @@ describe("PAXG-AUSDC Pool Testing", function () {
     console.log("(2/2) totalLpShares:", totalLpShares);
   })
 
+  it("Should allow large aggregations of claiming and removing", async function (){
+      blocknum = await ethers.provider.getBlockNumber();
+      timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+      await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(10000000), timestamp+60, 0);
+      await paxgPool.connect(lp2).addLiquidity(ONE_USDC.mul(6000000), timestamp+60, 0);
+      await paxgPool.connect(lp3).addLiquidity(ONE_USDC.mul(4000000), timestamp+60, 0);
+  
+      totalRepayments = ethers.BigNumber.from(0);
+      totalLeftColl = ethers.BigNumber.from(0);
+  
+      for (let i = 0; i < 2000; i++) {
+        await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+        loanInfo = await paxgPool.loanIdxToLoanInfo(i+1);
+        totalRepayments = totalRepayments.add(loanInfo[0]);
+        await paxgPool.connect(borrower).repay(i+1);
+      }
+  
+      for (let i = 0; i < 1999; i++) {
+        await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+        loanInfo = await paxgPool.loanIdxToLoanInfo(i+2001);
+        totalRepayments = totalRepayments.add(loanInfo[0]);
+      }
+  
+      //move forward to loan expiry
+      await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+      await ethers.provider.send("evm_mine");
+
+      //cannot claim on unless proper starting and ending values
+      await expect(paxgPool.connect(lp1).claimFromAggregated([0, 99, 1099], false, timestamp+9999999)).to.be.reverted;
+      await expect(paxgPool.connect(lp1).claimFromAggregated([0, 999, 1099, 1199, 1299, 2299], false, timestamp+9999999)).to.be.reverted;
+      await expect(paxgPool.connect(lp1).claimFromAggregated([0, 9999], false, timestamp+9999999)).to.be.reverted;
+
+      //claim
+      await paxgPool.connect(lp1).claimFromAggregated([0, 999, 1999], false, timestamp+9999999);
+      //await paxgPool.connect(lp2).claimFromAggregated([0, 99,199, 299, 399, 499, 599, 699, 799, 899, 999], false, timestamp+9999999);
+      await paxgPool.connect(lp2).claimFromAggregated([0, 99, 199, 299, 399, 499, 599, 699, 799, 899, 999, 1999, 2999, 3999], false, timestamp+9999999);
+      await paxgPool.connect(lp3).claimFromAggregated([0, 999, 1099, 1199, 1299, 1399, 1499, 1599, 1699, 1799, 1899, 1999, 2999, 3999], false, timestamp+9999999);
+  })
+
   it("Should allow adding liquidity again after removing and claiming", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
