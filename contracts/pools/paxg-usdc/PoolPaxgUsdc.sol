@@ -41,9 +41,8 @@ contract PoolPaxgUsdc is BasePool {
         internal
         view
         override
-        returns (uint128)
+        returns (uint128 transferFee)
     {
-        uint256 transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
-        return uint128(transferFee);
+        transferFee = uint128(IPAXG(collCcyToken).getFeeFor(pledgeAmount));
     }
 }
