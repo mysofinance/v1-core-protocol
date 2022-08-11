@@ -679,27 +679,23 @@ abstract contract BasePool is IBasePool {
         uint256 totalRepayments;
         uint256 totalCollateral;
         
-        //set initial start index to first entry in _aggIdxs array
-        uint256 startIndex = _aggIdxs[0];
-        //quick sanity check on start and end loan indices of aggregation
-        if (_aggIdxs[1] < startIndex + 1) {
-            revert InvalidFromToAggregation();
-        }
+        uint256 startIndex;
+        
         //local variables for each iteration's repayments and collateral
         uint256 repayments;
         uint256 collateral;
 
         //iterate over the length of the passed in array
-        for (uint256 counter = 1; counter < lengthArr; ) {
+        for (uint256 counter = 0 ; counter < lengthArr - 1 ; ) {
             //make sure input loan indices are strictly increasing
-            if (counter != lengthArr - 1) {
-                if (_aggIdxs[counter] >= _aggIdxs[counter + 1])
-                    revert NonAscendingLoanIdxs();
-            }
+            if (_aggIdxs[counter] >= _aggIdxs[counter + 1])
+                revert NonAscendingLoanIdxs();
+            //set initial start index to first entry in _aggIdxs array or 1 above last entry
+            startIndex = counter == 0 ? _aggIdxs[counter] : _aggIdxs[counter] + 1;
             //get aggregated claims
             (repayments, collateral) = getClaimsFromAggregated(
                 startIndex,
-                _aggIdxs[counter],
+                _aggIdxs[counter + 1],
                 lpInfo.sharesOverTime[currSharePtr]
             );
             //update total repayment amount and total collateral amount
@@ -707,8 +703,6 @@ abstract contract BasePool is IBasePool {
             totalCollateral += collateral;
 
             unchecked {
-                //set start to one above end index
-                startIndex = _aggIdxs[counter] + 1;
                 //increment local counter
                 counter++;
             }
@@ -885,15 +879,15 @@ abstract contract BasePool is IBasePool {
         }
     }
 
-    function checkSharePtrIncrement(LpInfo storage _lpInfo, uint256 _lastIndex, uint256 _currSharePtr, uint256 _sharesUnchangedUntilLoanIdx) internal {
+    function checkSharePtrIncrement(LpInfo storage _lpInfo, uint256 _lastIdxFromUserInput, uint256 _currSharePtr, uint256 _sharesUnchangedUntilLoanIdx) internal {
         //update LPs from loan index
-        _lpInfo.fromLoanIdx = uint32(_lastIndex) + 1;
+        _lpInfo.fromLoanIdx = uint32(_lastIdxFromUserInput) + 1;
         //if current share pointer is not already at end and
         //the last loan claimed was exactly one below the currentToLoanIdx
         //then increment the current share pointer
         if (
             _currSharePtr < _lpInfo.sharesOverTime.length - 1 &&
-            _lastIndex + 1 == _sharesUnchangedUntilLoanIdx
+            _lastIdxFromUserInput + 1 == _sharesUnchangedUntilLoanIdx
         ) {
             unchecked {
                 _lpInfo.currSharePtr++;
