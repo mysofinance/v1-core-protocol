@@ -26,7 +26,7 @@ abstract contract BasePool is IBasePool {
     error BeforeEarliestRemove();
     error InconsistentMsgValue();
     error InvalidPledgeAmount();
-    error InvalidPledgeAfterTransferFee();
+    error FeesExceedInAmount();
     error InvalidRemovalAmount();
     error TooSmallLoan();
     error LoanBelowLimit();
@@ -68,6 +68,7 @@ abstract contract BasePool is IBasePool {
 
     uint128 public protocolFee;
     uint128 public totalLpShares;
+    uint128 public totalFees;
     uint256 totalLiquidity;
     uint256 public loanIdx;
     uint256 public r1;
@@ -75,7 +76,6 @@ abstract contract BasePool is IBasePool {
     uint256 public tvl1;
     uint256 public tvl2;
     uint256 public minLoan;
-    uint256 public totalFees;
 
     //must be a multiple of 100
     uint256 firstLengthPerClaimInterval;
@@ -314,11 +314,15 @@ abstract contract BasePool is IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
+            uint128 _protocolFee,
             uint256 _totalLiquidity
         )
     {
         // compute terms (as uint256)
-        uint256 pledge = _inAmount - (_inAmount * protocolFee) / BASE;
+        uint256 transferFee = getTransferFee(_inAmount);
+        _protocolFee = uint128((_inAmount * protocolFee) / BASE);
+        if (transferFee + _protocolFee > _inAmount) revert FeesExceedInAmount();
+        uint256 pledge = _inAmount - transferFee - _protocolFee;
         _totalLiquidity = getTotalLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
@@ -356,12 +360,12 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 fee,
+            uint128 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(_inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
         // update state
         totalLiquidity = _totalLiquidity - loanAmount;
-        totalFees += fee;
+        totalFees += _protocolFee;
         // set borrower address
         loanIdxToBorrower[loanIdx] = msg.sender;
         // set loan info and transfer collateral
@@ -369,15 +373,10 @@ abstract contract BasePool is IBasePool {
         loanInfo.repayment = repaymentAmount;
         loanInfo.totalLpShares = totalLpShares;
         loanInfo.expiry = expiry;
+        loanInfo.collateral = pledgeAmount;
+        loanIdxToLoanInfo[loanIdx] = loanInfo;
         {
-            uint128 transferFee = getTransferFee(pledgeAmount);
-            if (pledgeAmount - transferFee == 0)
-                revert InvalidPledgeAfterTransferFee();
-            loanInfo.collateral = pledgeAmount - transferFee;
-            loanIdxToLoanInfo[loanIdx] = loanInfo;
-            uint128 collateral = uint128(
-                ((pledgeAmount - transferFee) * BASE) / totalLpShares
-            );
+            uint128 collateral = uint128((pledgeAmount * BASE) / totalLpShares);
             collAndRepayTotalBaseAgg1[loanIdx / firstLengthPerClaimInterval + 1]
                 .collateral += collateral;
             collAndRepayTotalBaseAgg2[
@@ -388,10 +387,11 @@ abstract contract BasePool is IBasePool {
             ].collateral += collateral;
             loanIdx += 1;
 
+            // transfer _inAmount (not pledgeAmount)
             IERC20Metadata(collCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                pledgeAmount
+                _inAmount
             );
         }
         // transfer liquidity
@@ -403,7 +403,7 @@ abstract contract BasePool is IBasePool {
             loanAmount,
             repaymentAmount,
             expiry,
-            fee,
+            _protocolFee,
             _referralCode
         );
     }
@@ -421,7 +421,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 fee,
+            uint128 _protocolFee,
             uint256 _totalLiquidity
         )
     {
@@ -432,6 +432,7 @@ abstract contract BasePool is IBasePool {
             loanAmount,
             repaymentAmount,
             pledgeAmount,
+            _protocolFee,
             _totalLiquidity
         ) = loanTerms(_inAmount);
         assert(_totalLiquidity - loanAmount >= MIN_LIQUIDITY);
@@ -441,7 +442,6 @@ abstract contract BasePool is IBasePool {
         if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         expiry = uint32(timestamp) + LOAN_TENOR;
-        fee = _inAmount - pledgeAmount;
     }
 
     function repay(uint256 _loanIdx) external override {
@@ -505,7 +505,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 fee,
+            uint128 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(
                 loanInfo.collateral,
@@ -514,7 +514,7 @@ abstract contract BasePool is IBasePool {
                 _deadline
             );
 
-        //update the aggregation mappings
+        // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             loanInfo.collateral,
@@ -534,7 +534,7 @@ abstract contract BasePool is IBasePool {
             loanIdxToLoanInfo[loanIdx] = loanInfoNew;
             loanIdx += 1;
             totalLiquidity = _totalLiquidity - loanAmount;
-            totalFees += fee;
+            totalFees += _protocolFee;
             // transfer liquidity
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,

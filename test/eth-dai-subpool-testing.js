@@ -85,13 +85,6 @@ describe("ETH-DAI Pool Testing", function () {
     expect(totalLiquidity).to.be.equal(ONE_DAI.mul(141333));
   });
 
-  it("Should not allow adding liquidity if already active LP", async function () {
-    blocknum = await ethers.provider.getBlockNumber();
-    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
-    await expect(subPool.loanTerms(subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0))).to.be.reverted;
-  });
-
   it("Should allow borrowing with ETH", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;

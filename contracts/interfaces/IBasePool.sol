@@ -34,7 +34,7 @@ interface IBasePool {
         uint256 loanAmount,
         uint256 repaymentAmount,
         uint256 expiry,
-        uint256 fee,
+        uint256 protocolFee,
         uint16 referralCode
     );
     event Roll(
@@ -78,6 +78,7 @@ interface IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
+            uint128 _protocolFee,
             uint256 _totalLiquidity
         );
 
@@ -148,7 +149,7 @@ interface IBasePool {
 
     function minLoan() external view returns (uint256);
 
-    function totalFees() external view returns (uint256);
+    function totalFees() external view returns (uint128);
 
     function loanIdxToBorrower(uint256) external view returns (address);
 }

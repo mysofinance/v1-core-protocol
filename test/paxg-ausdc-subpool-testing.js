@@ -119,16 +119,9 @@ describe("PAXG-AUSDC Pool Testing", function () {
     await paxgPool.connect(lp3).addLiquidity(ONE_USDC.mul(130111), timestamp+60, 0);
     totalLiquidity = await paxgPool.getTotalLiquidity();
     console.log("totalLiquidity: ", totalLiquidity)
-    await expect((ONE_USDC.mul(141333) <= totalLiquidity) && (totalLiquidity <= ONE_USDC.mul(141333).add(1))).to.be.true;
+    await expect(totalLiquidity).to.be.equal(ONE_USDC.mul(141333));
   });
-
-  it("Should not allow adding liquidity if already active LP", async function () {
-    blocknum = await ethers.provider.getBlockNumber();
-    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
-    await expect(paxgPool.loanTerms(paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0))).to.be.reverted;
-  });
-
+  
   it("Should allow borrowing with PAXG", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
