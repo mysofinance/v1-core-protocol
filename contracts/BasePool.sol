@@ -25,8 +25,9 @@ abstract contract BasePool is IBasePool {
     error NothingToRemove();
     error BeforeEarliestRemove();
     error InconsistentMsgValue();
-    error InvalidPledgeAmount();
+    error InvalidInAmount();
     error FeesExceedInAmount();
+    error InsufficientLiquidity();
     error InvalidRemovalAmount();
     error TooSmallLoan();
     error LoanBelowLimit();
@@ -324,6 +325,7 @@ abstract contract BasePool is IBasePool {
         if (transferFee + _protocolFee > _inAmount) revert FeesExceedInAmount();
         uint256 pledge = _inAmount - transferFee - _protocolFee;
         _totalLiquidity = getTotalLiquidity();
+        if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
             (_totalLiquidity - MIN_LIQUIDITY)) /
@@ -331,12 +333,14 @@ abstract contract BasePool is IBasePool {
                 maxLoanPerColl +
                 (_totalLiquidity - MIN_LIQUIDITY) *
                 10**COLL_TOKEN_DECIMALS);
+        if (loan < minLoan) revert TooSmallLoan();
+        uint256 postLiquidity = _totalLiquidity - loan;
+        assert(postLiquidity >= MIN_LIQUIDITY);
         uint256 rate;
-        uint256 x = _totalLiquidity - loan;
-        if (x < tvl1) {
-            rate = (r1 * tvl1) / x;
-        } else if (x < tvl2) {
-            rate = ((r1 - r2) * (tvl2 - x)) / (tvl2 - tvl1) + r2;
+        if (postLiquidity < tvl1) {
+            rate = (r1 * tvl1) / postLiquidity;
+        } else if (postLiquidity < tvl2) {
+            rate = ((r1 - r2) * (tvl2 - postLiquidity)) / (tvl2 - tvl1) + r2;
         } else {
             rate = r2;
         }
@@ -345,6 +349,7 @@ abstract contract BasePool is IBasePool {
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
         pledgeAmount = uint128(pledge);
+        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
     }
 
     function borrow(
@@ -428,6 +433,7 @@ abstract contract BasePool is IBasePool {
         // get and verify loan terms
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
+        if (_inAmount == 0) revert InvalidInAmount();
         (
             loanAmount,
             repaymentAmount,
@@ -435,11 +441,7 @@ abstract contract BasePool is IBasePool {
             _protocolFee,
             _totalLiquidity
         ) = loanTerms(_inAmount);
-        assert(_totalLiquidity - loanAmount >= MIN_LIQUIDITY);
-        if (pledgeAmount == 0) revert InvalidPledgeAmount();
-        if (loanAmount < minLoan) revert TooSmallLoan();
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
-        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         expiry = uint32(timestamp) + LOAN_TENOR;
     }

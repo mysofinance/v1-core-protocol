@@ -178,38 +178,35 @@ describe("ETH-DAI Pool Testing", function () {
   it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
+    await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
 
-    for (let i = 0; i < 7; i++) {
-      totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
-      if(loanTerms[0].sub(_minLoan).gte(MONE.mul(0))) {
-        await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-      } else {
-        await expect(subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH})).to.be.reverted;
+    // iteratively take out borrows until until liquidity so low that loan amount below min. loan
+    numBorrows = 0;
+    tooSmallLoans = false;
+    for (let i = 0; i < 100; i++) {
+      try {
+        loanTerms = await paxgPool.loanTerms(ONE_ETH);
+        await paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+        numBorrows += 1;
+        console.log("loanTerms: ", loanTerms);
+      } catch(error) {
+        console.log("loanTerms error: ", error);
+        await expect(paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
+        tooSmallLoans = true;
         break;
       }
-      console.log("totalLiquidity: ", totalLiquidity);
-      console.log("loanTerms: ", loanTerms);
     }
+    // check that some loans were taken out before eventually borrowing starts to revert
+    expect(numBorrows).to.be.gte(0);
+    expect(tooSmallLoans).to.be.true;
 
-    console.log("--------------------------------------------------------")
+    // add liquidity again
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
-    for (let i = 0; i < 7; i++) {
-      totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
-      if(loanTerms[0].sub(_minLoan).gte(MONE.mul(0))) {
-        await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-      } else {
-        await expect(subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH})).to.be.reverted;
-        break;
-      }
-      console.log("totalLiquidity: ", totalLiquidity);
-      console.log("loanTerms: ", loanTerms);
-    }
-    await expect(subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH})).to.be.reverted;
+    await paxgPool.connect(lp2).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
+
+    // take out a loan should be possible again without revert after liquidity add
+    await paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
   });
 
   it("Should allow LPs to claim individually", async function () {
