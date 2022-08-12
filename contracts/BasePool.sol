@@ -31,6 +31,7 @@ abstract contract BasePool is IBasePool {
     error ErroneousLoanTerms();
     error RepaymentAboveLimit();
     error InvalidLoanIdx();
+    error InvalidSender();
     error InvalidSubAggregation();
     error UnauthorizedRepay();
     error CannotRepayAfterExpiry();
@@ -450,15 +451,12 @@ abstract contract BasePool is IBasePool {
         uint128 _sendAmount
     ) external override {
         // verify loan info and eligibility
+        if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (
-            _loanIdx == 0 ||
-            _loanIdx >= loanIdx ||
-            (
-                !(loanIdxToBorrower[_loanIdx] == msg.sender ||
-                    (repayApprovals[loanIdxToBorrower[_loanIdx]][_recipient] &&
-                        _recipient == msg.sender))
-            )
-        ) revert InvalidLoanIdx();
+            !(loanIdxToBorrower[_loanIdx] == msg.sender ||
+                (repayApprovals[loanIdxToBorrower[_loanIdx]][_recipient] &&
+                    _recipient == msg.sender))
+        ) revert InvalidSender();
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         if (block.timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
         if (loanInfo.repaid) revert AlreadyRepaid();
