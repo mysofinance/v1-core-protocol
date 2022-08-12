@@ -78,14 +78,14 @@ interface IBasePool {
     function removeLiquidity(uint256 numSharesRemove) external;
 
     function borrow(
-        uint128 _pledgeAmount,
+        uint128 _sendAmount,
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline,
         uint16 _referralCode
     ) external payable;
 
-    function loanTerms(uint128 _inAmount)
+    function loanTerms(uint128 _inAmountAfterFees)
         external
         view
         returns (

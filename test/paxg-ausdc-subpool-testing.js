@@ -203,7 +203,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     await expect(paxgPool.connect(lp4).claim([1,3], false, timestamp+9999999)).to.be.reverted;
     await expect(paxgPool.connect(lp4).claim([1,2,3], false, timestamp+9999999)).to.be.reverted;
   });
-  */
+  
   it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
@@ -237,7 +237,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     // take out a loan should be possible again without revert after liquidity add
     await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
   });
-  /*
+  
   it("Should allow LPs to claim individually test", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
@@ -277,14 +277,16 @@ describe("PAXG-AUSDC Pool Testing", function () {
     preLpBal = await AUSDC.balanceOf(lp5.address);
 
     preBorrBal = await AUSDC.balanceOf(borrower.address);
-    pledgeAmount = ONE_PAXG.mul(2);
+    sendAmount = ONE_PAXG.mul(2);
     for (let i = 0; i < 99; i++) {
       totalLiquidity = await paxgPool.getTotalLiquidity();
       //indicative repayment
-      loanTerms = await paxgPool.loanTerms(pledgeAmount);
+      transferFee = await PAXG.getFeeFor(sendAmount);
+      inAmount = sendAmount.sub(transferFee);
+      loanTerms = await paxgPool.loanTerms(inAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
       //borrow
-      await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+      await paxgPool.connect(borrower).borrow(sendAmount, 0, MONE, timestamp+1000000000, 0);
       //actual repayment
       loanInfo = await paxgPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);

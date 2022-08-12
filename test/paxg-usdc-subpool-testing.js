@@ -232,14 +232,16 @@ describe("PAXG-USDC Pool Testing", function () {
     totalRepayments = ethers.BigNumber.from(0);
     totalInterestCosts = ethers.BigNumber.from(0);
     preBorrBal = await usdc.balanceOf(borrower.address);
-    pledgeAmount = ONE_PAXG.mul(2);
+    sendAmount = ONE_PAXG.mul(2);
     for (let i = 0; i < 99; i++) {
       totalLiquidity = await paxgPool.getTotalLiquidity();
       //indicative repayment
-      loanTerms = await paxgPool.loanTerms(pledgeAmount);
+      transferFee = await PAXG.getFeeFor(sendAmount);
+      inAmount = sendAmount.sub(transferFee);
+      loanTerms = await paxgPool.loanTerms(inAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
       //borrow
-      await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+      await paxgPool.connect(borrower).borrow(sendAmount, 0, MONE, timestamp+1000000000, 0);
       //actual repayment
       loanInfo = await paxgPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);

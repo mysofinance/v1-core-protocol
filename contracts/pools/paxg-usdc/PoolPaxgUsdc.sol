@@ -43,6 +43,8 @@ contract PoolPaxgUsdc is BasePool {
         override
         returns (uint128 transferFee)
     {
-        transferFee = uint128(IPAXG(collCcyToken).getFeeFor(pledgeAmount));
+        uint256 _transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
+        transferFee = uint128(_transferFee);
+        assert(transferFee == _transferFee);
     }
 }
