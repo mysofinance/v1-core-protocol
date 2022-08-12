@@ -204,7 +204,7 @@ abstract contract BasePool is IBasePool {
         uint256 dust;
         if (_totalLiquidity == 0 && totalLpShares == 0) {
             newLpShares = _inAmountAfterFees;
-        } else if (_totalLiquidity > 0 && totalLpShares == 0) {
+        } else if (totalLpShares == 0) {
             dust = _totalLiquidity;
             _totalLiquidity = 0;
             newLpShares = _inAmountAfterFees;
@@ -474,12 +474,12 @@ abstract contract BasePool is IBasePool {
         // transfer repayment amount
         uint128 repaymentAmountAfterFees = _sendAmount -
             getLoanCcyTransferFee(_sendAmount);
-        if (repaymentAmountAfterFees != loanInfo.repayment)
+        if (repaymentAmountAfterFees >= loanInfo.repayment)
             revert InvalidSendAmount();
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
-            loanInfo.repayment
+            _sendAmount
         );
         // transfer collateral
         IERC20Metadata(collCcyToken).safeTransfer(

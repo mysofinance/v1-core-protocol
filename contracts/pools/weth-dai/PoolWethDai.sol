@@ -36,21 +36,15 @@ contract PoolWethDai is BasePool {
         return totalLiquidity;
     }
 
-    function getCollCcyTransferFee(uint128 /*_transferAmount*/)
-        internal
-        pure
-        override
-        returns (uint128 transferFee)
-    {
+    function getCollCcyTransferFee(
+        uint128 /*_transferAmount*/
+    ) internal pure override returns (uint128 transferFee) {
         transferFee = 0;
     }
 
-    function getLoanCcyTransferFee(uint128 /*_transferAmount*/)
-        internal
-        pure
-        override
-        returns (uint128 transferFee)
-    {
+    function getLoanCcyTransferFee(
+        uint128 /*_transferAmount*/
+    ) internal pure override returns (uint128 transferFee) {
         transferFee = 0;
     }
 }

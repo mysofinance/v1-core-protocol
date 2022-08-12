@@ -48,12 +48,9 @@ contract PoolPaxgUsdc is BasePool {
         assert(transferFee == _transferFee);
     }
 
-    function getLoanCcyTransferFee(uint128 /*_transferAmount*/)
-        internal
-        pure
-        override
-        returns (uint128 transferFee)
-    {
+    function getLoanCcyTransferFee(
+        uint128 /*_transferAmount*/
+    ) internal pure override returns (uint128 transferFee) {
         transferFee = 0;
     }
 }
