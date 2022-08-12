@@ -99,7 +99,7 @@ interface IBasePool {
 
     function repay(
         uint256 _loanIdx,
-        address _onBehalf,
+        address _recipient,
         uint128 _sendAmount
     ) external;
 
@@ -187,4 +187,9 @@ interface IBasePool {
     function totalFees() external view returns (uint128);
 
     function loanIdxToBorrower(uint256) external view returns (address);
+
+    function repayApprovals(address _borrower, address _recipient)
+        external
+        view
+        returns (bool _approved);
 }

@@ -5,7 +5,6 @@ pragma solidity 0.8.15;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBasePool} from "./interfaces/IBasePool.sol";
-import {IWETH} from "./interfaces/IWETH.sol";
 
 abstract contract BasePool is IBasePool {
     using SafeERC20 for IERC20Metadata;
@@ -31,6 +30,7 @@ abstract contract BasePool is IBasePool {
     error ErroneousLoanTerms();
     error RepaymentAboveLimit();
     error InvalidLoanIdx();
+    error InvalidSender();
     error InvalidSubAggregation();
     error UnauthorizedRepay();
     error CannotRepayAfterExpiry();
@@ -53,7 +53,6 @@ abstract contract BasePool is IBasePool {
     error NewFeeTooHigh();
 
     address constant TREASURY = 0x1234567890000000000000000000000000000001;
-    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
@@ -82,6 +81,8 @@ abstract contract BasePool is IBasePool {
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
+
+    mapping(address => mapping(address => bool)) public repayApprovals;
 
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg1;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg2;
@@ -445,15 +446,16 @@ abstract contract BasePool is IBasePool {
 
     function repay(
         uint256 _loanIdx,
-        address _onBehalf,
+        address _recipient,
         uint128 _sendAmount
     ) external override {
         // verify loan info and eligibility
+        if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (
-            _loanIdx == 0 ||
-            _loanIdx >= loanIdx ||
-            loanIdxToBorrower[_loanIdx] != _onBehalf
-        ) revert InvalidLoanIdx();
+            !(loanIdxToBorrower[_loanIdx] == msg.sender ||
+                (repayApprovals[loanIdxToBorrower[_loanIdx]][_recipient] &&
+                    _recipient == msg.sender))
+        ) revert InvalidSender();
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         if (block.timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
         if (loanInfo.repaid) revert AlreadyRepaid();
@@ -486,7 +488,7 @@ abstract contract BasePool is IBasePool {
         );
         // transfer collateral
         IERC20Metadata(collCcyToken).safeTransfer(
-            _onBehalf,
+            _recipient,
             loanInfo.collateral
         );
         // spawn event
@@ -885,6 +887,12 @@ abstract contract BasePool is IBasePool {
         if (sharesLen > 0) {
             numShares = lpInfo.sharesOverTime[sharesLen - 1];
         }
+    }
+
+    function toggleRepayApproval(address _recipient) external {
+        repayApprovals[msg.sender][_recipient] = !repayApprovals[msg.sender][
+            _recipient
+        ];
     }
 
     function checkAutoIncrement(LpInfo storage _lpInfo) internal {
