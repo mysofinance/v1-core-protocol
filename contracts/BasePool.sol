@@ -24,7 +24,6 @@ abstract contract BasePool is IBasePool {
     error TooBigAddToLaterClaimColl();
     error NothingToRemove();
     error BeforeEarliestRemove();
-    error InvalidInAmount();
     error InsufficientLiquidity();
     error InvalidRemovalAmount();
     error TooSmallLoan();
@@ -431,7 +430,6 @@ abstract contract BasePool is IBasePool {
         // get and verify loan terms
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        if (_inAmountAfterFees == 0) revert InvalidInAmount();
         (
             loanAmount,
             repaymentAmount,
@@ -439,6 +437,7 @@ abstract contract BasePool is IBasePool {
             _protocolFee,
             _totalLiquidity
         ) = loanTerms(_inAmountAfterFees);
+        assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         expiry = uint32(timestamp) + LOAN_TENOR;
@@ -474,8 +473,13 @@ abstract contract BasePool is IBasePool {
         // transfer repayment amount
         uint128 repaymentAmountAfterFees = _sendAmount -
             getLoanCcyTransferFee(_sendAmount);
-        if (repaymentAmountAfterFees >= loanInfo.repayment)
-            revert InvalidSendAmount();
+        // set range in case of rounding exact repayment amount
+        // cannot be hit; set upper bound to prevent fat finger
+        if (
+            repaymentAmountAfterFees < loanInfo.repayment ||
+            repaymentAmountAfterFees >
+            ((10**6 + 1) * loanInfo.repayment) / 10**6
+        ) revert InvalidSendAmount();
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
