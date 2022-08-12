@@ -38,13 +38,22 @@ contract PoolPaxgAusdc is BasePool {
         return balanceOf;
     }
 
-    function getTransferFee(uint128 pledgeAmount)
+    function getCollCcyTransferFee(uint128 _transferAmount)
         internal
         view
         override
         returns (uint128)
     {
-        uint256 transferFee = IPAXG(collCcyToken).getFeeFor(pledgeAmount);
+        uint256 transferFee = IPAXG(collCcyToken).getFeeFor(_transferAmount);
         return uint128(transferFee);
+    }
+
+    function getLoanCcyTransferFee(uint128 _transferAmount)
+        internal
+        view
+        override
+        returns (uint128 transferFee)
+    {
+        transferFee = 0;
     }
 }

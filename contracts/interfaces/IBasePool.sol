@@ -59,15 +59,15 @@ interface IBasePool {
      * @notice Function which adds to an LPs current position
      * @dev This function will update loanIdxsWhereSharesChanged only if not
      * the first add
-     * @param _amount Amount of loan currency LP wishes to deposit
+     * @param _sendAmount Amount of loan currency LP wishes to deposit
      * @param _deadline Last timestamp after which function will revert
      * @param _referralCode Will possibly be used later to reward referrals
      */
     function addLiquidity(
-        uint128 _amount,
+        uint128 _sendAmount,
         uint256 _deadline,
         uint16 _referralCode
-    ) external payable;
+    ) external;
 
     /**
      * @notice Function which removes shares from an LPs
@@ -78,12 +78,13 @@ interface IBasePool {
     function removeLiquidity(uint256 numSharesRemove) external;
 
     function borrow(
+        address _onBehalf,
         uint128 _sendAmount,
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline,
         uint16 _referralCode
-    ) external payable;
+    ) external;
 
     function loanTerms(uint128 _inAmountAfterFees)
         external
@@ -96,7 +97,7 @@ interface IBasePool {
             uint256 _totalLiquidity
         );
 
-    function repay(uint256 _loanIdx) external;
+    function repay(uint256 _loanIdx, address _onBehalf) external;
 
     function rollOver(
         uint256 _loanIdx,

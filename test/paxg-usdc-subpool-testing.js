@@ -96,7 +96,7 @@ describe("PAXG-USDC Pool Testing", function () {
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
   });
   
   it("Should not allow new LPs to claim on unentitled previous loans", async function () {
@@ -117,21 +117,21 @@ describe("PAXG-USDC Pool Testing", function () {
     loanTerms = await paxgPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
-    await paxgPool.connect(borrower).repay(1);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await paxgPool.connect(borrower).repay(1, borrower.address);
 
     //borrow & repay
     loanTerms = await paxgPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
-    await paxgPool.connect(borrower).repay(2);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await paxgPool.connect(borrower).repay(2, borrower.address);
 
     //borrow & default
     loanTerms = await paxgPool.loanTerms(ONE_PAXG);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -174,12 +174,12 @@ describe("PAXG-USDC Pool Testing", function () {
     for (let i = 0; i < 100; i++) {
       try {
         loanTerms = await paxgPool.loanTerms(ONE_PAXG);
-        await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+        await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
         numBorrows += 1;
         console.log("loanTerms: ", loanTerms);
       } catch(error) {
         console.log("loanTerms error: ", error);
-        await expect(paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
+        await expect(paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
         tooSmallLoans = true;
         break;
       }
@@ -194,7 +194,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
 
     // take out a loan should be possible again without revert after liquidity add
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
   });
 
   it("Should allow LPs to claim individually", async function () {
@@ -207,8 +207,8 @@ describe("PAXG-USDC Pool Testing", function () {
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await paxgPool.getTotalLiquidity();
       loanTerms = await paxgPool.loanTerms(ONE_PAXG);
-      await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
-      await paxgPool.connect(borrower).repay(i+1);
+      await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+      await paxgPool.connect(borrower).repay(i+1, borrower.address);
     }
     loanIds = Array.from(Array(100), (_, index) => index + 1);
 
@@ -241,14 +241,14 @@ describe("PAXG-USDC Pool Testing", function () {
       loanTerms = await paxgPool.loanTerms(inAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
       //borrow
-      await paxgPool.connect(borrower).borrow(sendAmount, 0, MONE, timestamp+1000000000, 0);
+      await paxgPool.connect(borrower).borrow(borrower.address, sendAmount, 0, MONE, timestamp+1000000000, 0);
       //actual repayment
       loanInfo = await paxgPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
       //interest costs
       totalInterestCosts = totalInterestCosts.add(loanTerms[1].sub(loanTerms[0]));
       //repay
-      await paxgPool.connect(borrower).repay(i+1);
+      await paxgPool.connect(borrower).repay(i+1, borrower.address);
     }
     await expect(totalRepaymentsIndicative).to.be.equal(totalRepayments);
     console.log("totalRepayments", totalRepayments)
@@ -314,19 +314,19 @@ describe("PAXG-USDC Pool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await paxgPool.connect(borrower).repay(1);
+    await paxgPool.connect(borrower).repay(1, borrower.address);
 
     //2nd borrow & repay
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await paxgPool.connect(borrower).repay(2);
+    await paxgPool.connect(borrower).repay(2, borrower.address);
 
     //3rd borrow & default
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_PAXG);
 
     //move forward to loan expiry
@@ -411,14 +411,14 @@ describe("PAXG-USDC Pool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     for (let i = 0; i < 100; i++) {
-      await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+      await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await paxgPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
-      await paxgPool.connect(borrower).repay(i+1);
+      await paxgPool.connect(borrower).repay(i+1, borrower.address);
     }
 
     for (let i = 0; i < 99; i++) {
-      await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+      await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await paxgPool.loanIdxToLoanInfo(i+101);
       totalRepayments = totalRepayments.add(loanInfo[0]);
     }
@@ -468,19 +468,19 @@ describe("PAXG-USDC Pool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await paxgPool.connect(borrower).repay(1);
+    await paxgPool.connect(borrower).repay(1, borrower.address);
 
     //2nd borrow & repay
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await paxgPool.connect(borrower).repay(2);
+    await paxgPool.connect(borrower).repay(2, borrower.address);
 
     //3rd borrow & default
-    await paxgPool.connect(borrower).borrow(ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_PAXG);
 
     //move forward to loan expiry
@@ -525,7 +525,7 @@ describe("PAXG-USDC Pool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(1001), timestamp+60, 0);
 
-    await paxgPool.connect(borrower).borrow(ONE_PAXG.mul(10000), 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG.mul(10000), 0, MONE, timestamp+1000000000, 0);
     
     //check total liquidity & balance
     totalLiquidity = await paxgPool.getTotalLiquidity();
@@ -542,7 +542,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+60, 0);
 
     pledgeAmount = ONE_PAXG;
-    await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
 
     loanTerms = await paxgPool.loanTerms(loanInfo.collateral);
@@ -563,7 +563,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await paxgPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
 
     totalLiquidity = await paxgPool.getTotalLiquidity();
@@ -575,7 +575,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await paxgPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(2);
 
     totalLiquidity = await paxgPool.getTotalLiquidity();
@@ -587,7 +587,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp3).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await paxgPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(3);
 
     totalLiquidity = await paxgPool.getTotalLiquidity();
@@ -599,7 +599,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp4).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await paxgPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(4);
 
     totalLiquidity = await paxgPool.getTotalLiquidity();
@@ -612,7 +612,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp5).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await paxgPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await paxgPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(5);
 
     totalLiquidity = await paxgPool.getTotalLiquidity();
