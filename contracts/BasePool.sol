@@ -477,8 +477,7 @@ abstract contract BasePool is IBasePool {
         // cannot be hit; set upper bound to prevent fat finger
         if (
             repaymentAmountAfterFees < loanInfo.repayment ||
-            repaymentAmountAfterFees >
-            ((10**6 + 1) * loanInfo.repayment) / 10**6
+            repaymentAmountAfterFees > (101 * loanInfo.repayment) / 100
         ) revert InvalidSendAmount();
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
