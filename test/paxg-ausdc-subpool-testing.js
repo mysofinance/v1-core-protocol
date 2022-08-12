@@ -276,7 +276,7 @@ describe("PAXG-AUSDC Pool Testing", function () {
     //get LP bal for aToken yield reference
     preLpBal = await AUSDC.balanceOf(lp5.address);
 
-    preBorrBal = await usdc.balanceOf(borrower.address);
+    preBorrBal = await AUSDC.balanceOf(borrower.address);
     sendAmount = ONE_PAXG.mul(2);
     for (let i = 0; i < 99; i++) {
       totalLiquidity = await paxgPool.getTotalLiquidity();

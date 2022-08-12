@@ -307,7 +307,7 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function loanTerms(uint128 _inAmount)
+    function loanTerms(uint128 _inAmountAfterFees)
         public
         view
         returns (
@@ -319,8 +319,8 @@ abstract contract BasePool is IBasePool {
         )
     {
         // compute terms (as uint256)
-        _protocolFee = uint128((_inAmount * protocolFee) / BASE);
-        uint256 pledge = _inAmount - _protocolFee;
+        _protocolFee = uint128((_inAmountAfterFees * protocolFee) / BASE);
+        uint256 pledge = _inAmountAfterFees - _protocolFee;
         _totalLiquidity = getTotalLiquidity();
         if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
         uint256 loan = (pledge *
@@ -356,7 +356,7 @@ abstract contract BasePool is IBasePool {
         uint256 _deadline,
         uint16 _referralCode
     ) external payable override {
-        uint128 _inAmount = _sendAmount - getTransferFee(_sendAmount);
+        uint128 _inAmountAfterFees = _sendAmount - getTransferFee(_sendAmount);
         // get borrow terms and do checks
         (
             uint128 loanAmount,
@@ -365,7 +365,12 @@ abstract contract BasePool is IBasePool {
             uint32 expiry,
             uint128 _protocolFee,
             uint256 _totalLiquidity
-        ) = _borrow(_inAmount, _minLoanLimit, _maxRepayLimit, _deadline);
+        ) = _borrow(
+                _inAmountAfterFees,
+                _minLoanLimit,
+                _maxRepayLimit,
+                _deadline
+            );
         {
             // update pool state
             totalLiquidity = _totalLiquidity - loanAmount;
@@ -416,7 +421,7 @@ abstract contract BasePool is IBasePool {
     }
 
     function _borrow(
-        uint128 _inAmount,
+        uint128 _inAmountAfterFees,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
         uint256 _deadline
@@ -435,14 +440,14 @@ abstract contract BasePool is IBasePool {
         // get and verify loan terms
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        if (_inAmount == 0) revert InvalidInAmount();
+        if (_inAmountAfterFees == 0) revert InvalidInAmount();
         (
             loanAmount,
             repaymentAmount,
             pledgeAmount,
             _protocolFee,
             _totalLiquidity
-        ) = loanTerms(_inAmount);
+        ) = loanTerms(_inAmountAfterFees);
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         expiry = uint32(timestamp) + LOAN_TENOR;
