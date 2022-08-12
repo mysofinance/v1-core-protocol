@@ -97,7 +97,11 @@ interface IBasePool {
             uint256 _totalLiquidity
         );
 
-    function repay(uint256 _loanIdx, address _onBehalf) external;
+    function repay(
+        uint256 _loanIdx,
+        address _onBehalf,
+        uint128 _sendAmount
+    ) external;
 
     function rollOver(
         uint256 _loanIdx,

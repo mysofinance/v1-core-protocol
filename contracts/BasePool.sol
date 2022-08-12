@@ -37,6 +37,7 @@ abstract contract BasePool is IBasePool {
     error CannotRepayAfterExpiry();
     error AlreadyRepaid();
     error CannotRepayInSameBlock();
+    error InvalidSendAmount();
     error NothingToClaim();
     error MustBeLp();
     error InvalidNewSharePointer();
@@ -443,7 +444,11 @@ abstract contract BasePool is IBasePool {
         expiry = uint32(timestamp) + LOAN_TENOR;
     }
 
-    function repay(uint256 _loanIdx, address _onBehalf) external override {
+    function repay(
+        uint256 _loanIdx,
+        address _onBehalf,
+        uint128 _sendAmount
+    ) external override {
         // verify loan info and eligibility
         if (
             _loanIdx == 0 ||
@@ -467,6 +472,10 @@ abstract contract BasePool is IBasePool {
         );
 
         // transfer repayment amount
+        uint128 repaymentAmountAfterFees = _sendAmount -
+            getLoanCcyTransferFee(_sendAmount);
+        if (repaymentAmountAfterFees != loanInfo.repayment)
+            revert InvalidSendAmount();
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),

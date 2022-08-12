@@ -7,9 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {BasePool} from "../../BasePool.sol";
 import {IPAXG} from "../../interfaces/IPAXG.sol";
 
-contract PoolPaxgUsdc is BasePool {
+contract PoolWethDai is BasePool {
     constructor(
-        address _loanCcyToken,
         uint24 _loanTenor,
         uint128 _maxLoanPerColl,
         uint256 _r1,
@@ -20,8 +19,8 @@ contract PoolPaxgUsdc is BasePool {
         uint256 _firstLengthPerClaimInterval
     )
         BasePool(
-            _loanCcyToken,
-            0x45804880De22913dAFE09f4980848ECE6EcbAf78,
+            0x6B175474E89094C44Da98b954EedeAC495271d0F,
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
             _loanTenor,
             _maxLoanPerColl,
             _r1,
@@ -37,15 +36,13 @@ contract PoolPaxgUsdc is BasePool {
         return totalLiquidity;
     }
 
-    function getCollCcyTransferFee(uint128 _transferAmount)
+    function getCollCcyTransferFee(uint128 /*_transferAmount*/)
         internal
-        view
+        pure
         override
         returns (uint128 transferFee)
     {
-        uint256 _transferFee = IPAXG(collCcyToken).getFeeFor(_transferAmount);
-        transferFee = uint128(_transferFee);
-        assert(transferFee == _transferFee);
+        transferFee = 0;
     }
 
     function getLoanCcyTransferFee(uint128 /*_transferAmount*/)
