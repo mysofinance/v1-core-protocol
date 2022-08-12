@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("ETH-DAI Pool Testing", function () {
+describe("WETH-DAI Pool Testing", function () {
 
   const IERC20_SOURCE = "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20";
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18

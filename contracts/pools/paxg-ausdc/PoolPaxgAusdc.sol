@@ -48,12 +48,9 @@ contract PoolPaxgAusdc is BasePool {
         return uint128(transferFee);
     }
 
-    function getLoanCcyTransferFee(uint128 /*_transferAmount*/)
-        internal
-        pure
-        override
-        returns (uint128 transferFee)
-    {
+    function getLoanCcyTransferFee(
+        uint128 /*_transferAmount*/
+    ) internal pure override returns (uint128 transferFee) {
         transferFee = 0;
     }
 }

@@ -5,7 +5,6 @@ pragma solidity 0.8.15;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBasePool} from "./interfaces/IBasePool.sol";
-import {IWETH} from "./interfaces/IWETH.sol";
 
 abstract contract BasePool is IBasePool {
     using SafeERC20 for IERC20Metadata;
@@ -54,7 +53,6 @@ abstract contract BasePool is IBasePool {
     error NewFeeTooHigh();
 
     address constant TREASURY = 0x1234567890000000000000000000000000000001;
-    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint24 immutable LOAN_TENOR;
     uint32 constant MIN_LPING_PERIOD = 30;
     uint8 immutable COLL_TOKEN_DECIMALS;
