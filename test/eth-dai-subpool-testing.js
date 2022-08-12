@@ -23,6 +23,7 @@ describe("ETH-DAI Pool Testing", function () {
   beforeEach( async () => {
     [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
 
+    // prepare DAI balances
     DAI = await ethers.getContractAt(IERC20_SOURCE, _loanCcyToken);
     await ethers.provider.send("hardhat_setBalance", [
       DAI_HOLDER,
@@ -41,21 +42,29 @@ describe("ETH-DAI Pool Testing", function () {
     await DAI.connect(daiHolder).transfer(lp5.address, bal.div(6));
     await DAI.connect(daiHolder).transfer(borrower.address, bal.div(6));
 
+    // prepare WETH balance
     WETH = await ethers.getContractAt("IWETH", _collCcyToken);
+    await ethers.provider.send("hardhat_setBalance", [
+      borrower.address,
+      "0x204FCE5E3E25026110000000",
+    ]);
+    balance = await ethers.provider.getBalance(borrower.address);
+    await WETH.connect(borrower).deposit({value: balance.sub(ONE_ETH)});
 
-    SubPool = await ethers.getContractFactory("SubPoolV1");
-    SubPool = await SubPool.connect(deployer);
+    // deploy pool
+    PoolWethDai = await ethers.getContractFactory("PoolWethDai");
+    PoolWethDai = await PoolWethDai.connect(deployer);
+    poolWethDai = await PoolWethDai.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
+    await poolWethDai.deployed();
 
-    subPool = await SubPool.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
-
-    await subPool.deployed();
-
-    DAI.connect(lp1).approve(subPool.address, MAX_UINT128);
-    DAI.connect(lp2).approve(subPool.address, MAX_UINT128);
-    DAI.connect(lp3).approve(subPool.address, MAX_UINT128);
-    DAI.connect(lp4).approve(subPool.address, MAX_UINT128);
-    DAI.connect(lp5).approve(subPool.address, MAX_UINT128);
-    DAI.connect(borrower).approve(subPool.address, MAX_UINT128);
+    // approve DAI and WETH balances
+    DAI.connect(lp1).approve(poolWethDai.address, MAX_UINT128);
+    DAI.connect(lp2).approve(poolWethDai.address, MAX_UINT128);
+    DAI.connect(lp3).approve(poolWethDai.address, MAX_UINT128);
+    DAI.connect(lp4).approve(poolWethDai.address, MAX_UINT128);
+    DAI.connect(lp5).approve(poolWethDai.address, MAX_UINT128);
+    DAI.connect(borrower).approve(poolWethDai.address, MAX_UINT128);
+    WETH.connect(borrower).approve(poolWethDai.address, MAX_UINT128);
   });
   
   it("Should have sufficient DAI for testing", async function () {
@@ -64,134 +73,123 @@ describe("ETH-DAI Pool Testing", function () {
   });
 
   it("Should have correct initial values", async function () {
-    totalLiquidity = await subPool.totalLiquidity();
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
     expect(totalLiquidity).to.be.equal(0);
 
-    loanIdx = await subPool.loanIdx();
+    loanIdx = await poolWethDai.loanIdx();
     expect(loanIdx).to.be.equal(1);
   });
 
   it("Should fail on loan terms without LPs", async function () {
-    await expect(subPool.loanTerms(ONE_ETH)).to.be.reverted;
+    await expect(poolWethDai.loanTerms(ONE_ETH)).to.be.reverted;
   });
 
   it("Should allow LPs to add liquidity", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1111), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(10111), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(130111), timestamp+60, 0);
-    totalLiquidity = await subPool.totalLiquidity();
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(1111), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(10111), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(130111), timestamp+60, 0);
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
     expect(totalLiquidity).to.be.equal(ONE_DAI.mul(141333));
   });
 
   it("Should allow borrowing with ETH", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(10000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(10000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
 
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await poolWethDai.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
-    await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+60, 0, {value: ONE_ETH});
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
   });
 
-  it("Should revert when borrowing with inconsistent ETH msg.value", async function () {
-    blocknum = await ethers.provider.getBlockNumber();
-    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
-
-    loanTerms = await subPool.loanTerms(ONE_ETH);
-    minLoanLimit = loanTerms[0].mul(98).div(100);
-    maxRepayLimit = loanTerms[1].mul(102).div(100);
-    currBlock = await ethers.provider.getBlockNumber();
-    await expect(subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, {value: ONE_ETH})).to.be.reverted;
-    await expect(subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+60, {value: 0})).to.be.reverted;
-  });
-  
   it("Should not allow new LPs to claim on unentitled previous loans", async function () {
     //add liquidity
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(30000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(20000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(10000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(30000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(20000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(10000), timestamp+60, 0);
 
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
 
     //borrow & repay
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await poolWethDai.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+9999999, 0, {value: ONE_ETH});
-    await subPool.connect(borrower).repay(1);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(1);
+    await poolWethDai.connect(borrower).repay(1, borrower.address, loanInfo.repayment);
 
     //borrow & repay
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await poolWethDai.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+9999999, 0, {value: ONE_ETH});
-    await subPool.connect(borrower).repay(2);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(2);
+    await poolWethDai.connect(borrower).repay(2, borrower.address, loanInfo.repayment);
 
     //borrow & default
-    loanTerms = await subPool.loanTerms(ONE_ETH);
+    loanTerms = await poolWethDai.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(0, minLoanLimit, maxRepayLimit, timestamp+9999999, 0, {value: ONE_ETH});
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
 
     //claim
-    await subPool.connect(lp1).claim([1,2,3], false, timestamp+9999999);
+    await poolWethDai.connect(lp1).claim([1,2,3], false, timestamp+9999999);
 
     //remove liquidity
-    let lp1NumSharesPre = await paxgPool.getNumShares(lp1.address);
-    await paxgPool.connect(lp1).removeLiquidity(lp1NumSharesPre);
+    let lp1NumSharesPre = await poolWethDai.getNumShares(lp1.address);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1NumSharesPre);
 
     //cannot remove twice
-    await expect(paxgPool.connect(lp1).removeLiquidity(lp1NumSharesPre)).to.be.reverted;
+    await expect(poolWethDai.connect(lp1).removeLiquidity(lp1NumSharesPre)).to.be.reverted;
 
-    lp1NumSharesPost = await paxgPool.getNumShares(lp1.address);
+    lp1NumSharesPost = await poolWethDai.getNumShares(lp1.address);
     await expect(lp1NumSharesPost).to.be.equal(0);
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp4).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
-    await expect(subPool.connect(lp4).claim([1], false, timestamp+9999999)).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([2], false, timestamp+9999999)).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([3], false, timestamp+9999999)).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([1,2], false, timestamp+9999999)).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([2,3], false, timestamp+9999999)).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([1,3], false, timestamp+9999999)).to.be.reverted;
-    await expect(subPool.connect(lp4).claim([1,2,3], false, timestamp+9999999)).to.be.reverted;
+    await poolWethDai.connect(lp4).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
+    await expect(poolWethDai.connect(lp4).claim([1], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim([2], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim([3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim([1,2], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim([2,3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim([1,3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim([1,2,3], false, timestamp+9999999)).to.be.reverted;
   });
   
   it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await paxgPool.connect(lp1).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
 
     // iteratively take out borrows until until liquidity so low that loan amount below min. loan
     numBorrows = 0;
     tooSmallLoans = false;
     for (let i = 0; i < 100; i++) {
       try {
-        loanTerms = await paxgPool.loanTerms(ONE_ETH);
-        await paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+        loanTerms = await poolWethDai.loanTerms(ONE_ETH);
+        await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
         numBorrows += 1;
         console.log("loanTerms: ", loanTerms);
       } catch(error) {
         console.log("loanTerms error: ", error);
-        await expect(paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
+        await expect(poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
         tooSmallLoans = true;
         break;
       }
@@ -203,42 +201,43 @@ describe("ETH-DAI Pool Testing", function () {
     // add liquidity again
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await paxgPool.connect(lp2).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(1000), timestamp+60, 0);
 
     // take out a loan should be possible again without revert after liquidity add
-    await paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
   });
 
   it("Should allow LPs to claim individually", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
 
     for (let i = 0; i < 100; i++) {
-      totalLiquidity = await subPool.totalLiquidity();
-      loanTerms = await subPool.loanTerms(ONE_ETH);
-      await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-      await subPool.connect(borrower).repay(i+1);
+      totalLiquidity = await poolWethDai.getTotalLiquidity();
+      loanTerms = await poolWethDai.loanTerms(ONE_ETH);
+      await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+      loanInfo = await poolWethDai.loanIdxToLoanInfo(i+1);
+      await poolWethDai.connect(borrower).repay(i+1, borrower.address, loanInfo.repayment);
     }
     loanIds = Array.from(Array(100), (_, index) => index + 1);
 
-    await subPool.connect(lp1).claim(loanIds, false, timestamp+9999999);
+    await poolWethDai.connect(lp1).claim(loanIds, false, timestamp+9999999);
     //cannot claim twice
-    await expect(subPool.connect(lp1).claim(loanIds, false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp1).claim(loanIds, false, timestamp+9999999)).to.be.reverted;
 
-    await subPool.connect(lp2).claim(loanIds, false, timestamp+9999999);
-    await subPool.connect(lp3).claim(loanIds, false, timestamp+9999999);
+    await poolWethDai.connect(lp2).claim(loanIds, false, timestamp+9999999);
+    await poolWethDai.connect(lp3).claim(loanIds, false, timestamp+9999999);
   });
   
   it("Should handle aggregate claims correctly (1/2)", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
-    await subPool.connect(lp4).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
+    await poolWethDai.connect(lp4).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
 
     totalRepaymentsIndicative = ethers.BigNumber.from(0);
     totalRepayments = ethers.BigNumber.from(0);
@@ -247,19 +246,21 @@ describe("ETH-DAI Pool Testing", function () {
     pledgeAmount = ONE_ETH.mul(2);
 
     for (let i = 0; i < 99; i++) {
-      totalLiquidity = await subPool.totalLiquidity();
+      totalLiquidity = await poolWethDai.getTotalLiquidity();
       //indicative repayment
-      loanTerms = await subPool.loanTerms(pledgeAmount);
+      loanTerms = await poolWethDai.loanTerms(pledgeAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
       //borrow
-      await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
+      await poolWethDai.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MAX_UINT128, timestamp+1000000000, 0);
       //actual repayment
-      loanInfo = await subPool.loanIdxToLoanInfo(i+1);
+      loanInfo = await poolWethDai.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
+      await expect(loanTerms[1]).to.be.equal(loanInfo[0]);
       //interest costs
       totalInterestCosts = totalInterestCosts.add(loanTerms[1].sub(loanTerms[0]));
       //repay
-      await subPool.connect(borrower).repay(i+1);
+      loanInfo = await poolWethDai.loanIdxToLoanInfo(i+1);
+      await poolWethDai.connect(borrower).repay(i+1, borrower.address, loanInfo.repayment);
     }
     await expect(totalRepaymentsIndicative).to.be.equal(totalRepayments);
     console.log("totalRepayments", totalRepayments)
@@ -271,7 +272,7 @@ describe("ETH-DAI Pool Testing", function () {
     preClaimBal = await DAI.balanceOf(lp1.address);
     loanIds = Array.from(Array(99), (_, index) => index + 1);
 
-    await subPool.connect(lp1).claim(loanIds, false, timestamp+9999999);
+    await poolWethDai.connect(lp1).claim(loanIds, false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -279,7 +280,7 @@ describe("ETH-DAI Pool Testing", function () {
     await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
 
     //cannot claim twice
-    await expect(subPool.connect(lp1).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp1).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
 
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
@@ -287,17 +288,17 @@ describe("ETH-DAI Pool Testing", function () {
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await DAI.balanceOf(lp2.address);
-    await subPool.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999);
+    await poolWethDai.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
     //cannot claim twice
-    await expect(subPool.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
 
     //lp3 claims
     preClaimBal = await DAI.balanceOf(lp3.address);
-    await subPool.connect(lp3).claimFromAggregated([0, 99], false, timestamp+9999999);
+    await poolWethDai.connect(lp3).claimFromAggregated([0, 99], false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -306,7 +307,7 @@ describe("ETH-DAI Pool Testing", function () {
 
     //lp4 claims
     preClaimBal = await DAI.balanceOf(lp4.address);
-    await subPool.connect(lp4).claimFromAggregated([0, 99], false, timestamp+9999999);
+    await poolWethDai.connect(lp4).claimFromAggregated([0, 99], false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -317,27 +318,27 @@ describe("ETH-DAI Pool Testing", function () {
   it("Should handle aggregate claims correctly (2/2)", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
 
     totalRepayments = ethers.BigNumber.from(0);
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-    loanInfo = await subPool.loanIdxToLoanInfo(1);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(1);
+    await poolWethDai.connect(borrower).repay(1, borrower.address, loanInfo.repayment);
 
     //2nd borrow & repay
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-    loanInfo = await subPool.loanIdxToLoanInfo(2);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(2);
+    await poolWethDai.connect(borrower).repay(2, borrower.address, loanInfo.repayment);
 
     //3rd borrow & default
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_ETH);
 
     //move forward to loan expiry
@@ -348,8 +349,8 @@ describe("ETH-DAI Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await DAI.balanceOf(lp1.address);
-    await expect(subPool.connect(lp1).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
-    await subPool.connect(lp1).claim([1,2,3], false, timestamp+9999999);
+    await expect(poolWethDai.connect(lp1).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
+    await poolWethDai.connect(lp1).claim([1,2,3], false, timestamp+9999999);
     postClaimEthBal = await WETH.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await DAI.balanceOf(lp1.address);
 
@@ -370,8 +371,8 @@ describe("ETH-DAI Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     preClaimTokenBal = await DAI.balanceOf(lp2.address);
-    await expect(subPool.connect(lp2).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
-    await subPool.connect(lp2).claim([1,2,3], false, timestamp+9999999);
+    await expect(poolWethDai.connect(lp2).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
+    await poolWethDai.connect(lp2).claim([1,2,3], false, timestamp+9999999);
     postClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     postClaimTokenBal = await DAI.balanceOf(lp2.address);
 
@@ -392,8 +393,8 @@ describe("ETH-DAI Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await DAI.balanceOf(lp3.address);
-    await expect(subPool.connect(lp3).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
-    await subPool.connect(lp3).claim([1,2,3], false, timestamp+9999999);
+    await expect(poolWethDai.connect(lp3).claimFromAggregated([1, 3], false, timestamp+9999999)).to.be.reverted;
+    await poolWethDai.connect(lp3).claim([1,2,3], false, timestamp+9999999);
     postClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await DAI.balanceOf(lp3.address);
 
@@ -413,23 +414,23 @@ describe("ETH-DAI Pool Testing", function () {
   it("Should allow removing liquidity", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
 
     totalRepayments = ethers.BigNumber.from(0);
     totalLeftColl = ethers.BigNumber.from(0);
 
     for (let i = 0; i < 100; i++) {
-      await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-      loanInfo = await subPool.loanIdxToLoanInfo(i+1);
+      await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+      loanInfo = await poolWethDai.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
-      await subPool.connect(borrower).repay(i+1);
+      await poolWethDai.connect(borrower).repay(i+1, borrower.address, loanInfo.repayment);
     }
 
     for (let i = 0; i < 99; i++) {
-      await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-      loanInfo = await subPool.loanIdxToLoanInfo(i+101);
+      await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+      loanInfo = await poolWethDai.loanIdxToLoanInfo(i+101);
       totalRepayments = totalRepayments.add(loanInfo[0]);
     }
 
@@ -438,22 +439,22 @@ describe("ETH-DAI Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     //claim
-    await subPool.connect(lp1).claimFromAggregated([0, 99,199], false, timestamp+9999999);
-    await subPool.connect(lp2).claimFromAggregated([0, 99,199], false, timestamp+9999999);
+    await poolWethDai.connect(lp1).claimFromAggregated([0, 99,199], false, timestamp+9999999);
+    await poolWethDai.connect(lp2).claimFromAggregated([0, 99,199], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await paxgPool.getNumShares(lp1.address);
-    const lp2NumShares = await paxgPool.getNumShares(lp2.address);
-    const lp3NumShares = await paxgPool.getNumShares(lp3.address);
+    const lp1NumShares = await poolWethDai.getNumShares(lp1.address);
+    const lp2NumShares = await poolWethDai.getNumShares(lp2.address);
+    const lp3NumShares = await poolWethDai.getNumShares(lp3.address);
 
-    await paxgPool.connect(lp1).removeLiquidity(lp1NumShares);
-    await paxgPool.connect(lp2).removeLiquidity(lp2NumShares);
-    await paxgPool.connect(lp3).removeLiquidity(lp3NumShares);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1NumShares);
+    await poolWethDai.connect(lp2).removeLiquidity(lp2NumShares);
+    await poolWethDai.connect(lp3).removeLiquidity(lp3NumShares);
 
-    balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
-    balTestToken = await DAI.balanceOf(subPool.address);
-    totalLiquidity = await subPool.totalLiquidity();
-    totalLpShares = await subPool.totalLpShares();
+    balEth = await WETH.balanceOf(poolWethDai.address); //await ethers.provider.getBalance(poolWethDai.address);
+    balTestToken = await DAI.balanceOf(poolWethDai.address);
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    totalLpShares = await poolWethDai.totalLpShares();
 
     await expect(totalLiquidity).to.be.equal(MIN_LIQUIDITY);
     await expect(totalLpShares).to.be.equal(0);
@@ -466,27 +467,27 @@ describe("ETH-DAI Pool Testing", function () {
   it("Should allow adding liquidity again after removing and claiming", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
-    await subPool.connect(lp2).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
-    await subPool.connect(lp3).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
+    await poolWethDai.connect(lp2).addLiquidity(ONE_DAI.mul(300000), timestamp+60, 0);
+    await poolWethDai.connect(lp3).addLiquidity(ONE_DAI.mul(200000), timestamp+60, 0);
 
     totalRepayments = ethers.BigNumber.from(0);
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-    loanInfo = await subPool.loanIdxToLoanInfo(1);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(1);
+    await poolWethDai.connect(borrower).repay(1, borrower.address, loanInfo.repayment);
 
     //2nd borrow & repay
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
-    loanInfo = await subPool.loanIdxToLoanInfo(2);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(2);
+    await poolWethDai.connect(borrower).repay(2, borrower.address, loanInfo.repayment);
 
     //3rd borrow & default
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH});
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_ETH);
 
     //move forward to loan expiry
@@ -494,53 +495,53 @@ describe("ETH-DAI Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     //claim
-    await subPool.connect(lp1).claim([1, 2, 3], false, timestamp+9999999);
-    await subPool.connect(lp2).claim([1, 2, 3], false, timestamp+9999999);
-    await subPool.connect(lp3).claim([1, 2, 3], false, timestamp+9999999);
+    await poolWethDai.connect(lp1).claim([1, 2, 3], false, timestamp+9999999);
+    await poolWethDai.connect(lp2).claim([1, 2, 3], false, timestamp+9999999);
+    await poolWethDai.connect(lp3).claim([1, 2, 3], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await paxgPool.getNumShares(lp1.address);
-    const lp2NumShares = await paxgPool.getNumShares(lp2.address);
-    const lp3NumShares = await paxgPool.getNumShares(lp3.address);
+    const lp1NumShares = await poolWethDai.getNumShares(lp1.address);
+    const lp2NumShares = await poolWethDai.getNumShares(lp2.address);
+    const lp3NumShares = await poolWethDai.getNumShares(lp3.address);
 
-    await paxgPool.connect(lp1).removeLiquidity(lp1NumShares);
-    await paxgPool.connect(lp2).removeLiquidity(lp2NumShares);
-    await paxgPool.connect(lp3).removeLiquidity(lp3NumShares);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1NumShares);
+    await poolWethDai.connect(lp2).removeLiquidity(lp2NumShares);
+    await poolWethDai.connect(lp3).removeLiquidity(lp3NumShares);
 
-    balEth = await WETH.balanceOf(subPool.address); //await ethers.provider.getBalance(subPool.address);
-    balTestToken = await DAI.balanceOf(subPool.address);
+    balEth = await WETH.balanceOf(poolWethDai.address); //await ethers.provider.getBalance(poolWethDai.address);
+    balTestToken = await DAI.balanceOf(poolWethDai.address);
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
 
     //add liquidity with dust should automatically transfer
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+1000, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+1000, 0);
     
     //check dust was transferred to treasury
     balTreasury = await DAI.balanceOf("0x1234567890000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
-    totalLpShares = await subPool.totalLpShares();
+    totalLpShares = await poolWethDai.totalLpShares();
     await expect(totalLpShares).to.be.equal(ONE_DAI.mul(500000));
   })
 
   it("Should never fall below MIN_LIQUIDITY", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(1001), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(1001), timestamp+60, 0);
 
     //large borrow
     await ethers.provider.send("hardhat_setBalance", [
       borrower.address,
       "0x152D02C7E14AF6800000",
     ]);
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: ONE_ETH.mul(10000)});
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH.mul(10000), 0, MAX_UINT128, timestamp+1000000000, 0);
     
     //check total liquidity & balance
-    totalLiquidity = await subPool.totalLiquidity();
-    balance = await DAI.balanceOf(subPool.address);
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    balance = await DAI.balanceOf(poolWethDai.address);
     console.log("totalLiquidity:", totalLiquidity);
     console.log("balance:", balance)
     expect(totalLiquidity).to.be.equal(balance);
@@ -550,15 +551,15 @@ describe("ETH-DAI Pool Testing", function () {
   it("Should allow rolling over loan", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await subPool.connect(lp1).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
+    await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(100000), timestamp+60, 0);
 
     pledgeAmount = ONE_ETH;
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
-    loanInfo = await subPool.loanIdxToLoanInfo(1);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(1);
 
-    loanTerms = await subPool.loanTerms(loanInfo.collateral);
+    loanTerms = await poolWethDai.loanTerms(loanInfo.collateral);
     balTestTokenPre = await DAI.balanceOf(borrower.address);
-    await subPool.connect(borrower).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0);
+    await poolWethDai.connect(borrower).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0);
     balTestTokenPost = await DAI.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
@@ -567,75 +568,69 @@ describe("ETH-DAI Pool Testing", function () {
   })
   
   it("Shouldn't overflow even after 4x rounds of consecutive LPing with DAI ≈80mn and borrowing against 120,000,000 ETH", async function () {
-    //large borrow
-    await ethers.provider.send("hardhat_setBalance", [
-      borrower.address,
-      "0x204FCE5E3E25026110000000",
-    ]);
-
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     pledgeAmount = ONE_ETH.mul(120000000);
 
     bal = await DAI.balanceOf(lp1.address);
 
-    await subPool.connect(lp1).addLiquidity(bal, timestamp+1000000000, 0);
-    loanTerms = await subPool.loanTerms(pledgeAmount);
+    await poolWethDai.connect(lp1).addLiquidity(bal, timestamp+1000000000, 0);
+    loanTerms = await poolWethDai.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
-    loanInfo = await subPool.loanIdxToLoanInfo(1);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(1);
 
-    totalLiquidity = await subPool.totalLiquidity();
-    totalLpShares = await subPool.totalLpShares();
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    totalLpShares = await poolWethDai.totalLpShares();
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)
 
-    await subPool.connect(lp2).addLiquidity(bal, timestamp+1000000000, 0);
-    loanTerms = await subPool.loanTerms(pledgeAmount);
+    await poolWethDai.connect(lp2).addLiquidity(bal, timestamp+1000000000, 0);
+    loanTerms = await poolWethDai.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
-    loanInfo = await subPool.loanIdxToLoanInfo(2);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(2);
 
-    totalLiquidity = await subPool.totalLiquidity();
-    totalLpShares = await subPool.totalLpShares();
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    totalLpShares = await poolWethDai.totalLpShares();
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)
 
-    await subPool.connect(lp3).addLiquidity(bal, timestamp+1000000000, 0);
-    loanTerms = await subPool.loanTerms(pledgeAmount);
+    await poolWethDai.connect(lp3).addLiquidity(bal, timestamp+1000000000, 0);
+    loanTerms = await poolWethDai.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
-    loanInfo = await subPool.loanIdxToLoanInfo(3);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(3);
 
-    totalLiquidity = await subPool.totalLiquidity();
-    totalLpShares = await subPool.totalLpShares();
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    totalLpShares = await poolWethDai.totalLpShares();
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)
 
-    await subPool.connect(lp4).addLiquidity(bal, timestamp+1000000000, 0);
-    loanTerms = await subPool.loanTerms(pledgeAmount);
+    await poolWethDai.connect(lp4).addLiquidity(bal, timestamp+1000000000, 0);
+    loanTerms = await poolWethDai.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
-    loanInfo = await subPool.loanIdxToLoanInfo(4);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(4);
 
-    totalLiquidity = await subPool.totalLiquidity();
-    totalLpShares = await subPool.totalLpShares();
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    totalLpShares = await poolWethDai.totalLpShares();
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)
 
 
-    /*await subPool.connect(lp5).addLiquidity(bal, timestamp+1000000000, 0);
-    loanTerms = await subPool.loanTerms(pledgeAmount);
+    /*await poolWethDai.connect(lp5).addLiquidity(bal, timestamp+1000000000, 0);
+    loanTerms = await poolWethDai.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(0, 0, MAX_UINT128, timestamp+1000000000, 0, {value: pledgeAmount});
-    loanInfo = await subPool.loanIdxToLoanInfo(5);
+    await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+    loanInfo = await poolWethDai.loanIdxToLoanInfo(5);
 
-    totalLiquidity = await subPool.totalLiquidity();
-    totalLpShares = await subPool.totalLpShares();
+    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    totalLpShares = await poolWethDai.totalLpShares();
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)*/

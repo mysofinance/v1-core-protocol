@@ -24,8 +24,6 @@ abstract contract BasePool is IBasePool {
     error TooBigAddToLaterClaimColl();
     error NothingToRemove();
     error BeforeEarliestRemove();
-    error InconsistentMsgValue();
-    error InvalidInAmount();
     error InsufficientLiquidity();
     error InvalidRemovalAmount();
     error TooSmallLoan();
@@ -38,6 +36,7 @@ abstract contract BasePool is IBasePool {
     error CannotRepayAfterExpiry();
     error AlreadyRepaid();
     error CannotRepayInSameBlock();
+    error InvalidSendAmount();
     error NothingToClaim();
     error MustBeLp();
     error InvalidNewSharePointer();
@@ -152,9 +151,7 @@ abstract contract BasePool is IBasePool {
         tvl2 = _tvl2;
         minLoan = _minLoan;
         loanIdx = 1;
-        COLL_TOKEN_DECIMALS = _collCcyToken == WETH
-            ? 18
-            : IERC20Metadata(_collCcyToken).decimals();
+        COLL_TOKEN_DECIMALS = IERC20Metadata(_collCcyToken).decimals();
         firstLengthPerClaimInterval = _firstLengthPerClaimInterval;
         emit NewSubPool(
             _loanCcyToken,
@@ -169,43 +166,35 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function isEthPool() internal view returns (bool) {
-        return collCcyToken == WETH;
-    }
-
-    function isEthLoan() internal view returns (bool) {
-        return loanCcyToken == WETH;
-    }
-
     function getTotalLiquidity() public view virtual returns (uint256);
 
-    function getTransferFee(uint128 pledgeAmount)
+    function getCollCcyTransferFee(uint128 _transferAmount)
+        internal
+        view
+        virtual
+        returns (uint128);
+
+    function getLoanCcyTransferFee(uint128 _transferAmount)
         internal
         view
         virtual
         returns (uint128);
 
     function addLiquidity(
-        uint128 _inAmount,
+        uint128 _sendAmount,
         uint256 _deadline,
         uint16 _referralCode
-    ) public payable override {
+    ) public override {
         // verify lp info and eligibility
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        // verify eligibility of loan
-        bool wrapToWeth = isEthLoan() && _inAmount == 0 && msg.value > 0;
-        {
-            bool isWeth = isEthLoan() && _inAmount > 0 && msg.value == 0;
-            bool isErc20 = !isEthLoan() && _inAmount > 0 && msg.value == 0;
-            if (!wrapToWeth && !isWeth && !isErc20)
-                revert InconsistentMsgValue();
-        }
-        // get loanAmount
-        uint128 _amount = wrapToWeth ? uint128(msg.value) : _inAmount;
+        uint128 _inAmountAfterFees = _sendAmount -
+            getLoanCcyTransferFee(_sendAmount);
         uint256 _totalLiquidity = getTotalLiquidity();
-        if (_amount < MIN_LIQUIDITY || _amount + _totalLiquidity < minLoan)
-            revert InvalidAddAmount();
+        if (
+            _inAmountAfterFees < MIN_LIQUIDITY ||
+            _inAmountAfterFees + _totalLiquidity < minLoan
+        ) revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
 
@@ -213,15 +202,16 @@ abstract contract BasePool is IBasePool {
         uint256 newLpShares;
         uint256 dust;
         if (_totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = _amount;
-        } else if (_totalLiquidity > 0 && totalLpShares == 0) {
+            newLpShares = _inAmountAfterFees;
+        } else if (totalLpShares == 0) {
             dust = _totalLiquidity;
             _totalLiquidity = 0;
-            newLpShares = _amount;
+            newLpShares = _inAmountAfterFees;
         } else {
             assert(_totalLiquidity > 0 && totalLpShares > 0);
             newLpShares = uint128(
-                (uint256(_amount) * uint256(totalLpShares)) / _totalLiquidity
+                (uint256(_inAmountAfterFees) * uint256(totalLpShares)) /
+                    _totalLiquidity
             );
         }
         totalLpShares += uint128(newLpShares);
@@ -234,7 +224,7 @@ abstract contract BasePool is IBasePool {
                 newLpShares ==
             0
         ) revert TooBigAddToLaterClaimColl();
-        totalLiquidity = _totalLiquidity + _amount;
+        totalLiquidity = _totalLiquidity + _inAmountAfterFees;
         // update lp info
         bool isFirstAddLiquidity = lpInfo.fromLoanIdx == 0;
         if (isFirstAddLiquidity) {
@@ -249,24 +239,20 @@ abstract contract BasePool is IBasePool {
         }
         lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
 
-        if (wrapToWeth) {
-            // wrap to Weth
-            IWETH(loanCcyToken).deposit{value: _amount}();
-        } else {
-            // transfer liquidity
-            IERC20Metadata(loanCcyToken).safeTransferFrom(
-                msg.sender,
-                address(this),
-                _amount
-            );
-        }
+        // transfer liquidity
+        IERC20Metadata(loanCcyToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _sendAmount
+        );
+
         // transfer dust to treasury if any
         if (dust > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(TREASURY, dust);
         }
         // spawn event
         emit AddLiquidity(
-            _amount,
+            _sendAmount,
             newLpShares,
             totalLiquidity,
             totalLpShares,
@@ -350,13 +336,15 @@ abstract contract BasePool is IBasePool {
     }
 
     function borrow(
+        address _onBehalf,
         uint128 _sendAmount,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
         uint256 _deadline,
         uint16 _referralCode
-    ) external payable override {
-        uint128 _inAmountAfterFees = _sendAmount - getTransferFee(_sendAmount);
+    ) external override {
+        uint128 _inAmountAfterFees = _sendAmount -
+            getCollCcyTransferFee(_sendAmount);
         // get borrow terms and do checks
         (
             uint128 loanAmount,
@@ -377,7 +365,7 @@ abstract contract BasePool is IBasePool {
             totalFees += _protocolFee;
 
             // update loan info
-            loanIdxToBorrower[loanIdx] = msg.sender;
+            loanIdxToBorrower[loanIdx] = _onBehalf;
             LoanInfo memory loanInfo;
             loanInfo.repayment = repaymentAmount;
             loanInfo.totalLpShares = totalLpShares;
@@ -396,6 +384,8 @@ abstract contract BasePool is IBasePool {
             collAndRepayTotalBaseAgg3[
                 (loanIdx / (firstLengthPerClaimInterval * 100)) + 1
             ].collateral += collateral;
+
+            // update loan idx counter
             loanIdx += 1;
         }
         {
@@ -406,7 +396,7 @@ abstract contract BasePool is IBasePool {
                 _sendAmount
             );
             // transfer loanAmount in loan ccy
-            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
+            IERC20Metadata(loanCcyToken).safeTransfer(_onBehalf, loanAmount);
         }
         // spawn event
         emit Borrow(
@@ -440,7 +430,6 @@ abstract contract BasePool is IBasePool {
         // get and verify loan terms
         uint256 timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
-        if (_inAmountAfterFees == 0) revert InvalidInAmount();
         (
             loanAmount,
             repaymentAmount,
@@ -448,16 +437,23 @@ abstract contract BasePool is IBasePool {
             _protocolFee,
             _totalLiquidity
         ) = loanTerms(_inAmountAfterFees);
+        assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         expiry = uint32(timestamp) + LOAN_TENOR;
     }
 
-    function repay(uint256 _loanIdx) external override {
+    function repay(
+        uint256 _loanIdx,
+        address _onBehalf,
+        uint128 _sendAmount
+    ) external override {
         // verify loan info and eligibility
-        if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
-        if (loanIdxToBorrower[_loanIdx] != msg.sender)
-            revert UnauthorizedRepay();
+        if (
+            _loanIdx == 0 ||
+            _loanIdx >= loanIdx ||
+            loanIdxToBorrower[_loanIdx] != _onBehalf
+        ) revert InvalidLoanIdx();
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         if (block.timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
         if (loanInfo.repaid) revert AlreadyRepaid();
@@ -474,15 +470,23 @@ abstract contract BasePool is IBasePool {
             loanInfo.totalLpShares
         );
 
-        // transfer collateral
+        // transfer repayment amount
+        uint128 repaymentAmountAfterFees = _sendAmount -
+            getLoanCcyTransferFee(_sendAmount);
+        // set range in case of rounding exact repayment amount
+        // cannot be hit; set upper bound to prevent fat finger
+        if (
+            repaymentAmountAfterFees < loanInfo.repayment ||
+            repaymentAmountAfterFees > (101 * loanInfo.repayment) / 100
+        ) revert InvalidSendAmount();
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
             address(this),
-            loanInfo.repayment
+            _sendAmount
         );
-        // transfer liquidity
+        // transfer collateral
         IERC20Metadata(collCcyToken).safeTransfer(
-            msg.sender,
+            _onBehalf,
             loanInfo.collateral
         );
         // spawn event

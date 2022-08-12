@@ -85,7 +85,7 @@ describe("WETH-USDC Pool Testing", function () {
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
     currBlock = await ethers.provider.getBlockNumber();
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
   });
   
   it("Should not allow new LPs to claim on unentitled previous loans", async function () {
@@ -103,21 +103,21 @@ describe("WETH-USDC Pool Testing", function () {
     loanTerms = await subPool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
-    await subPool.connect(borrower).repay(1);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await subPool.connect(borrower).repay(1, borrower.address);
 
     //borrow & repay
     loanTerms = await subPool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
-    await subPool.connect(borrower).repay(2);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await subPool.connect(borrower).repay(2, borrower.address);
 
     //borrow & default
     loanTerms = await subPool.loanTerms(ONE_ETH);
     minLoanLimit = loanTerms[0].mul(98).div(100);
     maxRepayLimit = loanTerms[1].mul(102).div(100);
-    await subPool.connect(borrower).borrow(ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
 
     //move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
@@ -160,12 +160,12 @@ describe("WETH-USDC Pool Testing", function () {
     for (let i = 0; i < 100; i++) {
       try {
         loanTerms = await paxgPool.loanTerms(ONE_ETH);
-        await paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+        await paxgPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
         numBorrows += 1;
         console.log("loanTerms: ", loanTerms);
       } catch(error) {
         console.log("loanTerms error: ", error);
-        await expect(paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
+        await expect(paxgPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
         tooSmallLoans = true;
         break;
       }
@@ -180,7 +180,7 @@ describe("WETH-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).addLiquidity(ONE_USDC.mul(1000), timestamp+60, 0);
 
     // take out a loan should be possible again without revert after liquidity add
-    await paxgPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
   });
 
   it("Should allow LPs to claim individually", async function () {
@@ -193,8 +193,8 @@ describe("WETH-USDC Pool Testing", function () {
     for (let i = 0; i < 100; i++) {
       totalLiquidity = await subPool.totalLiquidity();
       loanTerms = await subPool.loanTerms(ONE_ETH);
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
-      await subPool.connect(borrower).repay(i+1);
+      await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+      await subPool.connect(borrower).repay(i+1, borrower.address);
     }
     loanIds = Array.from(Array(100), (_, index) => index + 1);
 
@@ -225,14 +225,14 @@ describe("WETH-USDC Pool Testing", function () {
       loanTerms = await subPool.loanTerms(pledgeAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
       //borrow
-      await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+      await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
       //actual repayment
       loanInfo = await subPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
       //interest costs
       totalInterestCosts = totalInterestCosts.add(loanTerms[1].sub(loanTerms[0]));
       //repay
-      await subPool.connect(borrower).repay(i+1);
+      await subPool.connect(borrower).repay(i+1, borrower.address);
     }
     await expect(totalRepaymentsIndicative).to.be.equal(totalRepayments);
     console.log("totalRepayments", totalRepayments)
@@ -297,19 +297,19 @@ describe("WETH-USDC Pool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(1);
+    await subPool.connect(borrower).repay(1, borrower.address);
 
     //2nd borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(2);
+    await subPool.connect(borrower).repay(2, borrower.address);
 
     //3rd borrow & default
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_ETH);
 
     //move forward to loan expiry
@@ -391,14 +391,14 @@ describe("WETH-USDC Pool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     for (let i = 0; i < 100; i++) {
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+      await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await subPool.loanIdxToLoanInfo(i+1);
       totalRepayments = totalRepayments.add(loanInfo[0]);
-      await subPool.connect(borrower).repay(i+1);
+      await subPool.connect(borrower).repay(i+1, borrower.address);
     }
 
     for (let i = 0; i < 99; i++) {
-      await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+      await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
       loanInfo = await subPool.loanIdxToLoanInfo(i+101);
       totalRepayments = totalRepayments.add(loanInfo[0]);
     }
@@ -447,19 +447,19 @@ describe("WETH-USDC Pool Testing", function () {
     totalLeftColl = ethers.BigNumber.from(0);
 
     //1st borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(1);
+    await subPool.connect(borrower).repay(1, borrower.address);
 
     //2nd borrow & repay
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
-    await subPool.connect(borrower).repay(2);
+    await subPool.connect(borrower).repay(2, borrower.address);
 
     //3rd borrow & default
-    await subPool.connect(borrower).borrow(ONE_ETH, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MONE, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_ETH);
 
     //move forward to loan expiry
@@ -511,7 +511,7 @@ describe("WETH-USDC Pool Testing", function () {
     ]);
     await WETH.connect(borrower).deposit({value: "0x33B2E3C9FD0803CE8000000"});
 
-    await subPool.connect(borrower).borrow(ONE_ETH.mul(10000), 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, ONE_ETH.mul(10000), 0, MONE, timestamp+1000000000, 0);
     
     //check total liquidity & balance
     totalLiquidity = await subPool.totalLiquidity();
@@ -528,7 +528,7 @@ describe("WETH-USDC Pool Testing", function () {
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000), timestamp+60, 0);
 
     pledgeAmount = ONE_ETH;
-    await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
 
     loanTerms = await subPool.loanTerms(loanInfo.collateral);
@@ -556,7 +556,7 @@ describe("WETH-USDC Pool Testing", function () {
     await subPool.connect(lp1).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await subPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(1);
 
     totalLiquidity = await subPool.totalLiquidity();
@@ -568,7 +568,7 @@ describe("WETH-USDC Pool Testing", function () {
     await subPool.connect(lp2).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await subPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(2);
 
     totalLiquidity = await subPool.totalLiquidity();
@@ -580,7 +580,7 @@ describe("WETH-USDC Pool Testing", function () {
     await subPool.connect(lp3).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await subPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(3);
 
     totalLiquidity = await subPool.totalLiquidity();
@@ -592,7 +592,7 @@ describe("WETH-USDC Pool Testing", function () {
     await subPool.connect(lp4).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await subPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(4);
 
     totalLiquidity = await subPool.totalLiquidity();
@@ -605,7 +605,7 @@ describe("WETH-USDC Pool Testing", function () {
     await subPool.connect(lp5).addLiquidity(ONE_USDC.mul(100000000), timestamp+1000000000, 0);
     loanTerms = await subPool.loanTerms(pledgeAmount);
     console.log(loanTerms)
-    await subPool.connect(borrower).borrow(pledgeAmount, 0, MONE, timestamp+1000000000, 0);
+    await subPool.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await subPool.loanIdxToLoanInfo(5);
 
     totalLiquidity = await subPool.totalLiquidity();
