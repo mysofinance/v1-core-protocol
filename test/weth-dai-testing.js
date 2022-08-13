@@ -280,7 +280,7 @@ describe("WETH-DAI Pool Testing", function () {
     await expect((10000 <= pct) && (pct <= 10010)).to.be.true;
 
     //cannot claim twice
-    await expect(poolWethDai.connect(lp1).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp1).claimFromAggregated([0, 100], false, timestamp+9999999)).to.be.reverted;
 
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
@@ -288,17 +288,17 @@ describe("WETH-DAI Pool Testing", function () {
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await DAI.balanceOf(lp2.address);
-    await poolWethDai.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999);
+    await poolWethDai.connect(lp2).claimFromAggregated([0, 100], false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
     //cannot claim twice
-    await expect(poolWethDai.connect(lp2).claimFromAggregated([0, 99], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp2).claimFromAggregated([0, 100], false, timestamp+9999999)).to.be.reverted;
 
     //lp3 claims
     preClaimBal = await DAI.balanceOf(lp3.address);
-    await poolWethDai.connect(lp3).claimFromAggregated([0, 99], false, timestamp+9999999);
+    await poolWethDai.connect(lp3).claimFromAggregated([0, 100], false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -307,7 +307,7 @@ describe("WETH-DAI Pool Testing", function () {
 
     //lp4 claims
     preClaimBal = await DAI.balanceOf(lp4.address);
-    await poolWethDai.connect(lp4).claimFromAggregated([0, 99], false, timestamp+9999999);
+    await poolWethDai.connect(lp4).claimFromAggregated([0, 100], false, timestamp+9999999);
     postClaimBal = await DAI.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
@@ -411,7 +411,7 @@ describe("WETH-DAI Pool Testing", function () {
     await expect((10000 <= pctEthDiff) && (pctEthDiff <= 10010)).to.be.true;
   });
 
-  it("Should allow removing liquidity", async function () {
+  it("Should allow removing liquidity test", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await poolWethDai.connect(lp1).addLiquidity(ONE_DAI.mul(500000), timestamp+60, 0);
@@ -439,8 +439,8 @@ describe("WETH-DAI Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     //claim
-    await poolWethDai.connect(lp1).claimFromAggregated([0, 99,199], false, timestamp+9999999);
-    await poolWethDai.connect(lp2).claimFromAggregated([0, 99,199], false, timestamp+9999999);
+    await poolWethDai.connect(lp1).claimFromAggregated([0, 100,200], false, timestamp+9999999);
+    await poolWethDai.connect(lp2).claimFromAggregated([0, 100,200], false, timestamp+9999999);
 
     //remove liquidity
     const lp1NumShares = await poolWethDai.getNumShares(lp1.address);

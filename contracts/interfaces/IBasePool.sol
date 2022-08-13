@@ -55,15 +55,23 @@ interface IBasePool {
     event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx);
 
+    enum ApprovalTypes {
+        REPAY,
+        ADD_LIQUIDITY,
+        REMOVE_LIQUIDITY
+    }
+
     /**
      * @notice Function which adds to an LPs current position
      * @dev This function will update loanIdxsWhereSharesChanged only if not
-     * the first add
+     * the first add. If address on behalf of is not sender, then sender must have permission.
+     * @param _onBehalfOf Recipient of the LP shares
      * @param _sendAmount Amount of loan currency LP wishes to deposit
      * @param _deadline Last timestamp after which function will revert
      * @param _referralCode Will possibly be used later to reward referrals
      */
     function addLiquidity(
+        address _onBehalfOf,
         uint128 _sendAmount,
         uint256 _deadline,
         uint16 _referralCode
@@ -72,10 +80,13 @@ interface IBasePool {
     /**
      * @notice Function which removes shares from an LPs
      * @dev This function will update loanIdxsWhereSharesChanged
-     * and shareOverTime arrays in lpInfo
+     * and shareOverTime arrays in lpInfo. If address on behalf
+     * of is not sender, then sender must have permission.
+     * @param _onBehalfOf Recipient of the transfer loan currency
      * @param numSharesRemove Amount of LP shares to remove
      */
-    function removeLiquidity(uint256 numSharesRemove) external;
+    function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
+        external;
 
     function borrow(
         address _onBehalf,
@@ -157,6 +168,11 @@ interface IBasePool {
         uint256 _shares
     ) external view returns (uint256 repayments, uint256 collateral);
 
+    function toggleRepayAndLiquidityApproval(
+        address _recipient,
+        ApprovalTypes _approvalType
+    ) external;
+
     function getNumShares(address _lpAddr)
         external
         view
@@ -188,8 +204,9 @@ interface IBasePool {
 
     function loanIdxToBorrower(uint256) external view returns (address);
 
-    function repayApprovals(address _borrower, address _recipient)
-        external
-        view
-        returns (bool _approved);
+    function repayAndLiquidityApprovals(
+        address _borrower,
+        address _recipient,
+        ApprovalTypes _approvalType
+    ) external view returns (bool _approved);
 }
