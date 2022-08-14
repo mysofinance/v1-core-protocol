@@ -595,28 +595,28 @@ abstract contract BasePool is IBasePool {
 
         // verify lp info and eligibility
         uint256 loanIdxsLen = _loanIdxs.length;
-        if (loanIdxsLen * lpInfo.sharesOverTime.length == 0)
-            revert NothingToClaim();
-        if (_loanIdxs[0] == 0 || _loanIdxs[loanIdxsLen - 1] >= loanIdx)
-            revert InvalidLoanIdx();
+        //length of sharesOverTime array for LP
+        uint256 sharesOverTimeLen = lpInfo.sharesOverTime.length;
+        if (loanIdxsLen * sharesOverTimeLen == 0) revert NothingToClaim();
+        if (_loanIdxs[0] == 0) revert InvalidLoanIdx();
 
         // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
         // and push fromLoanIdx forward
         checkAutoIncrement(lpInfo);
 
-        //current pointer in the sharesOverTime array
-        uint256 currSharePtr = lpInfo.currSharePtr;
-
         //check still valid beginning loan index
         if (_loanIdxs[0] < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
 
+        //current pointer in the sharesOverTime array
+        uint256 currSharePtr = lpInfo.currSharePtr;
+
         // infer applicable upper loan idx for which number of shares didn't change
         uint256 sharesUnchangedUntilLoanIdx;
-        if (lpInfo.currSharePtr == lpInfo.sharesOverTime.length - 1) {
+        if (currSharePtr == sharesOverTimeLen - 1) {
             sharesUnchangedUntilLoanIdx = loanIdx;
         } else {
             sharesUnchangedUntilLoanIdx = lpInfo.loanIdxsWhereSharesChanged[
-                lpInfo.currSharePtr
+                currSharePtr
             ];
         }
 

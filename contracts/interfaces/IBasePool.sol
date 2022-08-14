@@ -58,7 +58,8 @@ interface IBasePool {
     enum ApprovalTypes {
         REPAY,
         ADD_LIQUIDITY,
-        REMOVE_LIQUIDITY
+        REMOVE_LIQUIDITY,
+        CLAIM
     }
 
     /**
