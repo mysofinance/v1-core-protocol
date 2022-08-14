@@ -129,11 +129,15 @@ interface IBasePool {
      * changes position size in the middle of smallest aggregation block
      * or if LP wants to claim some of the loans before the expiry time
      * of the last loan in the aggregation block. _loanIdxs must be increasing array.
+     * If address on behalf of is not sender, then sender must have permission to claim.
+     * As well if reinvestment ootion is chosen, sender must have permission to add liquidity
+     * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
      * @param _loanIdxs Loan indices on which LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
      */
     function claim(
+        address _onBehalfOf,
         uint256[] calldata _loanIdxs,
         bool _isReinvested,
         uint256 _deadline
