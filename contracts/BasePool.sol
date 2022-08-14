@@ -602,28 +602,8 @@ abstract contract BasePool is IBasePool {
         if (loanIdxsLen * sharesOverTimeLen == 0) revert NothingToClaim();
         if (_loanIdxs[0] == 0) revert InvalidLoanIdx();
 
-        // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
-        // and push fromLoanIdx forward
-        // checkAutoIncrement(lpInfo);
-
-        // //check still valid beginning loan index
-        // if (_loanIdxs[0] < lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
-
         //current pointer in the sharesOverTime array
         uint256 currSharePtr = lpInfo.currSharePtr;
-
-        // // infer applicable upper loan idx for which number of shares didn't change
-        // uint256 sharesUnchangedUntilLoanIdx = sharesOverTimeLen - 1 ==
-        //     currSharePtr
-        //     ? loanIdx
-        //     : lpInfo.loanIdxsWhereSharesChanged[currSharePtr];
-
-        // // check passed last loan idx is consistent with constant share interval
-        // if (_loanIdxs[loanIdxsLen - 1] >= sharesUnchangedUntilLoanIdx)
-        //     revert LoanIdxsWithChangingShares();
-
-        // // get applicable number of shares for pro-rata calculations (given current share pointer position)
-        // uint256 applicableShares = lpInfo.sharesOverTime[lpInfo.currSharePtr];
 
         (
             uint256 sharesUnchangedUntilLoanIdx,
@@ -706,36 +686,8 @@ abstract contract BasePool is IBasePool {
         if (lpInfo.sharesOverTime.length == 0 || lengthArr < 2)
             revert NothingToClaim();
 
-        // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
-        // and push fromLoanIdx forward
-        // checkAutoIncrement(lpInfo);
-
         //current pointer in the sharesOverTime array
         uint256 currSharePtr = lpInfo.currSharePtr;
-
-        // //first loan index (which is what _fromLoanIdx will become)
-        // //cannot be less than from loan idx (double-claiming or not entitled since
-        // //wasn't invested during that time), unless special case of first loan globally
-        // if (
-        //     _aggIdxs[0] < lpInfo.fromLoanIdx &&
-        //     !(_aggIdxs[0] == 0 && lpInfo.fromLoanIdx == 1)
-        // ) revert UnentitledFromLoanIdx();
-
-        // //set the current max allowed to loan index. If the sharesOverTime pointer is all the way
-        // //at the end of the sharesOverTime array, then global loanIdx is max to loan index,
-        // //else you peek one ahead in the toLoanIdx array
-        // uint256 sharesUnchangedUntilLoanIdx = lpInfo.sharesOverTime.length -
-        //     1 ==
-        //     currSharePtr
-        //     ? loanIdx
-        //     : lpInfo.loanIdxsWhereSharesChanged[currSharePtr];
-
-        // // check passed last loan idx (minus 1 since buckets end at previous idx) is consistent with constant share interval
-        // if (_aggIdxs[lengthArr - 1] - 1 >= sharesUnchangedUntilLoanIdx)
-        //     revert LoanIdxsWithChangingShares();
-
-        // //unchanged amount of shares
-        // uint256 applicableShares = lpInfo.sharesOverTime[currSharePtr];
 
         (
             uint256 sharesUnchangedUntilLoanIdx,
@@ -946,18 +898,6 @@ abstract contract BasePool is IBasePool {
         ] = !repayAndLiquidityApprovals[msg.sender][_recipient][_approvalType];
     }
 
-    // function checkAutoIncrement(LpInfo storage _lpInfo) internal {
-    //     if (
-    //         _lpInfo.sharesOverTime[_lpInfo.currSharePtr] == 0 &&
-    //         _lpInfo.currSharePtr < _lpInfo.sharesOverTime.length - 1
-    //     ) {
-    //         _lpInfo.currSharePtr++;
-    //         _lpInfo.fromLoanIdx = uint32(
-    //             _lpInfo.loanIdxsWhereSharesChanged[_lpInfo.currSharePtr]
-    //         );
-    //     }
-    // }
-
     function checkSharePtrIncrement(
         LpInfo storage _lpInfo,
         uint256 _lastIdxFromUserInput,
@@ -1024,8 +964,18 @@ abstract contract BasePool is IBasePool {
             );
         }
 
-        //check still valid beginning loan index
-        if (_startIndex < _lpInfo.fromLoanIdx) revert UnentitledFromLoanIdx();
+        /*
+        first loan index (which is what _fromLoanIdx will become)
+        cannot be less than lpInfo.fromLoanIdx (double-claiming or not entitled since
+        wasn't invested during that time), unless special case of first loan globally
+        and LpInfo.fromLoanIdx is 1
+        Note: This still works for claim, since in that function startIndex !=0 is already
+        checked, so second part is always true in claim function
+        */
+        if (
+            _startIndex < _lpInfo.fromLoanIdx &&
+            !(_startIndex == 0 && _lpInfo.fromLoanIdx == 1)
+        ) revert UnentitledFromLoanIdx();
 
         // infer applicable upper loan idx for which number of shares didn't change
         _sharesUnchangedUntilLoanIdx = _lpInfo.currSharePtr ==
