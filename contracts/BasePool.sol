@@ -611,14 +611,10 @@ abstract contract BasePool is IBasePool {
         uint256 currSharePtr = lpInfo.currSharePtr;
 
         // infer applicable upper loan idx for which number of shares didn't change
-        uint256 sharesUnchangedUntilLoanIdx;
-        if (currSharePtr == sharesOverTimeLen - 1) {
-            sharesUnchangedUntilLoanIdx = loanIdx;
-        } else {
-            sharesUnchangedUntilLoanIdx = lpInfo.loanIdxsWhereSharesChanged[
-                currSharePtr
-            ];
-        }
+        uint256 sharesUnchangedUntilLoanIdx = sharesOverTimeLen - 1 ==
+            currSharePtr
+            ? loanIdx
+            : lpInfo.loanIdxsWhereSharesChanged[currSharePtr];
 
         // check passed last loan idx is consistent with constant share interval
         if (_loanIdxs[loanIdxsLen - 1] >= sharesUnchangedUntilLoanIdx)
