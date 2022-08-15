@@ -49,6 +49,7 @@ abstract contract BasePool is IBasePool {
     error UnauthorizedFeeUpdate();
     error NewFeeMustBeDifferent();
     error NewFeeTooHigh();
+    error InvalidApprovalAddress();
 
     address constant TREASURY = 0x1234567890000000000000000000000000000001;
     uint24 immutable LOAN_TENOR;
@@ -865,6 +866,8 @@ abstract contract BasePool is IBasePool {
         address _recipient,
         IBasePool.ApprovalTypes _approvalType
     ) external {
+        if (msg.sender == _recipient || _recipient == address(0))
+            revert InvalidApprovalAddress();
         repayAndLiquidityApprovals[msg.sender][_recipient][
             _approvalType
         ] = !repayAndLiquidityApprovals[msg.sender][_recipient][_approvalType];
