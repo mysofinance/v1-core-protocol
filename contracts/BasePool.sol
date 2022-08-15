@@ -562,9 +562,6 @@ abstract contract BasePool is IBasePool {
         if (loanIdxsLen * sharesOverTimeLen == 0) revert NothingToClaim();
         if (_loanIdxs[0] == 0) revert InvalidLoanIdx();
 
-        //current pointer in the sharesOverTime array
-        uint256 currSharePtr = lpInfo.currSharePtr;
-
         (
             uint256 sharesUnchangedUntilLoanIdx,
             uint256 applicableShares
@@ -585,7 +582,7 @@ abstract contract BasePool is IBasePool {
         checkSharePtrIncrement(
             lpInfo,
             _loanIdxs[loanIdxsLen - 1],
-            currSharePtr,
+            lpInfo.currSharePtr,
             sharesUnchangedUntilLoanIdx
         );
 
@@ -617,24 +614,23 @@ abstract contract BasePool is IBasePool {
     }
 
     function claimFromAggregated(
+        address _onBehalfOf,
         uint256[] calldata _aggIdxs,
         bool _isReinvested,
         uint256 _deadline
     ) external override {
-        //check if reinvested is chosen that deadline is valid
+        // if lp wants to reinvest check deadline
         checkTimeStamp(_deadline, _isReinvested);
+        checkApproval(_onBehalfOf, msg.sender, IBasePool.ApprovalTypes.CLAIM);
+        LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
         // verify lp info and eligibility
-        LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         //length of loanIdxs array lp wants to claim
         uint256 lengthArr = _aggIdxs.length;
         //checks if loanIds passed in are empty or if the sharesOverTime array is empty
         //in which case, the Lp has no positions.
         if (lpInfo.sharesOverTime.length == 0 || lengthArr < 2)
             revert NothingToClaim();
-
-        //current pointer in the sharesOverTime array
-        uint256 currSharePtr = lpInfo.currSharePtr;
 
         (
             uint256 sharesUnchangedUntilLoanIdx,
@@ -679,12 +675,12 @@ abstract contract BasePool is IBasePool {
         checkSharePtrIncrement(
             lpInfo,
             _aggIdxs[lengthArr - 1],
-            currSharePtr,
+            lpInfo.currSharePtr,
             sharesUnchangedUntilLoanIdx
         );
 
         claimTransferAndReinvestment(
-            msg.sender,
+            _onBehalfOf,
             totalRepayments,
             totalCollateral,
             _deadline,
@@ -934,7 +930,7 @@ abstract contract BasePool is IBasePool {
     ) internal {
         if (_repayments > 0) {
             if (_isReinvested) {
-                //saves transfers
+                //allows reinvestment and transfer of any dust from claim functions
                 (
                     uint256 dust,
                     uint256 newLpShares,

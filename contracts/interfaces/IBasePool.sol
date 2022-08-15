@@ -153,12 +153,16 @@ interface IBasePool {
      * @dev This function is much more efficient, but can only be used when LPs position size did not change
      * over the entire interval LP would like to claim over. _aggIdxs must be increasing array.
      * the first index of _aggIdxs is the from loan index to start aggregation, the rest of the
-     * indices are the end loan indexes of the intervals he wants to claim
+     * indices are the end loan indexes of the intervals he wants to claim.
+     * If address on behalf of is not sender, then sender must have permission to claim.
+     * As well if reinvestment ootion is chosen, sender must have permission to add liquidity
+     * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
      * @param _aggIdxs From index and end indices of the aggregation that LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
      */
     function claimFromAggregated(
+        address _onBehalfOf,
         uint256[] calldata _aggIdxs,
         bool _isReinvested,
         uint256 _deadline
