@@ -190,7 +190,6 @@ abstract contract BasePool is IBasePool {
         uint256 timestamp = checkTimestamp(_deadline);
         checkApproval(
             _onBehalfOf,
-            msg.sender,
             IBasePool.ApprovalTypes.ADD_LIQUIDITY
         );
 
@@ -275,7 +274,6 @@ abstract contract BasePool is IBasePool {
         // verify lp info and eligibility
         checkApproval(
             _onBehalfOf,
-            msg.sender,
             IBasePool.ApprovalTypes.REMOVE_LIQUIDITY
         );
 
@@ -469,13 +467,13 @@ abstract contract BasePool is IBasePool {
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         checkApproval(
             loanIdxToBorrower[_loanIdx],
-            msg.sender,
             IBasePool.ApprovalTypes.REPAY
         );
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
-        if (block.timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
+        uint256 timestamp = block.timestamp;
+        if (timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
         if (loanInfo.repaid) revert AlreadyRepaid();
-        if (block.timestamp == loanInfo.expiry - LOAN_TENOR)
+        if (timestamp == loanInfo.expiry - LOAN_TENOR)
             revert CannotRepayInSameBlock();
         // update loan info
         loanInfo.repaid = true;
@@ -518,13 +516,13 @@ abstract contract BasePool is IBasePool {
         uint256 _deadline,
         uint16 _referralCode
     ) external override {
+        uint256 timestamp = checkTimestamp(_deadline);
         // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         if (loanIdxToBorrower[_loanIdx] != msg.sender)
             revert UnauthorizedRepay();
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         {
-            uint256 timestamp = block.timestamp;
             if (timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
             if (loanInfo.repaid) revert AlreadyRepaid();
             if (timestamp == loanInfo.expiry - LOAN_TENOR)
@@ -591,7 +589,7 @@ abstract contract BasePool is IBasePool {
     ) external override {
         // if lp wants to reinvest check deadline
         if (_isReinvested) checkTimestamp(_deadline);
-        checkApproval(_onBehalfOf, msg.sender, IBasePool.ApprovalTypes.CLAIM);
+        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.CLAIM);
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
         // verify lp info and eligibility
@@ -901,13 +899,12 @@ abstract contract BasePool is IBasePool {
 
     function checkApproval(
         address _onBehalfOf,
-        address _sender,
         IBasePool.ApprovalTypes _approvalType
     ) internal view {
         if (
-            (_onBehalfOf != _sender &&
+            (_onBehalfOf != msg.sender &&
                 (
-                    !isApproved[_onBehalfOf][_sender][
+                    !isApproved[_onBehalfOf][msg.sender][
                         _approvalType
                     ]
                 ))
