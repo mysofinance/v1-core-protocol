@@ -629,26 +629,13 @@ abstract contract BasePool is IBasePool {
             sharesUnchangedUntilLoanIdx
         );
 
-        // transfer liquidity (and reinvest)
-        if (repayments > 0) {
-            if (_isReinvested) {
-                IERC20Metadata(loanCcyToken).safeTransfer(
-                    msg.sender,
-                    repayments
-                );
-                addLiquidity(_onBehalfOf, uint128(repayments), _deadline, 0);
-            } else {
-                IERC20Metadata(loanCcyToken).safeTransfer(
-                    _onBehalfOf,
-                    repayments
-                );
-            }
-        }
-
-        // transfer collateral
-        if (collateral > 0) {
-            IERC20Metadata(collCcyToken).safeTransfer(_onBehalfOf, collateral);
-        }
+        claimTransferAndReinvestment(
+            _onBehalfOf,
+            repayments,
+            collateral,
+            _deadline,
+            _isReinvested
+        );
 
         // spawn event
         emit Claim(_loanIdxs, repayments, collateral);
@@ -736,28 +723,13 @@ abstract contract BasePool is IBasePool {
             sharesUnchangedUntilLoanIdx
         );
 
-        // transfer liquidity or reinvest
-        if (totalRepayments > 0) {
-            IERC20Metadata(loanCcyToken).safeTransfer(
-                msg.sender,
-                totalRepayments
-            );
-            if (_isReinvested) {
-                addLiquidity(
-                    msg.sender,
-                    uint128(totalRepayments),
-                    _deadline,
-                    0
-                );
-            }
-        }
-        //transfer collateral
-        if (totalCollateral > 0) {
-            IERC20Metadata(collCcyToken).safeTransfer(
-                msg.sender,
-                totalCollateral
-            );
-        }
+        claimTransferAndReinvestment(
+            msg.sender,
+            totalRepayments,
+            totalCollateral,
+            _deadline,
+            _isReinvested
+        );
         //spawn event
         emit ClaimFromAggregated(
             _aggIdxs[0],
@@ -989,5 +961,31 @@ abstract contract BasePool is IBasePool {
 
         // get applicable number of shares for pro-rata calculations (given current share pointer position)
         _applicableShares = _lpInfo.sharesOverTime[_lpInfo.currSharePtr];
+    }
+
+    function claimTransferAndReinvestment(
+        address _onBehalfOf,
+        uint256 _repayments,
+        uint256 _collateral,
+        uint256 _deadline,
+        bool _isReinvested
+    ) internal {
+        if (_repayments > 0) {
+            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, _repayments);
+            if (_isReinvested) {
+                //wasteful...could possibly get away with internal addLiquidity part without transfers and fees...
+                addLiquidity(
+                    _onBehalfOf,
+                    uint128(_repayments) -
+                        getLoanCcyTransferFee(uint128(_repayments)),
+                    _deadline,
+                    0
+                );
+            }
+        }
+        //transfer collateral
+        if (_collateral > 0) {
+            IERC20Metadata(collCcyToken).safeTransfer(_onBehalfOf, _collateral);
+        }
     }
 }
