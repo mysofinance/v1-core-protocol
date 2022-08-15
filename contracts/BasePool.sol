@@ -940,11 +940,7 @@ abstract contract BasePool is IBasePool {
                     IERC20Metadata(loanCcyToken).safeTransfer(TREASURY, dust);
                 }
                 // spawn event
-                emit Reinvest(
-                    _repayments,
-                    newLpShares,
-                    earliestRemove
-                );
+                emit Reinvest(_repayments, newLpShares, earliestRemove);
             } else {
                 IERC20Metadata(loanCcyToken).safeTransfer(
                     msg.sender,
