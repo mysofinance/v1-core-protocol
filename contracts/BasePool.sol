@@ -189,10 +189,7 @@ abstract contract BasePool is IBasePool {
     ) public override {
         // verify lp info and eligibility
         uint256 timestamp = checkTimestamp(_deadline);
-        checkApproval(
-            _onBehalfOf,
-            IBasePool.ApprovalTypes.ADD_LIQUIDITY
-        );
+        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
 
         uint128 _inAmountAfterFees = _sendAmount -
             getLoanCcyTransferFee(_sendAmount);
@@ -202,7 +199,6 @@ abstract contract BasePool is IBasePool {
             uint256 newLpShares,
             uint32 earliestRemove
         ) = _addLiquidity(_onBehalfOf, _inAmountAfterFees);
-
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransferFrom(
@@ -222,7 +218,6 @@ abstract contract BasePool is IBasePool {
             totalLiquidity,
             totalLpShares,
             earliestRemove,
-            //lpInfo.earliestRemove,
             _referralCode
         );
     }
@@ -233,10 +228,7 @@ abstract contract BasePool is IBasePool {
         override
     {
         // verify lp info and eligibility
-        checkApproval(
-            _onBehalfOf,
-            IBasePool.ApprovalTypes.REMOVE_LIQUIDITY
-        );
+        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.REMOVE_LIQUIDITY);
 
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
         uint256 shareLength = lpInfo.sharesOverTime.length;
@@ -257,10 +249,7 @@ abstract contract BasePool is IBasePool {
         lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
 
         // transfer liquidity
-        IERC20Metadata(loanCcyToken).safeTransfer(
-            msg.sender,
-            liquidityRemoved
-        );
+        IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
         // spawn event
         emit RemoveLiquidity(
             liquidityRemoved,
@@ -619,9 +608,9 @@ abstract contract BasePool is IBasePool {
     ) external override {
         //check if reinvested is chosen that deadline is valid
         if (_isReinvested) checkTimestamp(_deadline);
-        checkApproval(_onBehalfOf, msg.sender, IBasePool.ApprovalTypes.CLAIM);
+        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.CLAIM);
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
-        
+
         // verify lp info and eligibility
         //length of loanIdxs array lp wants to claim
         uint256 lengthArr = _aggIdxs.length;
@@ -821,9 +810,9 @@ abstract contract BasePool is IBasePool {
     ) external {
         if (msg.sender == _recipient || _recipient == address(0))
             revert InvalidApprovalAddress();
-        isApproved[msg.sender][_recipient][
-            _approvalType
-        ] = !isApproved[msg.sender][_recipient][_approvalType];
+        isApproved[msg.sender][_recipient][_approvalType] = !isApproved[
+            msg.sender
+        ][_recipient][_approvalType];
     }
 
     function checkSharePtrIncrement(
@@ -862,11 +851,7 @@ abstract contract BasePool is IBasePool {
     ) internal view {
         if (
             (_onBehalfOf != msg.sender &&
-                (
-                    !isApproved[_onBehalfOf][msg.sender][
-                        _approvalType
-                    ]
-                ))
+                (!isApproved[_onBehalfOf][msg.sender][_approvalType]))
         ) revert InvalidSender();
     }
 
@@ -883,13 +868,15 @@ abstract contract BasePool is IBasePool {
     {
         // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
         // and push fromLoanIdx forward
+        uint256 currSharePtr = _lpInfo.currSharePtr;
         if (
-            _lpInfo.sharesOverTime[_lpInfo.currSharePtr] == 0 &&
-            _lpInfo.currSharePtr < _lpInfo.sharesOverTime.length - 1
+            _lpInfo.sharesOverTime[currSharePtr] == 0 &&
+            currSharePtr < _lpInfo.sharesOverTime.length - 1
         ) {
             _lpInfo.currSharePtr++;
+            currSharePtr++;
             _lpInfo.fromLoanIdx = uint32(
-                _lpInfo.loanIdxsWhereSharesChanged[_lpInfo.currSharePtr]
+                _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
             );
         }
 
@@ -907,17 +894,17 @@ abstract contract BasePool is IBasePool {
         ) revert UnentitledFromLoanIdx();
 
         // infer applicable upper loan idx for which number of shares didn't change
-        _sharesUnchangedUntilLoanIdx = _lpInfo.currSharePtr ==
+        _sharesUnchangedUntilLoanIdx = currSharePtr ==
             _lpInfo.sharesOverTime.length - 1
             ? loanIdx
-            : _lpInfo.loanIdxsWhereSharesChanged[_lpInfo.currSharePtr];
+            : _lpInfo.loanIdxsWhereSharesChanged[currSharePtr];
 
         // check passed last loan idx is consistent with constant share interval
         if (_endIndex >= _sharesUnchangedUntilLoanIdx)
             revert LoanIdxsWithChangingShares();
 
         // get applicable number of shares for pro-rata calculations (given current share pointer position)
-        _applicableShares = _lpInfo.sharesOverTime[_lpInfo.currSharePtr];
+        _applicableShares = _lpInfo.sharesOverTime[currSharePtr];
     }
 
     function claimTransferAndReinvestment(
