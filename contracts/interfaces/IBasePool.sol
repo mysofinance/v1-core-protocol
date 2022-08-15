@@ -54,6 +54,11 @@ interface IBasePool {
     event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral);
     event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx);
+    event Reinvest(
+        uint256 repayments,
+        uint256 newLpShares,
+        uint256 earliestRemove
+    );
 
     enum ApprovalTypes {
         REPAY,

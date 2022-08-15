@@ -197,54 +197,12 @@ abstract contract BasePool is IBasePool {
 
         uint128 _inAmountAfterFees = _sendAmount -
             getLoanCcyTransferFee(_sendAmount);
-        uint256 _totalLiquidity = getTotalLiquidity();
-        if (
-            _inAmountAfterFees < MIN_LIQUIDITY ||
-            _inAmountAfterFees + _totalLiquidity < minLoan
-        ) revert InvalidAddAmount();
-        // retrieve lpInfo of sender
-        LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
-        // update state of pool
-        uint256 newLpShares;
-        uint256 dust;
-        if (_totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = _inAmountAfterFees;
-        } else if (totalLpShares == 0) {
-            dust = _totalLiquidity;
-            _totalLiquidity = 0;
-            newLpShares = _inAmountAfterFees;
-        } else {
-            assert(_totalLiquidity > 0 && totalLpShares > 0);
-            newLpShares = uint128(
-                (uint256(_inAmountAfterFees) * uint256(totalLpShares)) /
-                    _totalLiquidity
-            );
-        }
-        totalLpShares += uint128(newLpShares);
-        // purposefully first divide and then multiply to emulate order of operations in claiming
-        if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
-            revert TooBigAddToLaterClaimOnRepay();
-        if (
-            ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
-                totalLpShares) *
-                newLpShares ==
-            0
-        ) revert TooBigAddToLaterClaimColl();
-        totalLiquidity = _totalLiquidity + _inAmountAfterFees;
-        // update lp info
-        bool isFirstAddLiquidity = lpInfo.fromLoanIdx == 0;
-        if (isFirstAddLiquidity) {
-            lpInfo.fromLoanIdx = uint32(loanIdx);
-            lpInfo.sharesOverTime.push(newLpShares);
-        } else {
-            lpInfo.sharesOverTime.push(
-                newLpShares +
-                    lpInfo.sharesOverTime[lpInfo.sharesOverTime.length - 1]
-            );
-            lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
-        }
-        lpInfo.earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
+        (
+            uint256 dust,
+            uint256 newLpShares,
+            uint32 earliestRemove
+        ) = _addLiquidity(_onBehalfOf, _inAmountAfterFees);
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransferFrom(
@@ -263,7 +221,8 @@ abstract contract BasePool is IBasePool {
             newLpShares,
             totalLiquidity,
             totalLpShares,
-            lpInfo.earliestRemove,
+            earliestRemove,
+            //lpInfo.earliestRemove,
             _referralCode
         );
     }
@@ -974,15 +933,26 @@ abstract contract BasePool is IBasePool {
         bool _isReinvested
     ) internal {
         if (_repayments > 0) {
-            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, _repayments);
             if (_isReinvested) {
-                //wasteful...could possibly get away with internal addLiquidity part without transfers and fees...
-                addLiquidity(
-                    _onBehalfOf,
-                    uint128(_repayments) -
-                        getLoanCcyTransferFee(uint128(_repayments)),
-                    _deadline,
-                    0
+                //saves transfers
+                (
+                    uint256 dust,
+                    uint256 newLpShares,
+                    uint32 earliestRemove
+                ) = _addLiquidity(_onBehalfOf, _repayments);
+                if (dust > 0) {
+                    IERC20Metadata(loanCcyToken).safeTransfer(TREASURY, dust);
+                }
+                // spawn event
+                emit Reinvest(
+                    _repayments,
+                    newLpShares,
+                    earliestRemove
+                );
+            } else {
+                IERC20Metadata(loanCcyToken).safeTransfer(
+                    msg.sender,
+                    _repayments
                 );
             }
         }
@@ -990,5 +960,62 @@ abstract contract BasePool is IBasePool {
         if (_collateral > 0) {
             IERC20Metadata(collCcyToken).safeTransfer(_onBehalfOf, _collateral);
         }
+    }
+
+    function _addLiquidity(address _onBehalfOf, uint256 _inAmountAfterFees)
+        internal
+        returns (
+            uint256 dust,
+            uint256 newLpShares,
+            uint32 earliestRemove
+        )
+    {
+        uint256 _totalLiquidity = getTotalLiquidity();
+        if (
+            _inAmountAfterFees < MIN_LIQUIDITY ||
+            _inAmountAfterFees + _totalLiquidity < minLoan
+        ) revert InvalidAddAmount();
+        // retrieve lpInfo of sender
+        LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
+
+        // update state of pool
+        if (_totalLiquidity == 0 && totalLpShares == 0) {
+            newLpShares = _inAmountAfterFees;
+        } else if (totalLpShares == 0) {
+            dust = _totalLiquidity;
+            _totalLiquidity = 0;
+            newLpShares = _inAmountAfterFees;
+        } else {
+            assert(_totalLiquidity > 0 && totalLpShares > 0);
+            newLpShares = uint128(
+                (uint256(_inAmountAfterFees) * uint256(totalLpShares)) /
+                    _totalLiquidity
+            );
+        }
+        totalLpShares += uint128(newLpShares);
+        // purposefully first divide and then multiply to emulate order of operations in claiming
+        if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
+            revert TooBigAddToLaterClaimOnRepay();
+        if (
+            ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
+                totalLpShares) *
+                newLpShares ==
+            0
+        ) revert TooBigAddToLaterClaimColl();
+        totalLiquidity = _totalLiquidity + _inAmountAfterFees;
+        // update lp info
+        bool isFirstAddLiquidity = lpInfo.fromLoanIdx == 0;
+        if (isFirstAddLiquidity) {
+            lpInfo.fromLoanIdx = uint32(loanIdx);
+            lpInfo.sharesOverTime.push(newLpShares);
+        } else {
+            lpInfo.sharesOverTime.push(
+                newLpShares +
+                    lpInfo.sharesOverTime[lpInfo.sharesOverTime.length - 1]
+            );
+            lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
+        }
+        earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
+        lpInfo.earliestRemove = earliestRemove;
     }
 }
