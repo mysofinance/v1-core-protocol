@@ -218,7 +218,7 @@ interface IBasePool {
 
     function loanIdxToBorrower(uint256) external view returns (address);
 
-    function repayAndLiquidityApprovals(
+    function isApproved(
         address _borrower,
         address _recipient,
         ApprovalTypes _approvalType
