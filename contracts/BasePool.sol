@@ -81,7 +81,7 @@ abstract contract BasePool is IBasePool {
     mapping(uint256 => address) public loanIdxToBorrower;
 
     mapping(address => mapping(address => mapping(IBasePool.ApprovalTypes => bool)))
-        public repayAndLiquidityApprovals;
+        public isApproved;
 
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg1;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg2;
@@ -187,7 +187,7 @@ abstract contract BasePool is IBasePool {
         uint16 _referralCode
     ) public override {
         // verify lp info and eligibility
-        checkTimeStamp(_deadline, true);
+        uint256 timestamp = checkTimestamp(_deadline);
         checkApproval(
             _onBehalfOf,
             msg.sender,
@@ -243,7 +243,7 @@ abstract contract BasePool is IBasePool {
             );
             lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
         }
-        lpInfo.earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
+        lpInfo.earliestRemove = uint32(timestamp) + MIN_LPING_PERIOD;
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransferFrom(
@@ -299,7 +299,7 @@ abstract contract BasePool is IBasePool {
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(
-            _onBehalfOf,
+            msg.sender,
             liquidityRemoved
         );
         // spawn event
@@ -361,6 +361,7 @@ abstract contract BasePool is IBasePool {
         uint256 _deadline,
         uint16 _referralCode
     ) external override {
+        uint256 _timestamp = checkTimestamp(_deadline);
         uint128 _inAmountAfterFees = _sendAmount -
             getCollCcyTransferFee(_sendAmount);
         // get borrow terms and do checks
@@ -375,7 +376,7 @@ abstract contract BasePool is IBasePool {
                 _inAmountAfterFees,
                 _minLoanLimit,
                 _maxRepayLimit,
-                _deadline
+                _timestamp
             );
         {
             // update pool state
@@ -432,7 +433,7 @@ abstract contract BasePool is IBasePool {
         uint128 _inAmountAfterFees,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline
+        uint256 _timestamp
     )
         internal
         view
@@ -446,8 +447,6 @@ abstract contract BasePool is IBasePool {
         )
     {
         // get and verify loan terms
-        checkTimeStamp(_deadline, true);
-
         (
             loanAmount,
             repaymentAmount,
@@ -458,7 +457,7 @@ abstract contract BasePool is IBasePool {
         assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
-        expiry = uint32(block.timestamp) + LOAN_TENOR;
+        expiry = uint32(_timestamp) + LOAN_TENOR;
     }
 
     function repay(
@@ -591,7 +590,7 @@ abstract contract BasePool is IBasePool {
         uint256 _deadline
     ) external override {
         // if lp wants to reinvest check deadline
-        checkTimeStamp(_deadline, _isReinvested);
+        if (_isReinvested) checkTimestamp(_deadline);
         checkApproval(_onBehalfOf, msg.sender, IBasePool.ApprovalTypes.CLAIM);
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
@@ -662,7 +661,7 @@ abstract contract BasePool is IBasePool {
         uint256 _deadline
     ) external override {
         //check if reinvested is chosen that deadline is valid
-        checkTimeStamp(_deadline, _isReinvested);
+        if (_isReinvested) checkTimestamp(_deadline);
 
         // verify lp info and eligibility
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
@@ -865,9 +864,9 @@ abstract contract BasePool is IBasePool {
         address _recipient,
         IBasePool.ApprovalTypes _approvalType
     ) external {
-        repayAndLiquidityApprovals[msg.sender][_recipient][
+        isApproved[msg.sender][_recipient][
             _approvalType
-        ] = !repayAndLiquidityApprovals[msg.sender][_recipient][_approvalType];
+        ] = !isApproved[msg.sender][_recipient][_approvalType];
     }
 
     function checkSharePtrIncrement(
@@ -891,11 +890,13 @@ abstract contract BasePool is IBasePool {
         }
     }
 
-    function checkTimeStamp(uint256 _deadline, bool _isReinvested)
+    function checkTimestamp(uint256 _deadline)
         internal
         view
+        returns (uint256 timestamp)
     {
-        if (_isReinvested && block.timestamp > _deadline) revert PastDeadline();
+        timestamp = block.timestamp;
+        if (timestamp > _deadline) revert PastDeadline();
     }
 
     function checkApproval(
@@ -904,9 +905,9 @@ abstract contract BasePool is IBasePool {
         IBasePool.ApprovalTypes _approvalType
     ) internal view {
         if (
-            !(_onBehalfOf == _sender ||
+            (_onBehalfOf != _sender &&
                 (
-                    repayAndLiquidityApprovals[_onBehalfOf][_sender][
+                    !isApproved[_onBehalfOf][_sender][
                         _approvalType
                     ]
                 ))
