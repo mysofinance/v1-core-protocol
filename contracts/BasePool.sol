@@ -447,7 +447,9 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                loanInfo.repayment - loanAmount
+                loanInfo.repayment -
+                    loanAmount +
+                    getLoanCcyTransferFee(loanInfo.repayment - loanAmount)
             );
         }
         // spawn event
@@ -516,11 +518,11 @@ abstract contract BasePool is IBasePool {
     function overrideSharePointer(uint256 _newSharePointer) external {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.fromLoanIdx == 0) revert MustBeLp();
+        // check that passed in pointer is greater than current share pointer
+        // and less than length of loanIdxWhereSharesChanged array
         if (
-            _newSharePointer == 0 ||
             _newSharePointer <= lpInfo.currSharePtr ||
-            _newSharePointer > lpInfo.sharesOverTime.length - 1 ||
-            _newSharePointer > lpInfo.loanIdxsWhereSharesChanged.length - 1
+            _newSharePointer + 1 > lpInfo.loanIdxsWhereSharesChanged.length
         ) revert InvalidNewSharePointer();
         lpInfo.currSharePtr = uint32(_newSharePointer);
         lpInfo.fromLoanIdx = uint32(
