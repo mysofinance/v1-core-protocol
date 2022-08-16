@@ -54,7 +54,7 @@ describe("WETH-DAI Pool Testing", function () {
     // deploy pool
     PoolWethDai = await ethers.getContractFactory("PoolWethDai");
     PoolWethDai = await PoolWethDai.connect(deployer);
-    poolWethDai = await PoolWethDai.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
+    poolWethDai = await PoolWethDai.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
     await poolWethDai.deployed();
 
     // approve DAI and WETH balances

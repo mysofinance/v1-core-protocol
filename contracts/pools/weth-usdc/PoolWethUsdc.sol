@@ -16,7 +16,8 @@ contract PoolWethUsdc is BasePool {
         uint256 _tvl1,
         uint256 _tvl2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval
+        uint256 _firstLengthPerClaimInterval,
+        uint128 _protocolFee
     )
         BasePool(
             0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
@@ -28,7 +29,8 @@ contract PoolWethUsdc is BasePool {
             _tvl1,
             _tvl2,
             _minLoan,
-            _firstLengthPerClaimInterval
+            _firstLengthPerClaimInterval,
+            _protocolFee
         )
     {}
 

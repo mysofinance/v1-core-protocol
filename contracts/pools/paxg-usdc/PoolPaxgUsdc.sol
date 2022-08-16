@@ -17,7 +17,8 @@ contract PoolPaxgUsdc is BasePool {
         uint256 _tvl1,
         uint256 _tvl2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval
+        uint256 _firstLengthPerClaimInterval,
+        uint128 _protocolFee
     )
         BasePool(
             _loanCcyToken,
@@ -29,7 +30,8 @@ contract PoolPaxgUsdc is BasePool {
             _tvl1,
             _tvl2,
             _minLoan,
-            _firstLengthPerClaimInterval
+            _firstLengthPerClaimInterval,
+            _protocolFee
         )
     {}
 

@@ -46,9 +46,7 @@ abstract contract BasePool is IBasePool {
     error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
-    error UnauthorizedFeeUpdate();
-    error NewFeeMustBeDifferent();
-    error NewFeeTooHigh();
+    error ProtocolFeeTooHigh();
     error InvalidApprovalAddress();
 
     address constant TREASURY = 0x1234567890000000000000000000000000000001;
@@ -63,9 +61,8 @@ abstract contract BasePool is IBasePool {
     address public immutable loanCcyToken;
     uint128 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
-    uint128 public protocolFee;
+    uint128 public immutable protocolFee;
     uint128 public totalLpShares;
-    uint128 public totalFees;
     uint256 totalLiquidity;
     uint256 public loanIdx;
     uint256 public r1;
@@ -75,7 +72,7 @@ abstract contract BasePool is IBasePool {
     uint256 public minLoan;
 
     //must be a multiple of 100
-    uint256 firstLengthPerClaimInterval;
+    uint256 public firstLengthPerClaimInterval;
 
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
@@ -126,7 +123,8 @@ abstract contract BasePool is IBasePool {
         uint256 _tvl1,
         uint256 _tvl2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval
+        uint256 _firstLengthPerClaimInterval,
+        uint128 _protocolFee
     ) {
         if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
         if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
@@ -142,6 +140,7 @@ abstract contract BasePool is IBasePool {
             _firstLengthPerClaimInterval < 100 ||
             _firstLengthPerClaimInterval % 100 != 0
         ) revert InvalidFirstLengthPerClaimInterval();
+        if (_protocolFee > MAX_PROTOCOL_FEE) revert ProtocolFeeTooHigh();
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -154,6 +153,7 @@ abstract contract BasePool is IBasePool {
         loanIdx = 1;
         COLL_TOKEN_DECIMALS = IERC20Metadata(_collCcyToken).decimals();
         firstLengthPerClaimInterval = _firstLengthPerClaimInterval;
+        protocolFee = _protocolFee;
         emit NewSubPool(
             _loanCcyToken,
             _collCcyToken,
@@ -329,7 +329,6 @@ abstract contract BasePool is IBasePool {
         {
             // update pool state
             totalLiquidity = _totalLiquidity - loanAmount;
-            totalFees += _protocolFee;
 
             // update loan info
             loanIdxToBorrower[loanIdx] = _onBehalf;
@@ -362,6 +361,10 @@ abstract contract BasePool is IBasePool {
                 address(this),
                 _sendAmount
             );
+
+            // transfer protocol fee to treasury in collateral ccy
+            IERC20Metadata(collCcyToken).safeTransfer(TREASURY, _protocolFee);
+
             // transfer loanAmount in loan ccy
             IERC20Metadata(loanCcyToken).safeTransfer(_onBehalf, loanAmount);
         }
@@ -513,7 +516,6 @@ abstract contract BasePool is IBasePool {
             loanIdxToLoanInfo[loanIdx] = loanInfoNew;
             loanIdx += 1;
             totalLiquidity = _totalLiquidity - loanAmount;
-            totalFees += _protocolFee;
             // transfer liquidity
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
@@ -731,7 +733,7 @@ abstract contract BasePool is IBasePool {
         ) revert InvalidSubAggregation();
         //expiry check to make sure last loan in aggregation (one prior to _toLoanIdx for bucket) was taken out and expired
         uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx - 1].expiry;
-        if (expiryCheck == 0 || expiryCheck > block.timestamp + 1) {
+        if (expiryCheck == 0 || expiryCheck + 1 > block.timestamp) {
             revert InvalidSubAggregation();
         }
         AggClaimsInfo memory aggClaimsInfo;
