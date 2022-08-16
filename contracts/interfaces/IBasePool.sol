@@ -94,6 +94,15 @@ interface IBasePool {
     function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
         external;
 
+    /**
+     * @notice Function which allows borrowing from the pool
+     * @param _onBehalfOf Recipient of the loan currency
+     * @param _sendAmount Amount of collateral currency sent by borrower
+     * @param _minLoan Minimum loan currency amount acceptable to borrower
+     * @param _maxRepay Maximum allowable loan currency amount borrower is willing to repay
+     * @param _deadline Timestamp after which transaction will be void
+     * @param _referralCode Code for later possible rewards in referral program
+     */
     function borrow(
         address _onBehalf,
         uint128 _sendAmount,
@@ -103,6 +112,15 @@ interface IBasePool {
         uint16 _referralCode
     ) external;
 
+    /**
+     * @notice Function which calculates loan terms
+     * @param _inAmountAfterFees Amount of collateral currency after fees are deducted
+     * @return loanAmount Amount of loan currency to be trasnferred to the borrower
+     * @return repaymentAmount Amount of loan currency borrower must repay to reclaim collateral
+     * @return pledgeAmount Amount of collateral currency borrower retrieves upon repayment
+     * @return _protocolFee Amount of collateral currency to be transferred to treasury
+     * @return _totalLiquidity Total liquidity of the pool
+     */
     function loanTerms(uint128 _inAmountAfterFees)
         external
         view
