@@ -155,7 +155,7 @@ interface IBasePool {
      * the first index of _aggIdxs is the from loan index to start aggregation, the rest of the
      * indices are the end loan indexes of the intervals he wants to claim.
      * If address on behalf of is not sender, then sender must have permission to claim.
-     * As well if reinvestment ootion is chosen, sender must have permission to add liquidity
+     * As well if reinvestment option is chosen, sender must have permission to add liquidity
      * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
      * @param _aggIdxs From index and end indices of the aggregation that LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested

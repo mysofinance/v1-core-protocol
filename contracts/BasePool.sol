@@ -963,8 +963,7 @@ abstract contract BasePool is IBasePool {
         } else {
             assert(_totalLiquidity > 0 && totalLpShares > 0);
             newLpShares = uint128(
-                (uint256(_inAmountAfterFees) * uint256(totalLpShares)) /
-                    _totalLiquidity
+                (_inAmountAfterFees * uint256(totalLpShares)) / _totalLiquidity
             );
         }
         totalLpShares += uint128(newLpShares);
