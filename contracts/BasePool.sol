@@ -519,14 +519,14 @@ abstract contract BasePool is IBasePool {
         LpInfo storage lpInfo = addrToLpInfo[msg.sender];
         if (lpInfo.fromLoanIdx == 0) revert MustBeLp();
         // check that passed in pointer is greater than current share pointer
-        // and less than length of loanIdxWhereSharesChanged array
+        // and less than length of lp's shares over time array
         if (
             _newSharePointer <= lpInfo.currSharePtr ||
-            _newSharePointer + 1 > lpInfo.loanIdxsWhereSharesChanged.length
+            _newSharePointer + 1 > lpInfo.sharesOverTime.length
         ) revert InvalidNewSharePointer();
         lpInfo.currSharePtr = uint32(_newSharePointer);
         lpInfo.fromLoanIdx = uint32(
-            lpInfo.loanIdxsWhereSharesChanged[_newSharePointer]
+            lpInfo.loanIdxsWhereSharesChanged[_newSharePointer - 1]
         );
     }
 
@@ -818,18 +818,18 @@ abstract contract BasePool is IBasePool {
             uint256 _applicableShares
         )
     {
-        // check if reasonable to automatically increment sharepointer for intermediate period with zero shares
+        // check if reasonable to automatically increment share pointer for intermediate period with zero shares
         // and push fromLoanIdx forward
         uint256 currSharePtr = _lpInfo.currSharePtr;
         if (
             _lpInfo.sharesOverTime[currSharePtr] == 0 &&
             currSharePtr < _lpInfo.sharesOverTime.length - 1
         ) {
-            _lpInfo.currSharePtr++;
-            currSharePtr++;
             _lpInfo.fromLoanIdx = uint32(
                 _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
             );
+            _lpInfo.currSharePtr++;
+            currSharePtr++;
         }
 
         /*
