@@ -188,7 +188,7 @@ abstract contract BasePool is IBasePool {
         uint16 _referralCode
     ) public override {
         // verify lp info and eligibility
-        uint256 timestamp = checkTimestamp(_deadline);
+        checkTimestamp(_deadline);
         checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
 
         uint128 _inAmountAfterFees = _sendAmount -
@@ -577,7 +577,6 @@ abstract contract BasePool is IBasePool {
             _onBehalfOf,
             repayments,
             collateral,
-            _deadline,
             _isReinvested
         );
 
@@ -670,7 +669,6 @@ abstract contract BasePool is IBasePool {
             _onBehalfOf,
             totalRepayments,
             totalCollateral,
-            _deadline,
             _isReinvested
         );
         //spawn event
@@ -911,7 +909,6 @@ abstract contract BasePool is IBasePool {
         address _onBehalfOf,
         uint256 _repayments,
         uint256 _collateral,
-        uint256 _deadline,
         bool _isReinvested
     ) internal {
         if (_repayments > 0) {
