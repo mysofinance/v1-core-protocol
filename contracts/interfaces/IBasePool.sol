@@ -96,7 +96,7 @@ interface IBasePool {
 
     /**
      * @notice Function which allows borrowing from the pool
-     * @param _onBehalfOf Recipient of the loan currency
+     * @param _onBehalf Recipient of the loan currency
      * @param _sendAmount Amount of collateral currency sent by borrower
      * @param _minLoan Minimum loan currency amount acceptable to borrower
      * @param _maxRepay Maximum allowable loan currency amount borrower is willing to repay

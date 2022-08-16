@@ -186,7 +186,7 @@ abstract contract BasePool is IBasePool {
         uint128 _sendAmount,
         uint256 _deadline,
         uint16 _referralCode
-    ) public override {
+    ) external override {
         // verify lp info and eligibility
         checkTimestamp(_deadline);
         checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
@@ -257,48 +257,6 @@ abstract contract BasePool is IBasePool {
             totalLiquidity,
             totalLpShares
         );
-    }
-
-    function loanTerms(uint128 _inAmountAfterFees)
-        public
-        view
-        returns (
-            uint128 loanAmount,
-            uint128 repaymentAmount,
-            uint128 pledgeAmount,
-            uint128 _protocolFee,
-            uint256 _totalLiquidity
-        )
-    {
-        // compute terms (as uint256)
-        _protocolFee = uint128((_inAmountAfterFees * protocolFee) / BASE);
-        uint256 pledge = _inAmountAfterFees - _protocolFee;
-        _totalLiquidity = getTotalLiquidity();
-        if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
-        uint256 loan = (pledge *
-            maxLoanPerColl *
-            (_totalLiquidity - MIN_LIQUIDITY)) /
-            (pledge *
-                maxLoanPerColl +
-                (_totalLiquidity - MIN_LIQUIDITY) *
-                10**COLL_TOKEN_DECIMALS);
-        if (loan < minLoan) revert TooSmallLoan();
-        uint256 postLiquidity = _totalLiquidity - loan;
-        assert(postLiquidity >= MIN_LIQUIDITY);
-        uint256 rate;
-        if (postLiquidity < tvl1) {
-            rate = (r1 * tvl1) / postLiquidity;
-        } else if (postLiquidity < tvl2) {
-            rate = ((r1 - r2) * (tvl2 - postLiquidity)) / (tvl2 - tvl1) + r2;
-        } else {
-            rate = r2;
-        }
-        uint256 repayment = (loan * (BASE + rate)) / BASE;
-        // return terms (as uint128)
-        loanAmount = uint128(loan);
-        repaymentAmount = uint128(repayment);
-        pledgeAmount = uint128(pledge);
-        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
     }
 
     function borrow(
@@ -378,37 +336,6 @@ abstract contract BasePool is IBasePool {
             _protocolFee,
             _referralCode
         );
-    }
-
-    function _borrow(
-        uint128 _inAmountAfterFees,
-        uint128 _minLoanLimit,
-        uint128 _maxRepayLimit,
-        uint256 _timestamp
-    )
-        internal
-        view
-        returns (
-            uint128 loanAmount,
-            uint128 repaymentAmount,
-            uint128 pledgeAmount,
-            uint32 expiry,
-            uint128 _protocolFee,
-            uint256 _totalLiquidity
-        )
-    {
-        // get and verify loan terms
-        (
-            loanAmount,
-            repaymentAmount,
-            pledgeAmount,
-            _protocolFee,
-            _totalLiquidity
-        ) = loanTerms(_inAmountAfterFees);
-        assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
-        if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
-        if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
-        expiry = uint32(_timestamp) + LOAN_TENOR;
     }
 
     function repay(
@@ -682,36 +609,69 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function getClaimsFromList(
-        uint256[] calldata _loanIdxs,
-        uint256 arrayLen,
-        uint256 _shares
-    ) internal view returns (uint256 repayments, uint256 collateral) {
-        // aggregate claims from list
-        for (uint256 i = 0; i < arrayLen; ) {
-            LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
-            if (i > 0) {
-                if (_loanIdxs[i] <= _loanIdxs[i - 1])
-                    revert NonAscendingLoanIdxs();
-            }
-            if (loanInfo.repaid) {
-                repayments +=
-                    (loanInfo.repayment * BASE) /
-                    loanInfo.totalLpShares;
-            } else if (loanInfo.expiry < block.timestamp) {
-                collateral +=
-                    (loanInfo.collateral * BASE) /
-                    loanInfo.totalLpShares;
-            } else {
-                revert CannotClaimWithUnsettledLoan();
-            }
-            unchecked {
-                i++;
-            }
+    function toggleRepayAndLiquidityApproval(
+        address _recipient,
+        IBasePool.ApprovalTypes _approvalType
+    ) external {
+        if (msg.sender == _recipient || _recipient == address(0))
+            revert InvalidApprovalAddress();
+        isApproved[msg.sender][_recipient][_approvalType] = !isApproved[
+            msg.sender
+        ][_recipient][_approvalType];
+    }
+
+    function getNumShares(address _lpAddr)
+        external
+        view
+        returns (uint256 numShares)
+    {
+        LpInfo memory lpInfo = addrToLpInfo[_lpAddr];
+        uint256 sharesLen = lpInfo.sharesOverTime.length;
+        if (sharesLen > 0) {
+            numShares = lpInfo.sharesOverTime[sharesLen - 1];
         }
-        // return claims
-        repayments = (repayments * _shares) / BASE;
-        collateral = (collateral * _shares) / BASE;
+    }
+
+    function loanTerms(uint128 _inAmountAfterFees)
+        public
+        view
+        returns (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount,
+            uint128 _protocolFee,
+            uint256 _totalLiquidity
+        )
+    {
+        // compute terms (as uint256)
+        _protocolFee = uint128((_inAmountAfterFees * protocolFee) / BASE);
+        uint256 pledge = _inAmountAfterFees - _protocolFee;
+        _totalLiquidity = getTotalLiquidity();
+        if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
+        uint256 loan = (pledge *
+            maxLoanPerColl *
+            (_totalLiquidity - MIN_LIQUIDITY)) /
+            (pledge *
+                maxLoanPerColl +
+                (_totalLiquidity - MIN_LIQUIDITY) *
+                10**COLL_TOKEN_DECIMALS);
+        if (loan < minLoan) revert TooSmallLoan();
+        uint256 postLiquidity = _totalLiquidity - loan;
+        assert(postLiquidity >= MIN_LIQUIDITY);
+        uint256 rate;
+        if (postLiquidity < tvl1) {
+            rate = (r1 * tvl1) / postLiquidity;
+        } else if (postLiquidity < tvl2) {
+            rate = ((r1 - r2) * (tvl2 - postLiquidity)) / (tvl2 - tvl1) + r2;
+        } else {
+            rate = r2;
+        }
+        uint256 repayment = (loan * (BASE + rate)) / BASE;
+        // return terms (as uint128)
+        loanAmount = uint128(loan);
+        repaymentAmount = uint128(repayment);
+        pledgeAmount = uint128(pledge);
+        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
     }
 
     function getClaimsFromAggregated(
@@ -759,6 +719,38 @@ abstract contract BasePool is IBasePool {
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
 
+    function getClaimsFromList(
+        uint256[] calldata _loanIdxs,
+        uint256 arrayLen,
+        uint256 _shares
+    ) internal view returns (uint256 repayments, uint256 collateral) {
+        // aggregate claims from list
+        for (uint256 i = 0; i < arrayLen; ) {
+            LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdxs[i]];
+            if (i > 0) {
+                if (_loanIdxs[i] <= _loanIdxs[i - 1])
+                    revert NonAscendingLoanIdxs();
+            }
+            if (loanInfo.repaid) {
+                repayments +=
+                    (loanInfo.repayment * BASE) /
+                    loanInfo.totalLpShares;
+            } else if (loanInfo.expiry < block.timestamp) {
+                collateral +=
+                    (loanInfo.collateral * BASE) /
+                    loanInfo.totalLpShares;
+            } else {
+                revert CannotClaimWithUnsettledLoan();
+            }
+            unchecked {
+                i++;
+            }
+        }
+        // return claims
+        repayments = (repayments * _shares) / BASE;
+        collateral = (collateral * _shares) / BASE;
+    }
+
     function updateAggregations(
         uint256 _loanIdx,
         uint128 _collateral,
@@ -792,29 +784,6 @@ abstract contract BasePool is IBasePool {
         ].repayments += repaymentUpdate;
     }
 
-    function getNumShares(address _lpAddr)
-        external
-        view
-        returns (uint256 numShares)
-    {
-        LpInfo memory lpInfo = addrToLpInfo[_lpAddr];
-        uint256 sharesLen = lpInfo.sharesOverTime.length;
-        if (sharesLen > 0) {
-            numShares = lpInfo.sharesOverTime[sharesLen - 1];
-        }
-    }
-
-    function toggleRepayAndLiquidityApproval(
-        address _recipient,
-        IBasePool.ApprovalTypes _approvalType
-    ) external {
-        if (msg.sender == _recipient || _recipient == address(0))
-            revert InvalidApprovalAddress();
-        isApproved[msg.sender][_recipient][_approvalType] = !isApproved[
-            msg.sender
-        ][_recipient][_approvalType];
-    }
-
     function checkSharePtrIncrement(
         LpInfo storage _lpInfo,
         uint256 _lastIdxFromUserInput,
@@ -834,25 +803,6 @@ abstract contract BasePool is IBasePool {
                 _lpInfo.currSharePtr++;
             }
         }
-    }
-
-    function checkTimestamp(uint256 _deadline)
-        internal
-        view
-        returns (uint256 timestamp)
-    {
-        timestamp = block.timestamp;
-        if (timestamp > _deadline) revert PastDeadline();
-    }
-
-    function checkApproval(
-        address _onBehalfOf,
-        IBasePool.ApprovalTypes _approvalType
-    ) internal view {
-        if (
-            (_onBehalfOf != msg.sender &&
-                (!isApproved[_onBehalfOf][msg.sender][_approvalType]))
-        ) revert InvalidSender();
     }
 
     function claimsChecksAndSetters(
@@ -993,5 +943,55 @@ abstract contract BasePool is IBasePool {
         }
         earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
         lpInfo.earliestRemove = earliestRemove;
+    }
+
+    function _borrow(
+        uint128 _inAmountAfterFees,
+        uint128 _minLoanLimit,
+        uint128 _maxRepayLimit,
+        uint256 _timestamp
+    )
+        internal
+        view
+        returns (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount,
+            uint32 expiry,
+            uint128 _protocolFee,
+            uint256 _totalLiquidity
+        )
+    {
+        // get and verify loan terms
+        (
+            loanAmount,
+            repaymentAmount,
+            pledgeAmount,
+            _protocolFee,
+            _totalLiquidity
+        ) = loanTerms(_inAmountAfterFees);
+        assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
+        if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
+        if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
+        expiry = uint32(_timestamp) + LOAN_TENOR;
+    }
+
+    function checkTimestamp(uint256 _deadline)
+        internal
+        view
+        returns (uint256 timestamp)
+    {
+        timestamp = block.timestamp;
+        if (timestamp > _deadline) revert PastDeadline();
+    }
+
+    function checkApproval(
+        address _onBehalfOf,
+        IBasePool.ApprovalTypes _approvalType
+    ) internal view {
+        if (
+            (_onBehalfOf != msg.sender &&
+                (!isApproved[_onBehalfOf][msg.sender][_approvalType]))
+        ) revert InvalidSender();
     }
 }
