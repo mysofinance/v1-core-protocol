@@ -54,16 +54,30 @@ interface IBasePool {
     event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral);
     event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx);
+    event Reinvest(
+        uint256 repayments,
+        uint256 newLpShares,
+        uint256 earliestRemove
+    );
+
+    enum ApprovalTypes {
+        REPAY,
+        ADD_LIQUIDITY,
+        REMOVE_LIQUIDITY,
+        CLAIM
+    }
 
     /**
      * @notice Function which adds to an LPs current position
      * @dev This function will update loanIdxsWhereSharesChanged only if not
-     * the first add
+     * the first add. If address on behalf of is not sender, then sender must have permission.
+     * @param _onBehalfOf Recipient of the LP shares
      * @param _sendAmount Amount of loan currency LP wishes to deposit
      * @param _deadline Last timestamp after which function will revert
      * @param _referralCode Will possibly be used later to reward referrals
      */
     function addLiquidity(
+        address _onBehalfOf,
         uint128 _sendAmount,
         uint256 _deadline,
         uint16 _referralCode
@@ -72,10 +86,13 @@ interface IBasePool {
     /**
      * @notice Function which removes shares from an LPs
      * @dev This function will update loanIdxsWhereSharesChanged
-     * and shareOverTime arrays in lpInfo
+     * and shareOverTime arrays in lpInfo. If address on behalf
+     * of is not sender, then sender must have permission.
+     * @param _onBehalfOf Recipient of the transfer loan currency
      * @param numSharesRemove Amount of LP shares to remove
      */
-    function removeLiquidity(uint256 numSharesRemove) external;
+    function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
+        external;
 
     function borrow(
         address _onBehalf,
@@ -117,11 +134,15 @@ interface IBasePool {
      * changes position size in the middle of smallest aggregation block
      * or if LP wants to claim some of the loans before the expiry time
      * of the last loan in the aggregation block. _loanIdxs must be increasing array.
+     * If address on behalf of is not sender, then sender must have permission to claim.
+     * As well if reinvestment ootion is chosen, sender must have permission to add liquidity
+     * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
      * @param _loanIdxs Loan indices on which LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
      */
     function claim(
+        address _onBehalfOf,
         uint256[] calldata _loanIdxs,
         bool _isReinvested,
         uint256 _deadline
@@ -132,12 +153,16 @@ interface IBasePool {
      * @dev This function is much more efficient, but can only be used when LPs position size did not change
      * over the entire interval LP would like to claim over. _aggIdxs must be increasing array.
      * the first index of _aggIdxs is the from loan index to start aggregation, the rest of the
-     * indices are the end loan indexes of the intervals he wants to claim
+     * indices are the end loan indexes of the intervals he wants to claim.
+     * If address on behalf of is not sender, then sender must have permission to claim.
+     * As well if reinvestment option is chosen, sender must have permission to add liquidity
+     * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
      * @param _aggIdxs From index and end indices of the aggregation that LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
      */
     function claimFromAggregated(
+        address _onBehalfOf,
         uint256[] calldata _aggIdxs,
         bool _isReinvested,
         uint256 _deadline
@@ -156,6 +181,11 @@ interface IBasePool {
         uint256 _toLoanIdx,
         uint256 _shares
     ) external view returns (uint256 repayments, uint256 collateral);
+
+    function toggleRepayAndLiquidityApproval(
+        address _recipient,
+        ApprovalTypes _approvalType
+    ) external;
 
     function getNumShares(address _lpAddr)
         external
@@ -188,8 +218,9 @@ interface IBasePool {
 
     function loanIdxToBorrower(uint256) external view returns (address);
 
-    function repayApprovals(address _borrower, address _recipient)
-        external
-        view
-        returns (bool _approved);
+    function isApproved(
+        address _borrower,
+        address _recipient,
+        ApprovalTypes _approvalType
+    ) external view returns (bool _approved);
 }
