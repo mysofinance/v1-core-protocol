@@ -243,10 +243,9 @@ abstract contract BasePool is IBasePool {
             (_totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
         totalLpShares -= uint128(numShares);
         totalLiquidity = _totalLiquidity - liquidityRemoved;
-        lpInfo.sharesOverTime.push(
-            lpInfo.sharesOverTime[shareLength - 1] - numShares
-        );
-        lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
+
+        //update lp arrays and check for auto increment
+        pushBothLpArrays(lpInfo, numShares, false);
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
@@ -937,11 +936,8 @@ abstract contract BasePool is IBasePool {
             lpInfo.fromLoanIdx = uint32(loanIdx);
             lpInfo.sharesOverTime.push(newLpShares);
         } else {
-            lpInfo.sharesOverTime.push(
-                newLpShares +
-                    lpInfo.sharesOverTime[lpInfo.sharesOverTime.length - 1]
-            );
-            lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
+            //update both lp arrays and check for auto increment
+            pushBothLpArrays(lpInfo, newLpShares, true);
         }
         earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
         lpInfo.earliestRemove = earliestRemove;
@@ -976,6 +972,22 @@ abstract contract BasePool is IBasePool {
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
         expiry = uint32(_timestamp) + LOAN_TENOR;
+    }
+
+    function pushBothLpArrays(
+        LpInfo storage _lpInfo,
+        uint256 _newLpShares,
+        bool _add
+    ) internal {
+        uint256 newShares = _add
+            ? _lpInfo.sharesOverTime[_lpInfo.sharesOverTime.length - 1] +
+                _newLpShares
+            : _lpInfo.sharesOverTime[_lpInfo.sharesOverTime.length - 1] -
+                _newLpShares;
+        _lpInfo.sharesOverTime.push(newShares);
+        _lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
+        //if lp has claimed all possible loans then auto increment
+        if (_lpInfo.fromLoanIdx == loanIdx) _lpInfo.currSharePtr++;
     }
 
     function checkTimestamp(uint256 _deadline)
