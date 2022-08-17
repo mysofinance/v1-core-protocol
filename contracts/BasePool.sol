@@ -42,7 +42,7 @@ abstract contract BasePool is IBasePool {
     error InvalidNewSharePointer();
     error UnentitledFromLoanIdx();
     error LoanIdxsWithChangingShares();
-    error InvalidFirstLengthPerClaimInterval();
+    error InvalidBaseAggrBucketSize();
     error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
@@ -72,7 +72,7 @@ abstract contract BasePool is IBasePool {
     uint256 public minLoan;
 
     //must be a multiple of 100
-    uint256 public firstLengthPerClaimInterval;
+    uint256 public baseAggrBucketSize;
 
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
@@ -123,7 +123,7 @@ abstract contract BasePool is IBasePool {
         uint256 _tvl1,
         uint256 _tvl2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval,
+        uint256 _baseAggrBucketSize,
         uint128 _protocolFee
     ) {
         if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
@@ -137,9 +137,9 @@ abstract contract BasePool is IBasePool {
         if (_minLoan == 0) revert InvalidMinLoan();
         assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
         if (
-            _firstLengthPerClaimInterval < 100 ||
-            _firstLengthPerClaimInterval % 100 != 0
-        ) revert InvalidFirstLengthPerClaimInterval();
+            _baseAggrBucketSize < 100 ||
+            _baseAggrBucketSize % 100 != 0
+        ) revert InvalidBaseAggrBucketSize();
         if (_protocolFee > MAX_PROTOCOL_FEE) revert ProtocolFeeTooHigh();
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
@@ -152,7 +152,7 @@ abstract contract BasePool is IBasePool {
         minLoan = _minLoan;
         loanIdx = 1;
         COLL_TOKEN_DECIMALS = IERC20Metadata(_collCcyToken).decimals();
-        firstLengthPerClaimInterval = _firstLengthPerClaimInterval;
+        baseAggrBucketSize = _baseAggrBucketSize;
         protocolFee = _protocolFee;
         emit NewSubPool(
             _loanCcyToken,
@@ -299,13 +299,13 @@ abstract contract BasePool is IBasePool {
         {
             // update aggregations
             uint128 collateral = uint128((pledgeAmount * BASE) / totalLpShares);
-            collAndRepayTotalBaseAgg1[loanIdx / firstLengthPerClaimInterval + 1]
+            collAndRepayTotalBaseAgg1[loanIdx / baseAggrBucketSize + 1]
                 .collateral += collateral;
             collAndRepayTotalBaseAgg2[
-                (loanIdx / (firstLengthPerClaimInterval * 10)) + 1
+                (loanIdx / (baseAggrBucketSize * 10)) + 1
             ].collateral += collateral;
             collAndRepayTotalBaseAgg3[
-                (loanIdx / (firstLengthPerClaimInterval * 100)) + 1
+                (loanIdx / (baseAggrBucketSize * 100)) + 1
             ].collateral += collateral;
 
             // update loan idx counter
@@ -681,16 +681,17 @@ abstract contract BasePool is IBasePool {
         uint256 _shares
     ) public view returns (uint256 repayments, uint256 collateral) {
         uint256 fromToDiff = _toLoanIdx - _fromLoanIdx;
+        uint256 _baseAggrBucketSize = baseAggrBucketSize;
         // check that the difference in the from and to indices
         // span one of allowable intervals and that _toLoanIdx is
         // also the correct modulus for that difference
         if (
-            !((_toLoanIdx % firstLengthPerClaimInterval == 0 &&
-                fromToDiff == firstLengthPerClaimInterval) ||
-                (_toLoanIdx % (10 * firstLengthPerClaimInterval) == 0 &&
-                    fromToDiff == firstLengthPerClaimInterval * 10) ||
-                (_toLoanIdx % (100 * firstLengthPerClaimInterval) == 0 &&
-                    fromToDiff == firstLengthPerClaimInterval * 100))
+            !((_toLoanIdx % _baseAggrBucketSize == 0 &&
+                fromToDiff == _baseAggrBucketSize) ||
+                (_toLoanIdx % (10 * _baseAggrBucketSize) == 0 &&
+                    fromToDiff == _baseAggrBucketSize * 10) ||
+                (_toLoanIdx % (100 * _baseAggrBucketSize) == 0 &&
+                    fromToDiff == _baseAggrBucketSize * 100))
         ) revert InvalidSubAggregation();
         //expiry check to make sure last loan in aggregation (one prior to _toLoanIdx for bucket) was taken out and expired
         uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx - 1].expiry;
@@ -699,17 +700,17 @@ abstract contract BasePool is IBasePool {
         }
         AggClaimsInfo memory aggClaimsInfo;
         //find which bucket to which the current aggregation belongs and get aggClaimsInfo
-        if (fromToDiff == firstLengthPerClaimInterval) {
+        if (fromToDiff == _baseAggrBucketSize) {
             aggClaimsInfo = collAndRepayTotalBaseAgg1[
-                _fromLoanIdx / firstLengthPerClaimInterval + 1
+                _fromLoanIdx / _baseAggrBucketSize + 1
             ];
-        } else if (fromToDiff == firstLengthPerClaimInterval * 10) {
+        } else if (fromToDiff == _baseAggrBucketSize * 10) {
             aggClaimsInfo = collAndRepayTotalBaseAgg2[
-                (_fromLoanIdx / (firstLengthPerClaimInterval * 10)) + 1
+                (_fromLoanIdx / (_baseAggrBucketSize * 10)) + 1
             ];
         } else {
             aggClaimsInfo = collAndRepayTotalBaseAgg3[
-                (_fromLoanIdx / (firstLengthPerClaimInterval * 100)) + 1
+                (_fromLoanIdx / (_baseAggrBucketSize * 100)) + 1
             ];
         }
         //make sure not an empty bucket
@@ -758,30 +759,34 @@ abstract contract BasePool is IBasePool {
         uint128 _repayment,
         uint128 _totalLpShares
     ) internal {
+        uint256 _baseAggFirstIndex = _loanIdx / baseAggrBucketSize + 1;
+        uint256 _baseAggSecondIndex = (_loanIdx / (baseAggrBucketSize * 10)) + 1;
+        uint256 _baseAggThirdIndex = (_loanIdx / (baseAggrBucketSize * 100)) + 1;
+
         uint128 collateralUpdate = uint128(
             (_collateral * BASE) / _totalLpShares
         );
         uint128 repaymentUpdate = uint128((_repayment * BASE) / _totalLpShares);
         //first aggregation updates
-        collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
+        collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
             .collateral -= collateralUpdate;
-        collAndRepayTotalBaseAgg1[_loanIdx / firstLengthPerClaimInterval + 1]
+        collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
             .repayments += repaymentUpdate;
 
         //second aggregation updates
         collAndRepayTotalBaseAgg2[
-            (_loanIdx / (firstLengthPerClaimInterval * 10)) + 1
+            _baseAggSecondIndex
         ].collateral -= collateralUpdate;
         collAndRepayTotalBaseAgg2[
-            (_loanIdx / (firstLengthPerClaimInterval * 10)) + 1
+            _baseAggSecondIndex
         ].repayments += repaymentUpdate;
 
         //third aggregation updates
         collAndRepayTotalBaseAgg3[
-            (_loanIdx / (firstLengthPerClaimInterval * 100)) + 1
+            _baseAggThirdIndex
         ].collateral -= collateralUpdate;
         collAndRepayTotalBaseAgg3[
-            (_loanIdx / (firstLengthPerClaimInterval * 100)) + 1
+            _baseAggThirdIndex
         ].repayments += repaymentUpdate;
     }
 
@@ -817,8 +822,12 @@ abstract contract BasePool is IBasePool {
             uint256 _applicableShares
         )
     {
-        // check if reasonable to automatically increment share pointer for intermediate period with zero shares
-        // and push fromLoanIdx forward
+        /*
+        * check if reasonable to automatically increment share pointer for intermediate period with zero shares
+        * and push fromLoanIdx forward
+        * Note: Since there is an offset of length 1 for the sharesOverTime and loanIdxWhereSharesChanged
+        * this is why the fromLoanIdx needs to be updated before the current share pointer increments
+        **/
         uint256 currSharePtr = _lpInfo.currSharePtr;
         if (
             _lpInfo.sharesOverTime[currSharePtr] == 0 &&
@@ -832,13 +841,13 @@ abstract contract BasePool is IBasePool {
         }
 
         /*
-        first loan index (which is what _fromLoanIdx will become)
-        cannot be less than lpInfo.fromLoanIdx (double-claiming or not entitled since
-        wasn't invested during that time), unless special case of first loan globally
-        and LpInfo.fromLoanIdx is 1
-        Note: This still works for claim, since in that function startIndex !=0 is already
-        checked, so second part is always true in claim function
-        */
+        * first loan index (which is what _fromLoanIdx will become)
+        * cannot be less than lpInfo.fromLoanIdx (double-claiming or not entitled since
+        * wasn't invested during that time), unless special case of first loan globally
+        * and LpInfo.fromLoanIdx is 1
+        * Note: This still works for claim, since in that function startIndex !=0 is already
+        * checked, so second part is always true in claim function
+        **/
         if (
             _startIndex < _lpInfo.fromLoanIdx &&
             !(_startIndex == 0 && _lpInfo.fromLoanIdx == 1)

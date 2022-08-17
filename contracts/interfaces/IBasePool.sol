@@ -261,7 +261,7 @@ interface IBasePool {
 
     function loanIdxToBorrower(uint256) external view returns (address);
 
-    function firstLengthPerClaimInterval() external view returns (uint256);
+    function baseAggrBucketSize() external view returns (uint256);
 
     function isApproved(
         address _borrower,
