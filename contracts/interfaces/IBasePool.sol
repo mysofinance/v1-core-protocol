@@ -94,6 +94,15 @@ interface IBasePool {
     function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
         external;
 
+    /**
+     * @notice Function which allows borrowing from the pool
+     * @param _onBehalf Recipient of the loan currency
+     * @param _sendAmount Amount of collateral currency sent by borrower
+     * @param _minLoan Minimum loan currency amount acceptable to borrower
+     * @param _maxRepay Maximum allowable loan currency amount borrower is willing to repay
+     * @param _deadline Timestamp after which transaction will be void
+     * @param _referralCode Code for later possible rewards in referral program
+     */
     function borrow(
         address _onBehalf,
         uint128 _sendAmount,
@@ -103,23 +112,30 @@ interface IBasePool {
         uint16 _referralCode
     ) external;
 
-    function loanTerms(uint128 _inAmountAfterFees)
-        external
-        view
-        returns (
-            uint128 loanAmount,
-            uint128 repaymentAmount,
-            uint128 pledgeAmount,
-            uint128 _protocolFee,
-            uint256 _totalLiquidity
-        );
-
+    /**
+     * @notice Function which allows repayment of a loan
+     * @dev The sent amount of loan currency must be sufficient to account
+     * for any fees on transfer (if any)
+     * @param _loanIdx Index of the loan to be repaid
+     * @param _recipient Address that will receive the collateral transfer
+     * @param _sendAmount Amount of loan currency sent for repayment.
+     */
     function repay(
         uint256 _loanIdx,
         address _recipient,
         uint128 _sendAmount
     ) external;
 
+    /**
+     * @notice Function which allows repayment of a loan and roll over into new loan
+     * @dev The old loan gets repaid and then a new loan with a new loan Id is taken out.
+     * No actual transfers are made other than the interest
+     * @param _loanIdx Index of the loan to be repaid
+     * @param _minLoanLimit Minimum amount of loan currency acceptable from new loan.
+     * @param _maxRepayLimit Maximum allowable loan currency amount borrower for new loan.
+     * @param _deadline Timestamp after which transaction will be void
+     * @param _referralCode Code for later possible rewards in referral program
+     */
     function rollOver(
         uint256 _loanIdx,
         uint128 _minLoanLimit,
@@ -147,6 +163,15 @@ interface IBasePool {
         bool _isReinvested,
         uint256 _deadline
     ) external;
+
+    /**
+     * @notice Function will update the share pointer for the lp
+     * @dev This function will allow an lp to skip his pointer ahead but
+     * caution should be used since once an Lp has updated their from index
+     * they lose all rights to any outstanding claims before that from index
+     * @param _newSharePointer New location of the Lp's current share pointer
+     */
+    function overrideSharePointer(uint256 _newSharePointer) external;
 
     /**
      * @notice Function which handles aggregate claiming by LPs
@@ -182,6 +207,26 @@ interface IBasePool {
         uint256 _shares
     ) external view returns (uint256 repayments, uint256 collateral);
 
+    /**
+     * @notice Function which calculates loan terms
+     * @param _inAmountAfterFees Amount of collateral currency after fees are deducted
+     * @return loanAmount Amount of loan currency to be trasnferred to the borrower
+     * @return repaymentAmount Amount of loan currency borrower must repay to reclaim collateral
+     * @return pledgeAmount Amount of collateral currency borrower retrieves upon repayment
+     * @return _protocolFee Amount of collateral currency to be transferred to treasury
+     * @return _totalLiquidity Total liquidity of the pool
+     */
+    function loanTerms(uint128 _inAmountAfterFees)
+        external
+        view
+        returns (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount,
+            uint128 _protocolFee,
+            uint256 _totalLiquidity
+        );
+
     function toggleRepayAndLiquidityApproval(
         address _recipient,
         ApprovalTypes _approvalType
@@ -214,9 +259,9 @@ interface IBasePool {
 
     function minLoan() external view returns (uint256);
 
-    function totalFees() external view returns (uint128);
-
     function loanIdxToBorrower(uint256) external view returns (address);
+
+    function baseAggrBucketSize() external view returns (uint256);
 
     function isApproved(
         address _borrower,

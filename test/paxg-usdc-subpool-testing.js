@@ -49,7 +49,7 @@ describe("PAXG-USDC Pool Testing", function () {
     PoolPaxg = await ethers.getContractFactory("PoolPaxgUsdc");
     PoolPaxg = await PoolPaxg.connect(deployer);
 
-    paxgPool = await PoolPaxg.deploy(_loanCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
+    paxgPool = await PoolPaxg.deploy(_loanCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
     await paxgPool.deployed();
 
     PAXG.connect(borrower).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");

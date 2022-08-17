@@ -58,7 +58,7 @@ describe("WETH-USDC Pool Testing", function () {
     // deploy pool
     PoolWethUsdc = await ethers.getContractFactory("PoolWethUsdc");
     PoolWethUsdc = await PoolWethUsdc.connect(deployer);
-    poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100);
+    poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
     await poolWethUsdc.deployed();
 
     // approve DAI and WETH balances

@@ -16,7 +16,8 @@ contract PoolWethDai is BasePool {
         uint256 _tvl1,
         uint256 _tvl2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval
+        uint256 _firstLengthPerClaimInterval,
+        uint128 _protocolFee
     )
         BasePool(
             0x6B175474E89094C44Da98b954EedeAC495271d0F,
@@ -28,7 +29,8 @@ contract PoolWethDai is BasePool {
             _tvl1,
             _tvl2,
             _minLoan,
-            _firstLengthPerClaimInterval
+            _firstLengthPerClaimInterval,
+            _protocolFee
         )
     {}
 
