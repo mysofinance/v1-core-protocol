@@ -282,7 +282,7 @@ abstract contract BasePool is IBasePool {
         }
         {
             // update aggregations
-            updateAggregations(loanIdx, pledgeAmount, 0, totalLpShares, 0);
+            updateAggregations(loanIdx, pledgeAmount, 0, totalLpShares, false);
 
             // update loan idx counter
             loanIdx += 1;
@@ -353,7 +353,7 @@ abstract contract BasePool is IBasePool {
             loanInfo.collateral,
             repaymentAmountAfterFees,
             loanInfo.totalLpShares,
-            1
+            true
         );
 
         IERC20Metadata(loanCcyToken).safeTransferFrom(
@@ -410,7 +410,7 @@ abstract contract BasePool is IBasePool {
             loanInfo.collateral,
             loanInfo.repayment,
             loanInfo.totalLpShares,
-            1
+            true
         );
 
         {
@@ -428,7 +428,7 @@ abstract contract BasePool is IBasePool {
                 pledgeAmount,
                 0,
                 loanInfoNew.totalLpShares,
-                0
+                false
             );
             loanIdx += 1;
             totalLiquidity = _totalLiquidity - loanAmount;
@@ -724,14 +724,14 @@ abstract contract BasePool is IBasePool {
      * @param _collateral Amount of collateral to add/subtract from aggregations
      * @param _repayment Amount of loan currency to add to repayments (only if _isRepay is 1)
      * @param _totalLpShares Amount of Lp Shares for given loan, used to divide amounts into units per Lp share
-     * @param _isRepay Flag which if 0 only allows adding collateral and if 1 subtracts collateral and adds repayments
+     * @param _isRepay Flag which if false only allows adding collateral else subtracts collateral and adds repayments
      */
     function updateAggregations(
         uint256 _loanIdx,
         uint128 _collateral,
         uint128 _repayment,
         uint128 _totalLpShares,
-        uint128 _isRepay
+        bool _isRepay
     ) internal {
         uint256 _baseAggFirstIndex = _loanIdx / baseAggrBucketSize + 1;
         uint256 _baseAggSecondIndex = (_loanIdx / (baseAggrBucketSize * 10)) +
@@ -742,35 +742,34 @@ abstract contract BasePool is IBasePool {
         uint128 collateralUpdate = uint128(
             (_collateral * BASE) / _totalLpShares
         );
-        uint128 repaymentUpdate = uint128((_repayment * BASE) / _totalLpShares);
+        uint128 repaymentUpdate = _isRepay
+            ? uint128((_repayment * BASE) / _totalLpShares)
+            : 0;
 
         //first aggregation updates
-        _isRepay == 0
+        _isRepay
             ? collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
-                .collateral += collateralUpdate
+                .collateral -= collateralUpdate
             : collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
-                .collateral -= collateralUpdate;
-        collAndRepayTotalBaseAgg1[_baseAggFirstIndex].repayments +=
-            _isRepay *
-            repaymentUpdate;
+                .collateral += collateralUpdate;
+        collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
+            .repayments += repaymentUpdate;
         //second aggregation updates
-        _isRepay == 0
+        _isRepay
             ? collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
-                .collateral += collateralUpdate
+                .collateral -= collateralUpdate
             : collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
-                .collateral -= collateralUpdate;
-        collAndRepayTotalBaseAgg2[_baseAggSecondIndex].repayments +=
-            _isRepay *
-            repaymentUpdate;
+                .collateral += collateralUpdate;
+        collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
+            .repayments += repaymentUpdate;
         //third aggregation updates
-        _isRepay == 0
+        _isRepay
             ? collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
-                .collateral += collateralUpdate
+                .collateral -= collateralUpdate
             : collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
-                .collateral -= collateralUpdate;
-        collAndRepayTotalBaseAgg3[_baseAggThirdIndex].repayments +=
-            _isRepay *
-            repaymentUpdate;
+                .collateral += collateralUpdate;
+        collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
+            .repayments += repaymentUpdate;
     }
 
     function checkSharePtrIncrement(
