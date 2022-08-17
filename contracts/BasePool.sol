@@ -733,10 +733,11 @@ abstract contract BasePool is IBasePool {
         uint128 _totalLpShares,
         bool _isRepay
     ) internal {
-        uint256 _baseAggFirstIndex = _loanIdx / baseAggrBucketSize + 1;
-        uint256 _baseAggSecondIndex = (_loanIdx / (baseAggrBucketSize * 10)) +
+        uint256 _baseAggrBucketSize = baseAggrBucketSize;
+        uint256 _baseAggFirstIndex = _loanIdx / _baseAggrBucketSize + 1;
+        uint256 _baseAggSecondIndex = (_loanIdx / (_baseAggrBucketSize * 10)) +
             1;
-        uint256 _baseAggThirdIndex = (_loanIdx / (baseAggrBucketSize * 100)) +
+        uint256 _baseAggThirdIndex = (_loanIdx / (_baseAggrBucketSize * 100)) +
             1;
 
         uint128 collateralUpdate = uint128(
