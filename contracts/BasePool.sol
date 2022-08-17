@@ -718,11 +718,11 @@ abstract contract BasePool is IBasePool {
 
     /**
      * @notice Function which updates the 3 aggegration levels when claiming
-     * @dev This function will subtract collateral and add to repay is _isRepay is 1 (true).
+     * @dev This function will subtract collateral and add to repay if _isRepay is true.
      * Otherwise, repayment will be unchanged and collateral will be added
      * @param _loanIdx Loan index used to determine aggregation "bucket" index
      * @param _collateral Amount of collateral to add/subtract from aggregations
-     * @param _repayment Amount of loan currency to add to repayments (only if _isRepay is 1)
+     * @param _repayment Amount of loan currency to add to repayments, only if _isRepay is true
      * @param _totalLpShares Amount of Lp Shares for given loan, used to divide amounts into units per Lp share
      * @param _isRepay Flag which if false only allows adding collateral else subtracts collateral and adds repayments
      */
