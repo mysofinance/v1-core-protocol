@@ -31,6 +31,7 @@ abstract contract BasePool is IBasePool {
     error RepaymentAboveLimit();
     error InvalidLoanIdx();
     error InvalidSender();
+    error InvalidRecipient();
     error InvalidSubAggregation();
     error CannotRepayAfterExpiry();
     error AlreadyRepaid();
@@ -322,7 +323,7 @@ abstract contract BasePool is IBasePool {
         address _loanOwner = loanIdxToBorrower[_loanIdx];
 
         if (_loanOwner != _recipient || msg.sender != _recipient)
-            revert InvalidSender();
+            revert InvalidRecipient();
         checkApproval(_loanOwner, IBasePool.ApprovalTypes.REPAY);
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         uint256 timestamp = block.timestamp;
