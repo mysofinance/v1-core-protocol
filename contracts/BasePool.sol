@@ -344,6 +344,7 @@ abstract contract BasePool is IBasePool {
             repaymentAmountAfterFees > (101 * _repayment) / 100
         ) revert InvalidSendAmount();
         // if repaymentAmountAfterFees was larger then update loan info
+        // this ensures the extra repayment goes to the LPs
         if (repaymentAmountAfterFees != _repayment) {
             loanInfo.repayment = repaymentAmountAfterFees;
         }
@@ -404,11 +405,12 @@ abstract contract BasePool is IBasePool {
                 _deadline
             );
 
+        uint128 originalLoanRepayment = loanInfo.repayment;
         // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             loanInfo.collateral,
-            loanInfo.repayment,
+            originalLoanRepayment,
             loanInfo.totalLpShares,
             true
         );
@@ -436,9 +438,9 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                loanInfo.repayment -
+                originalLoanRepayment -
                     loanAmount +
-                    getLoanCcyTransferFee(loanInfo.repayment - loanAmount)
+                    getLoanCcyTransferFee(originalLoanRepayment - loanAmount)
             );
 
             // transfer protocol fee to treasury in collateral ccy
@@ -449,7 +451,7 @@ abstract contract BasePool is IBasePool {
             _loanIdx,
             loanIdx - 1,
             pledgeAmount,
-            loanInfo.repayment - loanAmount,
+            originalLoanRepayment - loanAmount,
             _referralCode
         );
     }
@@ -583,7 +585,7 @@ abstract contract BasePool is IBasePool {
         // update lp's from loan index to prevent double claiming and check share pointer
         checkSharePtrIncrement(
             lpInfo,
-            _aggIdxs[lengthArr - 1],
+            _aggIdxs[lengthArr - 1] - 1,
             lpInfo.currSharePtr,
             sharesUnchangedUntilLoanIdx
         );
@@ -740,36 +742,41 @@ abstract contract BasePool is IBasePool {
         uint128 collateralUpdate = uint128(
             (_collateral * BASE) / _totalLpShares
         );
-        uint128 repaymentUpdate = _isRepay
-            ? uint128((_repayment * BASE) / _totalLpShares)
-            : 0;
+        uint128 repaymentUpdate = uint128((_repayment * BASE) / _totalLpShares);
 
-        //first aggregation updates
-        _isRepay
-            ? collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
-                .collateral -= collateralUpdate
-            : collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
+        if (_isRepay) {
+            collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
+                .collateral -= collateralUpdate;
+            collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
+                .collateral -= collateralUpdate;
+            collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
+                .collateral -= collateralUpdate;
+            collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
+                .repayments += repaymentUpdate;
+            collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
+                .repayments += repaymentUpdate;
+            collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
+                .repayments += repaymentUpdate;
+        } else {
+            collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
                 .collateral += collateralUpdate;
-        collAndRepayTotalBaseAgg1[_baseAggFirstIndex]
-            .repayments += repaymentUpdate;
-        //second aggregation updates
-        _isRepay
-            ? collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
-                .collateral -= collateralUpdate
-            : collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
+            collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
                 .collateral += collateralUpdate;
-        collAndRepayTotalBaseAgg2[_baseAggSecondIndex]
-            .repayments += repaymentUpdate;
-        //third aggregation updates
-        _isRepay
-            ? collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
-                .collateral -= collateralUpdate
-            : collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
+            collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
                 .collateral += collateralUpdate;
-        collAndRepayTotalBaseAgg3[_baseAggThirdIndex]
-            .repayments += repaymentUpdate;
+        }
     }
 
+    /**
+     * @notice Function which updates from index and checks if share pointer should be incremented
+     * @dev This function will update new from index for LP to last claimed id + 1. If the current
+     * share pointer is not at the end of the LP's shares over time array, and if the new from index
+     * is equivalent to the index where shares were then added/removed by LP, then increment share pointer.
+     * @param _lpInfo Storage struct of LpInfo passed into function
+     * @param _lastIdxFromUserInput Last claimable index passed by user into claims
+     * @param _currSharePtr Current pointer for shares over time array for LP
+     * @param _sharesUnchangedUntilLoanIdx Loan index where the number of shares owned by LP changed.
+     */
     function checkSharePtrIncrement(
         LpInfo storage _lpInfo,
         uint256 _lastIdxFromUserInput,
@@ -937,14 +944,16 @@ abstract contract BasePool is IBasePool {
         uint256 _newLpShares,
         bool _add
     ) internal {
+        uint256 currShares = _lpInfo.sharesOverTime[
+            _lpInfo.sharesOverTime.length - 1
+        ];
         uint256 newShares = _add
-            ? _lpInfo.sharesOverTime[_lpInfo.sharesOverTime.length - 1] +
-                _newLpShares
-            : _lpInfo.sharesOverTime[_lpInfo.sharesOverTime.length - 1] -
-                _newLpShares;
+            ? currShares + _newLpShares
+            : currShares - _newLpShares;
         _lpInfo.sharesOverTime.push(newShares);
         _lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
-        //if lp has claimed all possible loans then auto increment
+        // if lp has claimed all possible loans that were taken out and no new loans were made
+        // since that prior claim
         if (_lpInfo.fromLoanIdx == loanIdx) _lpInfo.currSharePtr++;
     }
 
