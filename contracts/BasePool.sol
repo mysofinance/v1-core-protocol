@@ -812,19 +812,20 @@ abstract contract BasePool is IBasePool {
         /*
          * check if reasonable to automatically increment share pointer for intermediate period with zero shares
          * and push fromLoanIdx forward
-         * Note: Since there is an offset of length 1 for the sharesOverTime and loanIdxWhereSharesChanged
-         * this is why the fromLoanIdx needs to be updated before the current share pointer increments
+         * Note: there is an offset of sharesOverTime and loanIdxsWhereSharesChanged
          **/
         uint256 currSharePtr = _lpInfo.currSharePtr;
+        //should never underflow since sharesOverTime cannot have 0 length here
+        uint256 fromLoanIdxPtr = currSharePtr - 1;
         if (
             _lpInfo.sharesOverTime[currSharePtr] == 0 &&
-            currSharePtr < _lpInfo.sharesOverTime.length - 1
+            fromLoanIdxPtr < _lpInfo.loanIdxsWhereSharesChanged.length - 1
         ) {
+            currSharePtr = ++_lpInfo.currSharePtr;
+            fromLoanIdxPtr++;
             _lpInfo.fromLoanIdx = uint32(
-                _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
+                _lpInfo.loanIdxsWhereSharesChanged[fromLoanIdxPtr]
             );
-            _lpInfo.currSharePtr++;
-            currSharePtr++;
         }
 
         /*
@@ -841,10 +842,10 @@ abstract contract BasePool is IBasePool {
         ) revert UnentitledFromLoanIdx();
 
         // infer applicable upper loan idx for which number of shares didn't change
-        _sharesUnchangedUntilLoanIdx = currSharePtr ==
-            _lpInfo.sharesOverTime.length - 1
+        _sharesUnchangedUntilLoanIdx = fromLoanIdxPtr ==
+            _lpInfo.loanIdxsWhereSharesChanged.length - 1
             ? loanIdx
-            : _lpInfo.loanIdxsWhereSharesChanged[currSharePtr];
+            : _lpInfo.loanIdxsWhereSharesChanged[fromLoanIdxPtr];
 
         // check passed last loan idx is consistent with constant share interval
         if (_endIndex >= _sharesUnchangedUntilLoanIdx)
