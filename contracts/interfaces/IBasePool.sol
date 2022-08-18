@@ -208,6 +208,26 @@ interface IBasePool {
     ) external view returns (uint256 repayments, uint256 collateral);
 
     /**
+     * @notice Function which toggles approval for another to perform a certain function on sender's behalf
+     * @param _recipient This address is being given approval for the action by the current sender
+     * @param _approvalType Type of action that is being approved
+     */
+    function toggleRepayAndLiquidityApproval(
+        address _recipient,
+        ApprovalTypes _approvalType
+    ) external;
+
+    /**
+     * @notice Function which gets the number of shares at end of array for lpAddr (this will be amended to get other info)
+     * @param _lpAddr Address of LP for which the info is being gathered
+     * @return numShares Number of shares currently owned by the LP
+     */
+    function getNumShares(address _lpAddr)
+        external
+        view
+        returns (uint256 numShares);
+
+    /**
      * @notice Function which calculates loan terms
      * @param _inAmountAfterFees Amount of collateral currency after fees are deducted
      * @return loanAmount Amount of loan currency to be trasnferred to the borrower
@@ -226,16 +246,6 @@ interface IBasePool {
             uint128 _protocolFee,
             uint256 _totalLiquidity
         );
-
-    function toggleRepayAndLiquidityApproval(
-        address _recipient,
-        ApprovalTypes _approvalType
-    ) external;
-
-    function getNumShares(address _lpAddr)
-        external
-        view
-        returns (uint256 numShares);
 
     function collCcyToken() external view returns (address);
 
