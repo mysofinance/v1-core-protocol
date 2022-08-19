@@ -71,7 +71,7 @@ abstract contract BasePool is IBasePool {
     uint256 public minLoan;
 
     //must be a multiple of 100
-    uint256 public baseAggrBucketSize;
+    uint256 public immutable baseAggrBucketSize;
 
     mapping(address => LpInfo) public addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
@@ -80,11 +80,9 @@ abstract contract BasePool is IBasePool {
     mapping(address => mapping(address => mapping(IBasePool.ApprovalTypes => bool)))
         public isApproved;
 
-    mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg1;
+    mapping(uint256 => AggClaimsInfo) public collAndRepayTotalBaseAgg1;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg2;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg3;
-
-    mapping(uint256 => mapping(uint256 => AggClaimsInfo)) loanIdxRangeToAggClaimsInfo;
 
     struct LpInfo {
         // lower bound loan idx (incl.) from which lp is entitled to claim
@@ -609,16 +607,15 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function toggleApprovals(
-        address _approvee,
-        IBasePool.ApprovalTypes[] calldata _approvalTypes
-    ) external {
+    function setApprovals(address _approvee, bool[5] calldata _approvals)
+        external
+    {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
-        for (uint256 index = 0; index < _approvalTypes.length; ) {
+        for (uint256 index = 0; index < 5; ) {
             isApproved[msg.sender][_approvee][
-                _approvalTypes[index]
-            ] = !isApproved[msg.sender][_approvee][_approvalTypes[index]];
+                IBasePool.ApprovalTypes(index)
+            ] = _approvals[index];
             unchecked {
                 index++;
             }

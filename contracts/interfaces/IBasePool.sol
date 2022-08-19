@@ -209,14 +209,12 @@ interface IBasePool {
     ) external view returns (uint256 repayments, uint256 collateral);
 
     /**
-     * @notice Function which toggles approval for another to perform a certain function on sender's behalf
+     * @notice Function which sets approval for another to perform a certain function on sender's behalf
      * @param _approvee This address is being given approval for the action(s) by the current sender
-     * @param _approvalTypes Types of actions that are being approved
+     * @param _approvals Array of flags to set which actions are approved or not approved
      */
-    function toggleApprovals(
-        address _approvee,
-        ApprovalTypes[] calldata _approvalTypes
-    ) external;
+    function setApprovals(address _approvee, bool[5] calldata _approvals)
+        external;
 
     /**
      * @notice Function which gets the shares over time and loan indices where shares changed
