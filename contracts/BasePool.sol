@@ -222,9 +222,10 @@ abstract contract BasePool is IBasePool {
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
         uint256 _totalLiquidity = getTotalLiquidity();
+        uint128 _totalLpShares = totalLpShares;
         // update state of pool
         uint256 liquidityRemoved = (numShares *
-            (_totalLiquidity - MIN_LIQUIDITY)) / totalLpShares;
+            (_totalLiquidity - MIN_LIQUIDITY)) / _totalLpShares;
         totalLpShares -= uint128(numShares);
         totalLiquidity = _totalLiquidity - liquidityRemoved;
 
@@ -238,7 +239,7 @@ abstract contract BasePool is IBasePool {
             liquidityRemoved,
             numShares,
             totalLiquidity,
-            totalLpShares
+            _totalLpShares - uint128(numShares)
         );
     }
 
@@ -285,7 +286,7 @@ abstract contract BasePool is IBasePool {
             updateAggregations(loanIdx, pledgeAmount, 0, totalLpShares, false);
 
             // update loan idx counter
-            loanIdx += 1;
+            loanIdx +=1;
         }
         {
             // transfer _sendAmount (not pledgeAmount) in collateral ccy
@@ -349,10 +350,11 @@ abstract contract BasePool is IBasePool {
         if (repaymentAmountAfterFees != _repayment) {
             loanInfo.repayment = repaymentAmountAfterFees;
         }
+        uint128 _collateral = loanInfo.collateral;
         //update the aggregation mappings
         updateAggregations(
             _loanIdx,
-            loanInfo.collateral,
+            _collateral,
             repaymentAmountAfterFees,
             loanInfo.totalLpShares,
             true
@@ -367,7 +369,7 @@ abstract contract BasePool is IBasePool {
         // transfer directly to someone other than payer/sender)
         IERC20Metadata(collCcyToken).safeTransfer(
             _recipient,
-            loanInfo.collateral
+            _collateral
         );
         // spawn event
         emit Repay(_loanIdx);
