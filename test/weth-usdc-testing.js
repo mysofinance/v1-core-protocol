@@ -822,7 +822,7 @@ describe("WETH-USDC Pool Testing", function () {
 
     const currLoanIdx = await poolWethUsdc.loanIdx();
 
-    await expect(poolWethUsdc.connect(lp2).claim(lp1.address, [300, 310], false, timestamp+9999999)).to.be.revertedWith("InvalidSender()");
+    await expect(poolWethUsdc.connect(lp2).claim(lp1.address, [300, 310], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender()");
     await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [300, 310, 330, 340, currLoanIdx], false, timestamp+9999999)).to.be.revertedWith("LoanIdxsWithChangingShares()");
     
     await poolWethUsdc.connect(lp1).claim(lp1.address, [300, 310, 330, 340, currLoanIdx - 1], false, timestamp+9999999);
