@@ -396,6 +396,8 @@ abstract contract BasePool is IBasePool {
             if (timestamp == loanInfo.expiry - LOAN_TENOR)
                 revert CannotRepayInSameBlock();
         }
+
+        uint128 _collateral = loanInfo.collateral;
         // get terms for new borrow
         (
             uint128 loanAmount,
@@ -405,7 +407,7 @@ abstract contract BasePool is IBasePool {
             uint128 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(
-                loanInfo.collateral,
+                _collateral,
                 _minLoanLimit,
                 _maxRepayLimit,
                 _deadline
@@ -415,7 +417,7 @@ abstract contract BasePool is IBasePool {
         // update the aggregation mappings
         updateAggregations(
             _loanIdx,
-            loanInfo.collateral,
+            _collateral,
             originalLoanRepayment,
             loanInfo.totalLpShares,
             true
