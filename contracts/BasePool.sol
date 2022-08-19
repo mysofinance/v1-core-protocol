@@ -322,7 +322,7 @@ abstract contract BasePool is IBasePool {
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         address _loanOwner = loanIdxToBorrower[_loanIdx];
 
-        if (_loanOwner != _recipient || msg.sender != _recipient)
+        if (_loanOwner != _recipient && msg.sender != _recipient)
             revert InvalidRecipient();
         checkApproval(_loanOwner, IBasePool.ApprovalTypes.REPAY);
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
@@ -385,7 +385,7 @@ abstract contract BasePool is IBasePool {
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         checkApproval(
             loanIdxToBorrower[_loanIdx],
-            IBasePool.ApprovalTypes.REPAY
+            IBasePool.ApprovalTypes.ROLLOVER
         );
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         {
