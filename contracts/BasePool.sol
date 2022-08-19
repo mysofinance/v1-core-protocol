@@ -43,7 +43,6 @@ abstract contract BasePool is IBasePool {
     error UnentitledFromLoanIdx();
     error LoanIdxsWithChangingShares();
     error InvalidBaseAggrBucketSize();
-    error NothingAggregatedToClaim();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
     error ProtocolFeeTooHigh();
@@ -286,7 +285,7 @@ abstract contract BasePool is IBasePool {
             updateAggregations(loanIdx, pledgeAmount, 0, totalLpShares, false);
 
             // update loan idx counter
-            loanIdx +=1;
+            loanIdx += 1;
         }
         {
             // transfer _sendAmount (not pledgeAmount) in collateral ccy
@@ -367,10 +366,7 @@ abstract contract BasePool is IBasePool {
         );
         // transfer collateral to _recipient (allows for possible
         // transfer directly to someone other than payer/sender)
-        IERC20Metadata(collCcyToken).safeTransfer(
-            _recipient,
-            _collateral
-        );
+        IERC20Metadata(collCcyToken).safeTransfer(_recipient, _collateral);
         // spawn event
         emit Repay(_loanIdx);
     }
@@ -406,12 +402,7 @@ abstract contract BasePool is IBasePool {
             uint32 expiry,
             uint128 _protocolFee,
             uint256 _totalLiquidity
-        ) = _borrow(
-                _collateral,
-                _minLoanLimit,
-                _maxRepayLimit,
-                _deadline
-            );
+        ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
         uint128 originalLoanRepayment = loanInfo.repayment;
         // update the aggregation mappings
@@ -685,7 +676,10 @@ abstract contract BasePool is IBasePool {
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
         pledgeAmount = uint128(pledge);
-        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
+        if (
+            repaymentAmount <= loanAmount ||
+            ((repaymentAmount * BASE) / totalLpShares) == 0
+        ) revert ErroneousLoanTerms();
     }
 
     function getClaimsFromAggregated(
@@ -726,9 +720,7 @@ abstract contract BasePool is IBasePool {
                 (_fromLoanIdx / (_baseAggrBucketSize * 100)) + 1
             ];
         }
-        //make sure not an empty bucket
-        if (aggClaimsInfo.repayments == 0 && aggClaimsInfo.collateral == 0)
-            revert NothingAggregatedToClaim();
+
         //return repayment and collateral amounts
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
@@ -953,14 +945,11 @@ abstract contract BasePool is IBasePool {
             );
         }
         totalLpShares += uint128(newLpShares);
-        // purposefully first divide and then multiply to emulate order of operations in claiming
-        if (((minLoan * BASE) / totalLpShares) * newLpShares == 0)
+        if (((minLoan * BASE) / totalLpShares) == 0)
             revert TooBigAddToLaterClaimOnRepay();
         if (
             ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
-                totalLpShares) *
-                newLpShares ==
-            0
+                totalLpShares) == 0
         ) revert TooBigAddToLaterClaimColl();
         totalLiquidity = _totalLiquidity + _inAmountAfterFees;
         // update lp info
