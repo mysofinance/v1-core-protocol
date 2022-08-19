@@ -30,7 +30,7 @@ abstract contract BasePool is IBasePool {
     error ErroneousLoanTerms();
     error RepaymentAboveLimit();
     error InvalidLoanIdx();
-    error InvalidSender();
+    error UnapprovedSender();
     error InvalidRecipient();
     error InvalidSubAggregation();
     error CannotRepayAfterExpiry();
@@ -172,7 +172,7 @@ abstract contract BasePool is IBasePool {
     ) external override {
         // verify lp info and eligibility
         checkTimestamp(_deadline);
-        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
+        checkSenderApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
 
         uint128 _inAmountAfterFees = _sendAmount -
             getLoanCcyTransferFee(_sendAmount);
@@ -211,7 +211,10 @@ abstract contract BasePool is IBasePool {
         override
     {
         // verify lp info and eligibility
-        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.REMOVE_LIQUIDITY);
+        checkSenderApproval(
+            _onBehalfOf,
+            IBasePool.ApprovalTypes.REMOVE_LIQUIDITY
+        );
 
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
         uint256 shareLength = lpInfo.sharesOverTime.length;
@@ -324,7 +327,7 @@ abstract contract BasePool is IBasePool {
 
         if (_loanOwner != _recipient && msg.sender != _recipient)
             revert InvalidRecipient();
-        checkApproval(_loanOwner, IBasePool.ApprovalTypes.REPAY);
+        checkSenderApproval(_loanOwner, IBasePool.ApprovalTypes.REPAY);
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         uint256 timestamp = block.timestamp;
         if (timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
@@ -381,7 +384,7 @@ abstract contract BasePool is IBasePool {
         uint256 timestamp = checkTimestamp(_deadline);
         // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
-        checkApproval(
+        checkSenderApproval(
             loanIdxToBorrower[_loanIdx],
             IBasePool.ApprovalTypes.ROLLOVER
         );
@@ -404,12 +407,12 @@ abstract contract BasePool is IBasePool {
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
-        uint128 originalLoanRepayment = loanInfo.repayment;
+        uint128 rollOverCost = loanInfo.repayment - loanAmount;
         // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             _collateral,
-            originalLoanRepayment,
+            rollOverCost + loanAmount,
             loanInfo.totalLpShares,
             true
         );
@@ -437,9 +440,7 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                originalLoanRepayment -
-                    loanAmount +
-                    getLoanCcyTransferFee(originalLoanRepayment - loanAmount)
+                rollOverCost + getLoanCcyTransferFee(rollOverCost)
             );
 
             // transfer protocol fee to treasury in collateral ccy
@@ -450,7 +451,7 @@ abstract contract BasePool is IBasePool {
             _loanIdx,
             loanIdx - 1,
             pledgeAmount,
-            originalLoanRepayment - loanAmount,
+            rollOverCost,
             _referralCode
         );
     }
@@ -465,7 +466,7 @@ abstract contract BasePool is IBasePool {
         if (_isReinvested) {
             claimReinvestmentCheck(_deadline, _onBehalfOf);
         }
-        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.CLAIM);
+        checkSenderApproval(_onBehalfOf, IBasePool.ApprovalTypes.CLAIM);
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
         // verify lp info and eligibility
@@ -535,7 +536,7 @@ abstract contract BasePool is IBasePool {
         if (_isReinvested) {
             claimReinvestmentCheck(_deadline, _onBehalfOf);
         }
-        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.CLAIM);
+        checkSenderApproval(_onBehalfOf, IBasePool.ApprovalTypes.CLAIM);
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
         // verify lp info and eligibility
@@ -1028,17 +1029,17 @@ abstract contract BasePool is IBasePool {
         view
     {
         checkTimestamp(_deadline);
-        checkApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
+        checkSenderApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
     }
 
-    function checkApproval(
+    function checkSenderApproval(
         address _ownerOrBeneficiary,
         IBasePool.ApprovalTypes _approvalType
     ) internal view {
         if (
             (_ownerOrBeneficiary != msg.sender &&
                 (!isApproved[_ownerOrBeneficiary][msg.sender][_approvalType]))
-        ) revert InvalidSender();
+        ) revert UnapprovedSender();
     }
 
     function getClaimsFromList(
