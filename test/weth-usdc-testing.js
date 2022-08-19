@@ -841,12 +841,13 @@ describe("WETH-USDC Pool Testing", function () {
 
     /*
     * global loanIdx = 381
-    * lp_1 : sharesOverTime: [100000000000000, 50000000000000, 90094550406881] loanIdxsWhereSharesChanged: [131, 381]
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000, 90077883500348] loanIdxsWhereSharesChanged: [131, 381]
     * fromIndex : 381 , currSharePtr : 2
     **/
 
     lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
     const thirdLp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    console.log(thirdLp1NumShares.sharesOverTime[2].toString())
     await expect(thirdLp1NumShares.loanIdxsWhereSharesChanged[1]).to.be.equal(currLoanIdx)
     await expect(lp1Info.currSharePtr).to.be.equal(2);
     await expect(lp1Info.fromLoanIdx).to.be.equal(currLoanIdx);
