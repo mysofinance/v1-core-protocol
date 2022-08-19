@@ -47,6 +47,7 @@ abstract contract BasePool is IBasePool {
     error CannotClaimWithUnsettledLoan();
     error ProtocolFeeTooHigh();
     error InvalidApprovalAddress();
+    error ZeroShareClaim();
 
     address constant TREASURY = 0x1234567890000000000000000000000000000001;
     uint24 immutable LOAN_TENOR;
@@ -836,10 +837,9 @@ abstract contract BasePool is IBasePool {
          * this is why the fromLoanIdx needs to be updated before the current share pointer increments
          **/
         uint256 currSharePtr = _lpInfo.currSharePtr;
-        if (
-            _lpInfo.sharesOverTime[currSharePtr] == 0 &&
-            currSharePtr < _lpInfo.sharesOverTime.length - 1
-        ) {
+        if (_lpInfo.sharesOverTime[currSharePtr] == 0) {
+            if (currSharePtr == _lpInfo.sharesOverTime.length - 1)
+                revert ZeroShareClaim();
             _lpInfo.fromLoanIdx = uint32(
                 _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
             );
