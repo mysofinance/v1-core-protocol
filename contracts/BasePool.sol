@@ -837,9 +837,10 @@ abstract contract BasePool is IBasePool {
          * this is why the fromLoanIdx needs to be updated before the current share pointer increments
          **/
         uint256 currSharePtr = _lpInfo.currSharePtr;
-        if (_lpInfo.sharesOverTime[currSharePtr] == 0) {
-            if (currSharePtr == _lpInfo.sharesOverTime.length - 1)
-                revert ZeroShareClaim();
+        if (
+            _lpInfo.sharesOverTime[currSharePtr] == 0 &&
+            currSharePtr < _lpInfo.sharesOverTime.length - 1
+        ) {
             _lpInfo.fromLoanIdx = uint32(
                 _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
             );
@@ -870,8 +871,9 @@ abstract contract BasePool is IBasePool {
             revert LoanIdxsWithChangingShares();
 
         // get applicable number of shares for pro-rata calculations (given current share pointer position)
-        // since zero shares were either incremented or reverted above this should be always non-zero
         _applicableShares = _lpInfo.sharesOverTime[currSharePtr];
+        // check if shares are 0
+        if (_applicableShares == 0) revert ZeroShareClaim();
     }
 
     /**
@@ -969,17 +971,30 @@ abstract contract BasePool is IBasePool {
         uint256 _newLpShares,
         bool _add
     ) internal {
-        uint256 currShares = _lpInfo.sharesOverTime[
-            _lpInfo.sharesOverTime.length - 1
-        ];
+        uint256 _loanIdx = loanIdx;
+        uint256 _sharesLen = _lpInfo.sharesOverTime.length;
+        uint256 _loanIdxsLen = _sharesLen - 1;
+        uint256 currShares = _lpInfo.sharesOverTime[_sharesLen - 1];
         uint256 newShares = _add
             ? currShares + _newLpShares
             : currShares - _newLpShares;
-        _lpInfo.sharesOverTime.push(newShares);
-        _lpInfo.loanIdxsWhereSharesChanged.push(loanIdx);
-        // if lp has claimed all possible loans that were taken out and no new loans were made
-        // since that prior claim
-        if (_lpInfo.fromLoanIdx == loanIdx) _lpInfo.currSharePtr++;
+        // if lp has claimed all possible loans that were taken out (fromLoanIdx = loanIdx) OR
+        // loanIdxsWhereSharesUnchanged array is nonzero length and last entry is equal to _loanIdx
+        // then you just overwrite the last entry of the sharesOverTime array
+        // should short-circuit if loanIdxsWhereSharesChanged is empty
+        if (
+            _lpInfo.fromLoanIdx == _loanIdx ||
+            (_loanIdxsLen > 0 &&
+                _lpInfo.loanIdxsWhereSharesChanged[_loanIdxsLen - 1] ==
+                _loanIdx)
+        ) {
+            _lpInfo.sharesOverTime[_sharesLen - 1] = currShares;
+        } else {
+            // if the previous conditions are not met then push newShares onto shares over time array
+            // and push global loan index onto loanIdxsWhereSharesChanged
+            _lpInfo.sharesOverTime.push(newShares);
+            _lpInfo.loanIdxsWhereSharesChanged.push(_loanIdx);
+        }
     }
 
     function _borrow(
