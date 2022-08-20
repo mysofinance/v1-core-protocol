@@ -6,6 +6,7 @@ describe("PAXG-USDC Pool Testing", function () {
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
   const ONE_USDC = ethers.BigNumber.from("1000000");
   const ONE_PAXG = MONE;
+  const _loanCcyToken = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
   const _collCcyToken = "0x45804880De22913dAFE09f4980848ECE6EcbAf78";
   const _loanTenor = 86400;
   const _maxLoanPerColl = ONE_USDC.mul(1000);
@@ -15,16 +16,40 @@ describe("PAXG-USDC Pool Testing", function () {
   const _tvl2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(300);
   const MIN_LIQUIDITY = ONE_USDC.mul(100);
+  const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
   const SUPPLY_CONTROLLER = "0xE25a329d385f77df5D4eD56265babe2b99A5436e";
+  const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
   beforeEach( async () => {
-    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
+    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, pledger, ...addrs] = await ethers.getSigners();
 
-    USDC = await ethers.getContractFactory("USDC");
-    USDC = await USDC.connect(deployer);
-    usdc = await USDC.deploy("USDC", "USDC", 6);
-    const _loanCcyToken = usdc.address;
+    // prepare USDC balances
+    USDC = await ethers.getContractAt("IUSDC", _loanCcyToken);
+    await ethers.provider.send("hardhat_setBalance", [
+      USDC_MASTER_MINTER,
+      "0x56BC75E2D63100000",
+    ]);
+    await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [USDC_MASTER_MINTER],
+    });
+    masterMinter = await ethers.getSigner(USDC_MASTER_MINTER);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(lp1.address, MAX_UINT128);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(lp2.address, MAX_UINT128);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(lp3.address, MAX_UINT128);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(lp4.address, MAX_UINT128);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(lp5.address, MAX_UINT128);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(borrower.address, MAX_UINT128);
+    await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+    await USDC.connect(masterMinter).mint(pledger.address, MAX_UINT128);
 
+    // prepare PAXG balances
     PAXG = await ethers.getContractAt("IPAXG", _collCcyToken);
     await ethers.provider.send("hardhat_setBalance", [
       SUPPLY_CONTROLLER,
@@ -38,13 +63,8 @@ describe("PAXG-USDC Pool Testing", function () {
 
     await PAXG.connect(supplyController).increaseSupply("800000000000000000000000000");
     await PAXG.connect(supplyController).transfer(borrower.address, "800000000000000000000000000");
-
-    await usdc.connect(deployer).mint(lp1.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await usdc.connect(deployer).mint(lp2.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await usdc.connect(deployer).mint(lp3.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await usdc.connect(deployer).mint(lp4.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await usdc.connect(deployer).mint(lp5.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    await usdc.connect(deployer).mint(borrower.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    await PAXG.connect(supplyController).increaseSupply("800000000000000000000000000");
+    await PAXG.connect(supplyController).transfer(pledger.address, "800000000000000000000000000");
 
     PoolPaxg = await ethers.getContractFactory("PoolPaxgUsdc");
     PoolPaxg = await PoolPaxg.connect(deployer);
@@ -52,13 +72,16 @@ describe("PAXG-USDC Pool Testing", function () {
     paxgPool = await PoolPaxg.deploy(_loanCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
     await paxgPool.deployed();
 
+    // set allowances
     PAXG.connect(borrower).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    usdc.connect(lp1).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    usdc.connect(lp2).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    usdc.connect(lp3).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    usdc.connect(lp4).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    usdc.connect(lp5).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    usdc.connect(borrower).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    PAXG.connect(pledger).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(lp1).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(lp2).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(lp3).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(lp4).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(lp5).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(borrower).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    USDC.connect(pledger).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
   });
   
   it("Should have correct initial values", async function () {
@@ -95,7 +118,6 @@ describe("PAXG-USDC Pool Testing", function () {
     maxRepayLimit = loanTerms[1].mul(102).div(100);
     console.log(loanTerms);
     console.log(minLoanLimit, maxRepayLimit);
-    currBlock = await ethers.provider.getBlockNumber();
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
   });
   
@@ -237,7 +259,7 @@ describe("PAXG-USDC Pool Testing", function () {
     totalRepaymentsIndicative = ethers.BigNumber.from(0);
     totalRepayments = ethers.BigNumber.from(0);
     totalInterestCosts = ethers.BigNumber.from(0);
-    preBorrBal = await usdc.balanceOf(borrower.address);
+    preBorrBal = await USDC.balanceOf(borrower.address);
     sendAmount = ONE_PAXG.mul(2);
     for (let i = 0; i < 99; i++) {
       totalLiquidity = await paxgPool.getTotalLiquidity();
@@ -259,14 +281,14 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(totalRepaymentsIndicative).to.be.equal(totalRepayments);
     console.log("totalRepayments", totalRepayments)
     //total interest cost
-    postBorrBal = await usdc.balanceOf(borrower.address);
+    postBorrBal = await USDC.balanceOf(borrower.address);
     await expect(preBorrBal.sub(postBorrBal)).to.be.equal(totalInterestCosts);
 
     //lp1 claims individually
-    preClaimBal = await usdc.balanceOf(lp1.address);
+    preClaimBal = await USDC.balanceOf(lp1.address);
     loanIds = Array.from(Array(99), (_, index) => index + 1);
     await paxgPool.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999);
-    postClaimBal = await usdc.balanceOf(lp1.address);
+    postClaimBal = await USDC.balanceOf(lp1.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
     pct = actClaim.mul(9900).div(actClaim)
@@ -280,10 +302,10 @@ describe("PAXG-USDC Pool Testing", function () {
     
     //lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
-    preClaimBal = await usdc.balanceOf(lp2.address);
+    preClaimBal = await USDC.balanceOf(lp2.address);
     await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [1, 99], false, timestamp+9999999)).to.be.reverted;
     await paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999);
-    postClaimBal = await usdc.balanceOf(lp2.address);
+    postClaimBal = await USDC.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
@@ -291,18 +313,18 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999)).to.be.reverted;
 
     //lp3 claims
-    preClaimBal = await usdc.balanceOf(lp3.address);
+    preClaimBal = await USDC.balanceOf(lp3.address);
     await paxgPool.connect(lp3).claimFromAggregated(lp3.address, [0, 100], false, timestamp+9999999);
-    postClaimBal = await usdc.balanceOf(lp3.address);
+    postClaimBal = await USDC.balanceOf(lp3.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
     pct = actClaim.mul(9900).div(actClaim)
     await expect((9900 <= pct) && (pct <= 10010)).to.be.true;
 
     //lp4 claims
-    preClaimBal = await usdc.balanceOf(lp4.address);
+    preClaimBal = await USDC.balanceOf(lp4.address);
     await paxgPool.connect(lp4).claimFromAggregated(lp4.address, [0, 100], false, timestamp+9999999);
-    postClaimBal = await usdc.balanceOf(lp4.address);
+    postClaimBal = await USDC.balanceOf(lp4.address);
     expClaim = totalRepayments.mul(5).div(15);
     actClaim = postClaimBal.sub(preClaimBal);
     pct = actClaim.mul(9900).div(actClaim)
@@ -341,11 +363,11 @@ describe("PAXG-USDC Pool Testing", function () {
 
     //lp1 claims
     preClaimEthBal = await PAXG.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
-    preClaimTokenBal = await usdc.balanceOf(lp1.address);
+    preClaimTokenBal = await USDC.balanceOf(lp1.address);
     await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [1, 3], false, timestamp+9999999)).to.be.reverted;
     await paxgPool.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
-    postClaimTokenBal = await usdc.balanceOf(lp1.address);
+    postClaimTokenBal = await USDC.balanceOf(lp1.address);
 
     //PAXG diffs
     console.log("preClaimEthBal", preClaimEthBal)
@@ -366,10 +388,10 @@ describe("PAXG-USDC Pool Testing", function () {
     //lp2 claims
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await PAXG.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
-    preClaimTokenBal = await usdc.balanceOf(lp2.address);
+    preClaimTokenBal = await USDC.balanceOf(lp2.address);
     await paxgPool.connect(lp2).claim(lp2.address, [1, 2, 3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
-    postClaimTokenBal = await usdc.balanceOf(lp2.address);
+    postClaimTokenBal = await USDC.balanceOf(lp2.address);
 
     //PAXG diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
@@ -387,11 +409,11 @@ describe("PAXG-USDC Pool Testing", function () {
     //lp3 claims
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
-    preClaimTokenBal = await usdc.balanceOf(lp3.address);
+    preClaimTokenBal = await USDC.balanceOf(lp3.address);
     await expect(paxgPool.connect(lp3).claimFromAggregated(lp3.address, [1, 3], false, timestamp+9999999)).to.be.reverted;
     await paxgPool.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
-    postClaimTokenBal = await usdc.balanceOf(lp3.address);
+    postClaimTokenBal = await USDC.balanceOf(lp3.address);
 
     //PAXG diffs
     ethDiff = postClaimEthBal.sub(preClaimEthBal);
@@ -451,7 +473,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await PAXG.balanceOf(paxgPool.address); //await ethers.provider.getBalance(paxgPool.address);
-    balTestToken = await usdc.balanceOf(paxgPool.address);
+    balTestToken = await USDC.balanceOf(paxgPool.address);
     totalLiquidity = await paxgPool.getTotalLiquidity();
     totalLpShares = await paxgPool.totalLpShares();
 
@@ -508,7 +530,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await PAXG.balanceOf(paxgPool.address); //await ethers.provider.getBalance(paxgPool.address);
-    balTestToken = await usdc.balanceOf(paxgPool.address);
+    balTestToken = await USDC.balanceOf(paxgPool.address);
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
 
@@ -518,7 +540,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+1000, 0);
 
     //check dust was transferred to treasury
-    balTreasury = await usdc.balanceOf("0x1234567890000000000000000000000000000001");
+    balTreasury = await USDC.balanceOf("0x1234567890000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
@@ -535,7 +557,7 @@ describe("PAXG-USDC Pool Testing", function () {
     
     //check total liquidity & balance
     totalLiquidity = await paxgPool.getTotalLiquidity();
-    balance = await usdc.balanceOf(paxgPool.address);
+    balance = await USDC.balanceOf(paxgPool.address);
     console.log("totalLiquidity:", totalLiquidity);
     console.log("balance:", balance)
     expect(totalLiquidity).to.be.equal(balance);
@@ -552,9 +574,9 @@ describe("PAXG-USDC Pool Testing", function () {
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
 
     loanTerms = await paxgPool.loanTerms(loanInfo.collateral);
-    balTestTokenPre = await usdc.balanceOf(borrower.address);
+    balTestTokenPre = await USDC.balanceOf(borrower.address);
     await paxgPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0);
-    balTestTokenPost = await usdc.balanceOf(borrower.address);
+    balTestTokenPost = await USDC.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
     actRollCost = balTestTokenPre.sub(balTestTokenPost);
@@ -626,5 +648,93 @@ describe("PAXG-USDC Pool Testing", function () {
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)
+  })
+  
+  it("Should allow borrowing on behalf", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
+
+    loanTerms = await paxgPool.loanTerms(ONE_PAXG);
+    minLoanLimit = loanTerms[0].mul(98).div(100);
+    maxRepayLimit = loanTerms[1].mul(102).div(100);
+
+    // let pledger borrow on behalf of borrower
+    await paxgPool.connect(pledger).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+
+    // check loan owner
+    loanOwner = await paxgPool.loanIdxToBorrower(1);
+    await expect(loanOwner).to.be.equal(borrower.address);
+
+    // get loan info
+    loanInfo = await paxgPool.loanIdxToLoanInfo(1);
+
+    // check that pledger is not entitled to repay
+    await expect(paxgPool.connect(pledger).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWith("UnapprovedSender");
+
+    // check that borrower can repay
+    await paxgPool.connect(borrower).repay(1, borrower.address, loanInfo.repayment)
+  })
+
+  it("Should allow adding liquidity on behalf", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+
+    // lp2 shouldn't be able to add liquidity on lp1's behalf without approval
+    await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWith("UnapprovedSender");
+
+    // should still fail with wrong approval
+    await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, false, true, true]);
+    await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWith("UnapprovedSender");
+
+    // lp1 approves lp2 correctly
+    await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, true, false, false]);
+
+    // lp2 adds liquidity on behalf of lp1
+    await paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
+
+    // check lp shares
+    lpArrayInfo1 = await paxgPool.getLpArrayInfo(lp1.address);
+    lpArrayInfo2 = await paxgPool.getLpArrayInfo(lp2.address);
+    await expect(lpArrayInfo1.sharesOverTime[0]).to.be.equal(ONE_USDC.mul(10000));
+    await expect(lpArrayInfo2.sharesOverTime.length).to.be.equal(0);
+  })
+
+  it("Should allow removing liquidity on behalf", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+
+    // add liquidity
+    await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
+
+    // lp2 shouldn't be able to remove liquidity on lp1's behalf without approval
+    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWith("UnapprovedSender");
+
+    // should still fail with wrong approval
+    await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, false, true]);
+    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWith("UnapprovedSender");
+    
+    //move forward past earliest remove
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 100])
+    await ethers.provider.send("evm_mine");
+
+    // lp1 approves lp2
+    await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, false, true, false]);
+    preBal = await USDC.balanceOf(lp2.address); 
+    await paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000));
+    postBal = await USDC.balanceOf(lp2.address);
+    await expect(postBal.sub(preBal)).to.be.equal(ONE_USDC.mul(10000).sub(MIN_LIQUIDITY));
+  })
+
+  it("Should allow repaying on behalf", async function () {
+
+  })
+
+  it("Should allow rolling over on behalf", async function () {
+
+  })
+
+  it("Should allow claiming on behalf", async function () {
+
   })
 });

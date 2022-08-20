@@ -262,7 +262,15 @@ interface IBasePool {
 
     function loanIdx() external view returns (uint256);
 
-    function getRateParams() external view returns(uint256 _liquidityBnd1, uint256 _liquidityBnd2, uint256 _r1, uint256 _r2);
+    function getRateParams()
+        external
+        view
+        returns (
+            uint256 _liquidityBnd1,
+            uint256 _liquidityBnd2,
+            uint256 _r1,
+            uint256 _r2
+        );
 
     function minLoan() external view returns (uint256);
 
