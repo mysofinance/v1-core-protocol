@@ -131,7 +131,8 @@ abstract contract BasePool is IBasePool {
         if (_loanTenor < 86400) revert InvalidLoanTenor();
         if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
-        if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0) revert InvalidLiquidityBnds();
+        if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
+            revert InvalidLiquidityBnds();
         if (_minLoan == 0) revert InvalidMinLoan();
         assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
@@ -541,8 +542,8 @@ abstract contract BasePool is IBasePool {
         // verify lp info and eligibility
         //length of loanIdxs array lp wants to claim
         uint256 lengthArr = _aggIdxs.length;
-        //checks if loanIds passed in are empty or if the sharesOverTime array is empty
-        //in which case, the Lp has no positions.
+        //checks if length loanIds passed in is less than 2 (hence does not make even one valid claim interval)
+        //OR if sharesOverTime array is empty.
         if (lpInfo.sharesOverTime.length == 0 || lengthArr < 2)
             revert NothingToClaim();
 
@@ -662,8 +663,9 @@ abstract contract BasePool is IBasePool {
         if (loan < minLoan) revert TooSmallLoan();
         uint256 postLiquidity = _totalLiquidity - loan;
         assert(postLiquidity >= MIN_LIQUIDITY);
-        uint256 avgRate = (getRate(_totalLiquidity) + getRate(postLiquidity))/2;
-        uint256 repayment = loan * (BASE + avgRate) / BASE;
+        uint256 avgRate = (getRate(_totalLiquidity) + getRate(postLiquidity)) /
+            2;
+        uint256 repayment = (loan * (BASE + avgRate)) / BASE;
         // return terms (as uint128)
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
@@ -1084,13 +1086,25 @@ abstract contract BasePool is IBasePool {
         if (_liquidity < liquidityBnd1) {
             rate = (r1 * liquidityBnd1) / _liquidity;
         } else if (_liquidity <= liquidityBnd2) {
-            rate = r2 + ((r1 - r2) * (liquidityBnd2 - _liquidity)) / (liquidityBnd2 - liquidityBnd1);
+            rate =
+                r2 +
+                ((r1 - r2) * (liquidityBnd2 - _liquidity)) /
+                (liquidityBnd2 - liquidityBnd1);
         } else {
             rate = r2;
         }
     }
 
-    function getRateParams() external view returns(uint256 _liquidityBnd1, uint256 _liquidityBnd2, uint256 _r1, uint256 _r2) {
+    function getRateParams()
+        external
+        view
+        returns (
+            uint256 _liquidityBnd1,
+            uint256 _liquidityBnd2,
+            uint256 _r1,
+            uint256 _r2
+        )
+    {
         _liquidityBnd1 = liquidityBnd1;
         _liquidityBnd2 = liquidityBnd2;
         _r1 = r1;
