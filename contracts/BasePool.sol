@@ -870,6 +870,7 @@ abstract contract BasePool is IBasePool {
             revert LoanIdxsWithChangingShares();
 
         // get applicable number of shares for pro-rata calculations (given current share pointer position)
+        // since zero shares were either incremented or reverted above this should be always non-zero
         _applicableShares = _lpInfo.sharesOverTime[currSharePtr];
     }
 
