@@ -62,6 +62,7 @@ interface IBasePool {
 
     enum ApprovalTypes {
         REPAY,
+        ROLLOVER,
         ADD_LIQUIDITY,
         REMOVE_LIQUIDITY,
         CLAIM
@@ -85,10 +86,10 @@ interface IBasePool {
 
     /**
      * @notice Function which removes shares from an LPs
-     * @dev This function will update loanIdxsWhereSharesChanged
-     * and shareOverTime arrays in lpInfo. If address on behalf
-     * of is not sender, then sender must have permission.
-     * @param _onBehalfOf Recipient of the transfer loan currency
+     * @dev This function will update loanIdxsWhereSharesChanged and
+     * shareOverTime arrays in lpInfo. If address on behalf of is not
+     * sender, then sender must have permission to remove on behalf of owner.
+     * @param _onBehalfOf Owner of the Lp shares
      * @param numSharesRemove Amount of LP shares to remove
      */
     function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
@@ -96,7 +97,7 @@ interface IBasePool {
 
     /**
      * @notice Function which allows borrowing from the pool
-     * @param _onBehalf Recipient of the loan currency
+     * @param _onBehalf Will become owner of the loan
      * @param _sendAmount Amount of collateral currency sent by borrower
      * @param _minLoan Minimum loan currency amount acceptable to borrower
      * @param _maxRepay Maximum allowable loan currency amount borrower is willing to repay
@@ -152,7 +153,7 @@ interface IBasePool {
      * of the last loan in the aggregation block. _loanIdxs must be increasing array.
      * If address on behalf of is not sender, then sender must have permission to claim.
      * As well if reinvestment ootion is chosen, sender must have permission to add liquidity
-     * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
+     * @param _onBehalfOf Lp address which is owner or has approved sender to claim on their behalf (and possibly reinvest)
      * @param _loanIdxs Loan indices on which LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
@@ -181,7 +182,7 @@ interface IBasePool {
      * indices are the end loan indexes of the intervals he wants to claim.
      * If address on behalf of is not sender, then sender must have permission to claim.
      * As well if reinvestment option is chosen, sender must have permission to add liquidity
-     * @param _onBehalfOf Recipient of the claimed currency (and possibly reinvestment)
+     * @param _onBehalfOf Lp address which is owner or has approved sender to claim on their behalf (and possibly reinvest)
      * @param _aggIdxs From index and end indices of the aggregation that LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
@@ -208,24 +209,26 @@ interface IBasePool {
     ) external view returns (uint256 repayments, uint256 collateral);
 
     /**
-     * @notice Function which toggles approval for another to perform a certain function on sender's behalf
-     * @param _recipient This address is being given approval for the action by the current sender
-     * @param _approvalType Type of action that is being approved
+     * @notice Function which sets approval for another to perform a certain function on sender's behalf
+     * @param _approvee This address is being given approval for the action(s) by the current sender
+     * @param _approvals Array of flags to set which actions are approved or not approved
      */
-    function toggleRepayAndLiquidityApproval(
-        address _recipient,
-        ApprovalTypes _approvalType
-    ) external;
+    function setApprovals(address _approvee, bool[5] calldata _approvals)
+        external;
 
     /**
-     * @notice Function which gets the number of shares at end of array for lpAddr (this will be amended to get other info)
+     * @notice Function which gets the shares over time and loan indices where shares changed
      * @param _lpAddr Address of LP for which the info is being gathered
-     * @return numShares Number of shares currently owned by the LP
+     * @return sharesOverTime array of number of shares Lp owned over time
+     * @return loanIdxsWhereSharesChanged array of loan indices where the Lp changed number of shares
      */
-    function getNumShares(address _lpAddr)
+    function getLpArrayInfo(address _lpAddr)
         external
         view
-        returns (uint256 numShares);
+        returns (
+            uint256[] memory sharesOverTime,
+            uint256[] memory loanIdxsWhereSharesChanged
+        );
 
     /**
      * @notice Function which calculates loan terms
@@ -274,8 +277,8 @@ interface IBasePool {
     function baseAggrBucketSize() external view returns (uint256);
 
     function isApproved(
-        address _borrower,
-        address _recipient,
+        address _ownerOrBenficiary,
+        address _sender,
         ApprovalTypes _approvalType
     ) external view returns (bool _approved);
 }

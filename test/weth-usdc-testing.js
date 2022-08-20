@@ -150,14 +150,14 @@ describe("WETH-USDC Pool Testing", function () {
     await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999)).to.be.reverted;
 
     //remove liquidity
-    let lp1NumSharesPre = await poolWethUsdc.getNumShares(lp1.address);
-    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre);
+    let lp1NumSharesPre = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre.sharesOverTime[0]);
 
     //cannot remove twice
     await expect(poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre)).to.be.reverted;
 
-    lp1NumSharesPost = await poolWethUsdc.getNumShares(lp1.address);
-    await expect(lp1NumSharesPost).to.be.equal(0);
+    lp1NumSharesPost = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    await expect(lp1NumSharesPost.sharesOverTime[1]).to.be.equal(0);
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
@@ -431,7 +431,7 @@ describe("WETH-USDC Pool Testing", function () {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+3001);
-        totalRepayments = totalRepayments.add(loanInfo[0]);
+        totalLeftColl = totalLeftColl.add(loanInfo[1]);
       } catch(error) {
         console.log(i, error)
       }
@@ -448,13 +448,13 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claimFromAggregated(lp3.address, [0, 1000, 2000, 3000, 4000, 5000], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await poolWethUsdc.getNumShares(lp1.address);
-    const lp2NumShares = await poolWethUsdc.getNumShares(lp2.address);
-    const lp3NumShares = await poolWethUsdc.getNumShares(lp3.address);
+    const lp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    const lp2NumShares = await poolWethUsdc.getLpArrayInfo(lp2.address);
+    const lp3NumShares = await poolWethUsdc.getLpArrayInfo(lp3.address);
 
-    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumShares);
-    await poolWethUsdc.connect(lp2).removeLiquidity(lp2.address, lp2NumShares);
-    await poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, lp3NumShares);
+    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
+    await poolWethUsdc.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
+    await poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await WETH.balanceOf(poolWethUsdc.address); //await ethers.provider.getBalance(poolWethUsdc.address);
     balTestToken = await USDC.balanceOf(poolWethUsdc.address);
@@ -505,13 +505,13 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await poolWethUsdc.getNumShares(lp1.address);
-    const lp2NumShares = await poolWethUsdc.getNumShares(lp2.address);
-    const lp3NumShares = await poolWethUsdc.getNumShares(lp3.address);
+    const lp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    const lp2NumShares = await poolWethUsdc.getLpArrayInfo(lp2.address);
+    const lp3NumShares = await poolWethUsdc.getLpArrayInfo(lp3.address);
 
-    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumShares);
-    await poolWethUsdc.connect(lp2).removeLiquidity(lp2.address, lp2NumShares);
-    await poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, lp3NumShares);
+    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
+    await poolWethUsdc.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
+    await poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await WETH.balanceOf(poolWethUsdc.address); //await ethers.provider.getBalance(poolWethUsdc.address);
     balTestToken = await USDC.balanceOf(poolWethUsdc.address);
@@ -643,5 +643,371 @@ describe("WETH-USDC Pool Testing", function () {
     console.log(loanInfo)
     console.log(totalLiquidity)
     console.log(totalLpShares)
+  })
+
+  it("Should track loan index and share changes over time", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp2).addLiquidity(lp2.address, ONE_USDC.mul(60000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp4).addLiquidity(lp4.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+
+    let lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000] loanIdxsWhereSharesChanged: []
+    * lp_2 : sharesOverTime: [60000000000000] loanIdxsWhereSharesChanged: []
+    * lp_3 : sharesOverTime: [40000000000000] loanIdxsWhereSharesChanged: []
+    * lp_4 : sharesOverTime: [100000000000000] loanIdxsWhereSharesChanged: []
+    **/
+
+    totalRepayments = ethers.BigNumber.from(0);
+    totalLeftColl = ethers.BigNumber.from(0);
+
+    for (let i = 0; i < 130; i++) {
+      try {
+        await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+        loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+1);
+        totalRepayments = totalRepayments.add(loanInfo[0]);
+        await poolWethUsdc.connect(borrower).repay(i+1, borrower.address, loanInfo.repayment);
+      } catch(error) {
+        console.log(i, error)
+      }
+    }
+
+    //update liquidity
+    const initialLp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    const initialLp2NumShares = await poolWethUsdc.getLpArrayInfo(lp2.address);
+    const initialLp3NumShares = await poolWethUsdc.getLpArrayInfo(lp3.address);
+    const initialLp4NumShares = await poolWethUsdc.getLpArrayInfo(lp4.address);
+
+    let totalLpShares = await poolWethUsdc.totalLpShares();
+    await expect(initialLp1NumShares.sharesOverTime[0]).to.be.equal(totalLpShares.div(3));
+    
+
+    await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, initialLp1NumShares.sharesOverTime[0]/2);
+    await poolWethUsdc.connect(lp2).removeLiquidity(lp2.address, initialLp2NumShares.sharesOverTime[0]);
+    await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+6000, 0);
+    await poolWethUsdc.connect(lp4).removeLiquidity(lp4.address, initialLp4NumShares.sharesOverTime[0]);
+
+    const secondLp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    const secondLp2NumShares = await poolWethUsdc.getLpArrayInfo(lp2.address);
+    const secondLp3NumShares = await poolWethUsdc.getLpArrayInfo(lp3.address);
+    const secondLp4NumShares = await poolWethUsdc.getLpArrayInfo(lp4.address);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * lp_2 : sharesOverTime: [60000000000000, 0] loanIdxsWhereSharesChanged: [131]
+    * lp_3 : sharesOverTime: [40000000000000, 80017333063860] loanIdxsWhereSharesChanged: [131]
+    * lp_4 : sharesOverTime: [100000000000000, 0] loanIdxsWhereSharesChanged: [131]
+    **/
+
+    await expect(secondLp1NumShares.sharesOverTime[1]).to.be.equal(secondLp1NumShares.sharesOverTime[0].div(2));
+    await expect(secondLp1NumShares.loanIdxsWhereSharesChanged[0]).to.be.equal(131);
+
+    for (let i = 0; i < 150; i++) {
+      try {
+        await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+        loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+131);
+        totalRepayments = totalRepayments.add(loanInfo[0]);
+        await poolWethUsdc.connect(borrower).repay(i+131, borrower.address, loanInfo.repayment);
+      } catch(error) {
+        console.log(i, error)
+      }
+    }
+
+    //lp2 and lp4 add back in
+    await poolWethUsdc.connect(lp2).addLiquidity(lp2.address, ONE_USDC.mul(50000000), timestamp+6000, 0);
+    await poolWethUsdc.connect(lp4).addLiquidity(lp4.address, ONE_USDC.mul(100000000), timestamp+6000, 0);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * lp_2 : sharesOverTime: [60000000000000, 0, 50079450445941] loanIdxsWhereSharesChanged: [131, 281]
+    * lp_3 : sharesOverTime: [40000000000000, 80025992304529] loanIdxsWhereSharesChanged: [131]
+    * lp_4 : sharesOverTime: [60000000000000, 0, 100158900891883] loanIdxsWhereSharesChanged: [131, 281]
+    **/
+
+    const thirdLp2NumShares = await poolWethUsdc.getLpArrayInfo(lp2.address);
+    const thirdLp4NumShares = await poolWethUsdc.getLpArrayInfo(lp4.address);
+    await expect(thirdLp2NumShares.sharesOverTime.length).to.be.equal(3);
+    await expect(thirdLp2NumShares.loanIdxsWhereSharesChanged.length).to.be.equal(2);
+    await expect(thirdLp2NumShares.sharesOverTime[1]).to.be.equal(0);
+    await expect(thirdLp2NumShares.loanIdxsWhereSharesChanged[0]).to.be.equal(131);
+    await expect(thirdLp2NumShares.loanIdxsWhereSharesChanged[1]).to.be.equal(281);
+
+    for (let i = 0; i < 100; i++) {
+      try {
+        await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+        loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+281);
+        totalLeftColl = totalLeftColl.add(loanInfo[1]);
+      } catch(error) {
+        console.log(i, error)
+      }
+    }
+
+    //move forward to loan expiry
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_mine");
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(0);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(1);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 1 , currSharePtr : 0
+    **/
+
+    await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 100], false, timestamp+9999999);
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(0);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(100);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 100 , currSharePtr : 0
+    **/
+
+    await expect(poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [100, 200], false, timestamp+9999999)).to.be.revertedWith("LoanIdxsWithChangingShares()");
+    await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [98, 101, 102], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx()");
+    await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [100, 103, 102], false, timestamp+9999999)).to.be.revertedWith("NonAscendingLoanIdxs()");
+
+    await poolWethUsdc.connect(lp1).claim(lp1.address, [100, 103, 104, 105, 108, 112, 120], false, timestamp+9999999);
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(0);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(121);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 121 , currSharePtr : 0
+    **/
+
+    await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [122, 125, 126, 129, 130, 131], false, timestamp+9999999)).to.be.revertedWith("LoanIdxsWithChangingShares()");
+    await poolWethUsdc.connect(lp1).claim(lp1.address, [122, 125, 126, 129, 130], false, timestamp+9999999);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 131 , currSharePtr : 1
+    **/
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(1);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(131);
+
+    await expect(poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [131, 200], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation()");
+    await poolWethUsdc.connect(lp1).claim(lp1.address, [131, 135, 160, 189, 190, 199], false, timestamp+9999999);
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(1);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(200);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 200 , currSharePtr : 1
+    **/
+
+    await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [200, 300], false, timestamp+9999999);
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(1);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(300);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 300 , currSharePtr : 1
+    **/
+
+    const currLoanIdx = await poolWethUsdc.loanIdx();
+
+    await expect(poolWethUsdc.connect(lp2).claim(lp1.address, [300, 310], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender()");
+    await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [300, 310, 330, 340, currLoanIdx], false, timestamp+9999999)).to.be.revertedWith("LoanIdxsWithChangingShares()");
+    
+    await poolWethUsdc.connect(lp1).claim(lp1.address, [300, 310, 330, 340, currLoanIdx - 1], false, timestamp+9999999);
+
+    /*
+    * global loanIdx = 381
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * fromIndex : 381 , currSharePtr : 1
+    **/
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    await expect(lp1Info.currSharePtr).to.be.equal(1);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(currLoanIdx);
+
+    await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(40000000), timestamp + 60*60*24*365 + 900, 0);
+
+    /*
+    * global loanIdx = 381
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000, 90077883500348] loanIdxsWhereSharesChanged: [131, 381]
+    * fromIndex : 381 , currSharePtr : 2
+    **/
+
+    lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    const thirdLp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    console.log(thirdLp1NumShares.sharesOverTime[2].toString())
+    await expect(thirdLp1NumShares.loanIdxsWhereSharesChanged[1]).to.be.equal(currLoanIdx)
+    await expect(lp1Info.currSharePtr).to.be.equal(2);
+    await expect(lp1Info.fromLoanIdx).to.be.equal(currLoanIdx);
+
+    //Now let lp2 go since he went down to 0
+
+    await poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999);
+
+    let lp2Info = await poolWethUsdc.addrToLpInfo(lp2.address);
+    await expect(lp2Info.currSharePtr).to.be.equal(0);
+    await expect(lp2Info.fromLoanIdx).to.be.equal(100);
+
+    await poolWethUsdc.connect(lp2).claim(lp2.address, [102, 122, 125, 126, 129, 130], false, timestamp+9999999);
+
+    lp2Info = await poolWethUsdc.addrToLpInfo(lp2.address);
+    await expect(lp2Info.currSharePtr).to.be.equal(1);
+    await expect(lp2Info.fromLoanIdx).to.be.equal(131);
+
+    /*
+    * lp_2 : sharesOverTime: [60000000000000, 0, 50079450445941] loanIdxsWhereSharesChanged: [131, 281]
+    * fromIndex : 131 , currSharePtr : 1
+    **/
+
+    //should not allow claiming at 0, since will try to pop share pointer forward
+    await expect(poolWethUsdc.connect(lp2).claim(lp2.address, [131, 140, 250], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx()");
+
+    //should be able to claim starting at the loan indices after the 0 position
+    await poolWethUsdc.connect(lp2).claim(lp2.address, [281, 290, currLoanIdx - 1], false, timestamp+9999999);
+    
+    lp2Info = await poolWethUsdc.addrToLpInfo(lp2.address);
+    await expect(lp2Info.currSharePtr).to.be.equal(2);
+    await expect(lp2Info.fromLoanIdx).to.be.equal(currLoanIdx);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
+    * lp_2 : sharesOverTime: [60000000000000, 0, 50079450445941] loanIdxsWhereSharesChanged: [131, 281]
+    * lp_3 : sharesOverTime: [40000000000000, 80025992304529] loanIdxsWhereSharesChanged: [131]
+    * lp_4 : sharesOverTime: [60000000000000, 0, 100158900891883, 0] loanIdxsWhereSharesChanged: [131, 281, 381]
+    **/
+
+
+    await poolWethUsdc.connect(lp4).removeLiquidity(lp4.address, thirdLp4NumShares.sharesOverTime[2]);
+
+    const fourthLp4NumShares = await poolWethUsdc.getLpArrayInfo(lp4.address);
+    let lp4Info = await poolWethUsdc.addrToLpInfo(lp4.address);
+    await expect(lp4Info.currSharePtr).to.be.equal(0);
+    await expect(lp4Info.fromLoanIdx).to.be.equal(1);
+    await expect(fourthLp4NumShares.sharesOverTime.length).to.be.equal(4);
+
+    //Now let lp4 go since he went down to 0 and then back up again and down
+
+    await expect(poolWethUsdc.connect(lp4).claim(lp4.address, [0, 130], false, timestamp+9999999)).to.be.revertedWith("InvalidLoanIdx()");
+
+    await poolWethUsdc.connect(lp4).claim(lp4.address, [1, 130], false, timestamp+9999999);
+    lp4Info = await poolWethUsdc.addrToLpInfo(lp4.address);
+    await expect(lp4Info.currSharePtr).to.be.equal(1);
+    await expect(lp4Info.fromLoanIdx).to.be.equal(131);
+
+    /*
+    * lp_4 : sharesOverTime: [60000000000000, 0, 100158900891883, 0] loanIdxsWhereSharesChanged: [131, 281, 381]
+    * fromIndex : 131 , currSharePtr : 1
+    **/
+
+    //should be able to claim starting at the loan indices after the 0 position and then should increment share pointer again
+    await poolWethUsdc.connect(lp4).claim(lp4.address, [281, 290, currLoanIdx - 1], false, timestamp+9999999);
+
+    lp4Info = await poolWethUsdc.addrToLpInfo(lp4.address);
+    await expect(lp4Info.currSharePtr).to.be.equal(3);
+    await expect(lp4Info.fromLoanIdx).to.be.equal(currLoanIdx);
+
+    for (let i = 0; i < 10; i++) {
+      try {
+        await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+        loanInfo = await poolWethUsdc.loanIdxToLoanInfo(currLoanIdx.add(i));
+        totalRepayments = totalRepayments.add(loanInfo[0]);
+        await poolWethUsdc.connect(borrower).repay(currLoanIdx.add(i), borrower.address, loanInfo.repayment);
+      } catch(error) {
+        console.log(i, error)
+      }
+    }
+
+    await expect(poolWethUsdc.connect(lp4).claim(lp4.address, [currLoanIdx, currLoanIdx + 1], false, timestamp+9999999)).to.be.revertedWith("ZeroShareClaim()");
+
+  })
+
+  it("Should allow or revert approvals correctly", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp2).addLiquidity(lp2.address, ONE_USDC.mul(60000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp4).addLiquidity(lp4.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+
+    /*
+    * lp_1 : sharesOverTime: [100000000000000] loanIdxsWhereSharesChanged: []
+    * lp_2 : sharesOverTime: [60000000000000] loanIdxsWhereSharesChanged: []
+    * lp_3 : sharesOverTime: [40000000000000] loanIdxsWhereSharesChanged: []
+    * lp_4 : sharesOverTime: [100000000000000] loanIdxsWhereSharesChanged: []
+    **/
+
+    //two more adds with no loans...should increment currSharePtr twice and loanIdxs push 1 twice
+    await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+
+    let lp1Info = await poolWethUsdc.addrToLpInfo(lp1.address);
+    const initialLp1NumShares = await poolWethUsdc.getLpArrayInfo(lp1.address);
+    await expect(initialLp1NumShares.sharesOverTime.length).to.be.equal(3);
+    await expect(initialLp1NumShares.loanIdxsWhereSharesChanged).to.be.eql([ethers.BigNumber.from(1), ethers.BigNumber.from(1)]);
+    await expect(lp1Info.currSharePtr).to.be.equal(2);
+
+    //revert if pass in your own address or address 0
+    await expect(poolWethUsdc.connect(lp2).setApprovals(lp2.address, [true, true, false, false, true])).to.be.revertedWith("InvalidApprovalAddress()");
+    await expect(poolWethUsdc.connect(lp2).setApprovals("0x0000000000000000000000000000000000000000", [true, true, false, false, true])).to.be.revertedWith("InvalidApprovalAddress()");
+    
+    /**
+     enum ApprovalTypes {
+        REPAY = 0,
+        ROLLOVER = 1,
+        ADD_LIQUIDITY = 2,
+        REMOVE_LIQUIDITY = 3,
+        CLAIM = 4
+    } */
+    await poolWethUsdc.connect(lp2).setApprovals(lp1.address, [false, false, true, true, true]);
+
+    for (let i = 0; i < 10; i++) {
+      try {
+        await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
+        loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+1);
+        await poolWethUsdc.connect(borrower).repay(i+1, borrower.address, loanInfo.repayment);
+      } catch(error) {
+        console.log(i, error)
+      }
+    }
+
+    await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
+    await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
+
+    const secondlp3NumShares = await poolWethUsdc.getLpArrayInfo(lp3.address);
+    let lp3Info = await poolWethUsdc.addrToLpInfo(lp3.address);
+    await expect(secondlp3NumShares.sharesOverTime.length).to.be.equal(4);
+    await expect(secondlp3NumShares.loanIdxsWhereSharesChanged).to.be.eql(
+      [ethers.BigNumber.from(11), ethers.BigNumber.from(11), ethers.BigNumber.from(11)]
+    )
+    await expect(lp3Info.currSharePtr).to.be.equal(0);
+
+    //from loan index 0 since never lp
+    await expect(poolWethUsdc.connect(lp5).overrideSharePointer(1)).to.be.revertedWith("MustBeLp()");
+    //from curr share pointer greater than or equal to 1
+    await expect(poolWethUsdc.connect(lp1).overrideSharePointer(1)).to.be.revertedWith("InvalidNewSharePointer()");
+    //new pointer not less than length of shares over time array
+    await expect(poolWethUsdc.connect(lp3).overrideSharePointer(4)).to.be.revertedWith("InvalidNewSharePointer()");
+
+    await poolWethUsdc.connect(lp3).claim(lp3.address, [1, 5, 9, 10], false, timestamp+9999999);
+    lp3Info = await poolWethUsdc.addrToLpInfo(lp3.address);
+    await expect(lp3Info.currSharePtr).to.be.equal(1);
+
+    await poolWethUsdc.connect(lp3).overrideSharePointer(3);
+    lp3Info = await poolWethUsdc.addrToLpInfo(lp3.address);
+    await expect(lp3Info.currSharePtr).to.be.equal(3);
+    
   })
 });

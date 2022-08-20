@@ -141,14 +141,20 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
 
     //remove liquidity
-    let lp1NumSharesPre = await paxgPool.getNumShares(lp1.address);
-    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre);
+    let lp1NumSharesPre = await paxgPool.getLpArrayInfo(lp1.address);
+    //check lengths of arrays for Lp
+    await expect(lp1NumSharesPre.sharesOverTime.length).to.be.equal(1);
+    await expect(lp1NumSharesPre.loanIdxsWhereSharesChanged.length).to.be.equal(0);
+
+    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre.sharesOverTime[0]);
     
     //cannot remove twice
     await expect(paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre)).to.be.reverted;
 
-    lp1NumSharesPost = await paxgPool.getNumShares(lp1.address);
-    await expect(lp1NumSharesPost).to.be.equal(0);
+    lp1NumSharesPost = await paxgPool.getLpArrayInfo(lp1.address);
+    await expect(lp1NumSharesPost.sharesOverTime.length).to.be.equal(2);
+    await expect(lp1NumSharesPost.loanIdxsWhereSharesChanged.length).to.be.equal(1);
+    await expect(lp1NumSharesPost.sharesOverTime[1]).to.be.equal(0);
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
@@ -436,13 +442,13 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100, 200], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await paxgPool.getNumShares(lp1.address);
-    const lp2NumShares = await paxgPool.getNumShares(lp2.address);
-    const lp3NumShares = await paxgPool.getNumShares(lp3.address);
+    const lp1NumShares = await paxgPool.getLpArrayInfo(lp1.address);
+    const lp2NumShares = await paxgPool.getLpArrayInfo(lp2.address);
+    const lp3NumShares = await paxgPool.getLpArrayInfo(lp3.address);
 
-    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares);
-    await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares);
-    await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares);
+    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
+    await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
+    await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await PAXG.balanceOf(paxgPool.address); //await ethers.provider.getBalance(paxgPool.address);
     balTestToken = await usdc.balanceOf(paxgPool.address);
@@ -493,13 +499,13 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await paxgPool.getNumShares(lp1.address);
-    const lp2NumShares = await paxgPool.getNumShares(lp2.address);
-    const lp3NumShares = await paxgPool.getNumShares(lp3.address);
+    const lp1NumShares = await paxgPool.getLpArrayInfo(lp1.address);
+    const lp2NumShares = await paxgPool.getLpArrayInfo(lp2.address);
+    const lp3NumShares = await paxgPool.getLpArrayInfo(lp3.address);
 
-    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares);
-    await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares);
-    await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares);
+    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
+    await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
+    await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await PAXG.balanceOf(paxgPool.address); //await ethers.provider.getBalance(paxgPool.address);
     balTestToken = await usdc.balanceOf(paxgPool.address);

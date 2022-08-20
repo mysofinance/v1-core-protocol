@@ -151,14 +151,14 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
 
     //remove liquidity
-    let lp1NumSharesPre = await poolWethDai.getNumShares(lp1.address);
-    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre);
+    let lp1NumSharesPre = await poolWethDai.getLpArrayInfo(lp1.address);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre.sharesOverTime[0]);
 
     //cannot remove twice
     await expect(poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre)).to.be.reverted;
 
-    lp1NumSharesPost = await poolWethDai.getNumShares(lp1.address);
-    await expect(lp1NumSharesPost).to.be.equal(0);
+    lp1NumSharesPost = await poolWethDai.getLpArrayInfo(lp1.address);
+    await expect(lp1NumSharesPost.sharesOverTime[1]).to.be.equal(0);
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
@@ -443,13 +443,13 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp2).claimFromAggregated(lp2.address, [0, 100,200], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await poolWethDai.getNumShares(lp1.address);
-    const lp2NumShares = await poolWethDai.getNumShares(lp2.address);
-    const lp3NumShares = await poolWethDai.getNumShares(lp3.address);
+    const lp1NumShares = await poolWethDai.getLpArrayInfo(lp1.address);
+    const lp2NumShares = await poolWethDai.getLpArrayInfo(lp2.address);
+    const lp3NumShares = await poolWethDai.getLpArrayInfo(lp3.address);
 
-    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumShares);
-    await poolWethDai.connect(lp2).removeLiquidity(lp2.address, lp2NumShares);
-    await poolWethDai.connect(lp3).removeLiquidity(lp3.address, lp3NumShares);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
+    await poolWethDai.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
+    await poolWethDai.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await WETH.balanceOf(poolWethDai.address); //await ethers.provider.getBalance(poolWethDai.address);
     balTestToken = await DAI.balanceOf(poolWethDai.address);
@@ -500,13 +500,13 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await poolWethDai.getNumShares(lp1.address);
-    const lp2NumShares = await poolWethDai.getNumShares(lp2.address);
-    const lp3NumShares = await poolWethDai.getNumShares(lp3.address);
+    const lp1NumShares = await poolWethDai.getLpArrayInfo(lp1.address);
+    const lp2NumShares = await poolWethDai.getLpArrayInfo(lp2.address);
+    const lp3NumShares = await poolWethDai.getLpArrayInfo(lp3.address);
 
-    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumShares);
-    await poolWethDai.connect(lp2).removeLiquidity(lp2.address, lp2NumShares);
-    await poolWethDai.connect(lp3).removeLiquidity(lp3.address, lp3NumShares);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
+    await poolWethDai.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
+    await poolWethDai.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
 
     balEth = await WETH.balanceOf(poolWethDai.address); //await ethers.provider.getBalance(poolWethDai.address);
     balTestToken = await DAI.balanceOf(poolWethDai.address);
