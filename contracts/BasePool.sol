@@ -65,10 +65,10 @@ abstract contract BasePool is IBasePool {
     uint128 public totalLpShares;
     uint256 totalLiquidity;
     uint256 public loanIdx;
-    uint256 public r1;
-    uint256 public r2;
-    uint256 public liquidityBnd1;
-    uint256 public liquidityBnd2;
+    uint256 r1;
+    uint256 r2;
+    uint256 liquidityBnd1;
+    uint256 liquidityBnd2;
     uint256 public minLoan;
 
     //must be a multiple of 100
@@ -1069,10 +1069,17 @@ abstract contract BasePool is IBasePool {
         if (_liquidity < liquidityBnd1) {
             rate = (r1 * liquidityBnd1) / _liquidity;
         } else if (_liquidity <= liquidityBnd2) {
-            rate = ((r1 - r2) * (liquidityBnd2 - _liquidity)) / (liquidityBnd2 - liquidityBnd1) + r2;
+            rate = r2 + ((r1 - r2) * (liquidityBnd2 - _liquidity)) / (liquidityBnd2 - liquidityBnd1);
         } else {
             rate = r2;
         }
+    }
+
+    function getRateParams() external view returns(uint256 _liquidityBnd1, uint256 _liquidityBnd2, uint256 _r1, uint256 _r2) {
+        _liquidityBnd1 = liquidityBnd1;
+        _liquidityBnd2 = liquidityBnd2;
+        _r1 = r1;
+        _r2 = r2;
     }
 
     function getCollCcyTransferFee(uint128 _transferAmount)
