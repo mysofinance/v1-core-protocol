@@ -81,7 +81,7 @@ abstract contract BasePool is IBasePool {
     mapping(address => mapping(address => mapping(IBasePool.ApprovalTypes => bool)))
         public isApproved;
 
-    mapping(uint256 => AggClaimsInfo) public collAndRepayTotalBaseAgg1;
+    mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg1;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg2;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg3;
 
@@ -232,7 +232,7 @@ abstract contract BasePool is IBasePool {
         totalLiquidity = _totalLiquidity - liquidityRemoved;
 
         //update lp arrays and check for auto increment
-        pushBothLpArrays(lpInfo, numShares, false);
+        adjustLpArrays(lpInfo, numShares, false);
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
@@ -839,7 +839,9 @@ abstract contract BasePool is IBasePool {
             _lpInfo.fromLoanIdx = uint32(
                 _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
             );
-            currSharePtr = ++_lpInfo.currSharePtr;
+            unchecked {
+                currSharePtr = ++_lpInfo.currSharePtr;
+            }
         }
 
         /*
@@ -955,40 +957,82 @@ abstract contract BasePool is IBasePool {
             lpInfo.sharesOverTime.push(newLpShares);
         } else {
             //update both lp arrays and check for auto increment
-            pushBothLpArrays(lpInfo, newLpShares, true);
+            adjustLpArrays(lpInfo, newLpShares, true);
         }
         earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
         lpInfo.earliestRemove = earliestRemove;
     }
 
-    function pushBothLpArrays(
+    function adjustLpArrays(
         LpInfo storage _lpInfo,
         uint256 _newLpShares,
         bool _add
     ) internal {
         uint256 _loanIdx = loanIdx;
-        uint256 _sharesLen = _lpInfo.sharesOverTime.length;
-        uint256 _loanIdxsLen = _sharesLen - 1;
-        uint256 currShares = _lpInfo.sharesOverTime[_sharesLen - 1];
+        uint256 _originalSharesLen = _lpInfo.sharesOverTime.length;
+        uint256 _originalLoanIdxsLen = _originalSharesLen - 1;
+        uint256 currShares = _lpInfo.sharesOverTime[_originalSharesLen - 1];
         uint256 newShares = _add
             ? currShares + _newLpShares
             : currShares - _newLpShares;
-        // if lp has claimed all possible loans that were taken out (fromLoanIdx = loanIdx) OR
-        // loanIdxsWhereSharesUnchanged array is nonzero length and last entry is equal to _loanIdx
-        // then you just overwrite the last entry of the sharesOverTime array
-        // should short-circuit if loanIdxsWhereSharesChanged is empty
-        if (
-            _lpInfo.fromLoanIdx == _loanIdx ||
-            (_loanIdxsLen > 0 &&
-                _lpInfo.loanIdxsWhereSharesChanged[_loanIdxsLen - 1] ==
-                _loanIdx)
-        ) {
-            _lpInfo.sharesOverTime[_sharesLen - 1] = newShares;
+        bool loanCheck = (_originalLoanIdxsLen > 0 &&
+            _lpInfo.loanIdxsWhereSharesChanged[_originalLoanIdxsLen - 1] ==
+            _loanIdx);
+        // if lp has claimed all possible loans that were taken out (fromLoanIdx = loanIdx)
+        if (_lpInfo.fromLoanIdx == _loanIdx) {
+            /**
+                if shares length has one value, OR
+                if loanIdxsWhereSharesChanged array is non empty
+                and the last value of the array is equal to current loanId
+                then we go ahead and overwrite the lastShares array.
+                We do not have to worry about popping array in second case
+                because since fromLoanIdx == loanIdx, we know currSharePtr is
+                already at end of the array, and therefore can never get stuck
+            */
+            if (_originalSharesLen == 1 || loanCheck) {
+                _lpInfo.sharesOverTime[_originalSharesLen - 1] = newShares;
+            }
+            /**
+            if loanIdxsWhereSharesChanged array is non empty
+            and the last value of the array is NOT equal to current loanId
+            then we go ahead and push a new value onto both arrays and increment currSharePtr
+            we can safely increment share pointer because we know if fromLoanIdx is == loanIdx
+            then currSharePtr has to already be length of original shares over time array - 1 and
+            we want to keep it at end of the array 
+            */
+            else {
+                pushLpArrays(_lpInfo, newShares, _loanIdx);
+                unchecked {
+                    _lpInfo.currSharePtr++;
+                }
+            }
+        }
+        /**
+            fromLoanIdx is NOT equal to loanIdx in this case, but
+            loanIdxsWhereSharesChanged array is non empty
+            and the last value of the array is equal to current loanId.        
+        */
+        else if (loanCheck) {
+            /**
+                Additionally, the value in the shares array before the last array
+                In this case we are going to pop off the last values.
+                Since we know that if currSharePtr was at end of array and loan id is still equal to last value
+                on the loanIdxsWhereSharesUnchanged array, this would have meant that fromLoanIdx == loanIdx
+                and hence, no need to check if currSharePtr needs to decrement
+            */
+            if (_lpInfo.sharesOverTime[_originalSharesLen - 2] == newShares) {
+                _lpInfo.sharesOverTime.pop();
+                _lpInfo.loanIdxsWhereSharesChanged.pop();
+            }
+            //if next to last shares over time value is not same as newShares,
+            //then just overwrite last share value
+            else {
+                _lpInfo.sharesOverTime[_originalSharesLen - 1] = newShares;
+            }
         } else {
             // if the previous conditions are not met then push newShares onto shares over time array
             // and push global loan index onto loanIdxsWhereSharesChanged
-            _lpInfo.sharesOverTime.push(newShares);
-            _lpInfo.loanIdxsWhereSharesChanged.push(_loanIdx);
+            pushLpArrays(_lpInfo, newShares, _loanIdx);
         }
     }
 
@@ -1109,6 +1153,15 @@ abstract contract BasePool is IBasePool {
         _liquidityBnd2 = liquidityBnd2;
         _r1 = r1;
         _r2 = r2;
+    }
+
+    function pushLpArrays(
+        LpInfo storage _lpInfo,
+        uint256 _newShares,
+        uint256 _loanIdx
+    ) internal {
+        _lpInfo.sharesOverTime.push(_newShares);
+        _lpInfo.loanIdxsWhereSharesChanged.push(_loanIdx);
     }
 
     function getCollCcyTransferFee(uint128 _transferAmount)
