@@ -15,7 +15,7 @@ abstract contract BasePool is IBasePool {
     error InvalidLoanTenor();
     error InvalidMaxLoanPerColl();
     error InvalidRateParams();
-    error InvalidTvlParams();
+    error InvalidLiquidityBnds();
     error InvalidMinLoan();
     error PastDeadline();
     error InvalidAddAmount();
@@ -65,10 +65,10 @@ abstract contract BasePool is IBasePool {
     uint128 public totalLpShares;
     uint256 totalLiquidity;
     uint256 public loanIdx;
-    uint256 public r1;
-    uint256 public r2;
-    uint256 public tvl1;
-    uint256 public tvl2;
+    uint256 r1;
+    uint256 r2;
+    uint256 liquidityBnd1;
+    uint256 liquidityBnd2;
     uint256 public minLoan;
 
     //must be a multiple of 100
@@ -118,8 +118,8 @@ abstract contract BasePool is IBasePool {
         uint128 _maxLoanPerColl,
         uint256 _r1,
         uint256 _r2,
-        uint256 _tvl1,
-        uint256 _tvl2,
+        uint256 _liquidityBnd1,
+        uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
         uint128 _protocolFee
@@ -131,7 +131,7 @@ abstract contract BasePool is IBasePool {
         if (_loanTenor < 86400) revert InvalidLoanTenor();
         if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
-        if (_tvl2 <= _tvl1 || _tvl1 == 0) revert InvalidTvlParams();
+        if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0) revert InvalidLiquidityBnds();
         if (_minLoan == 0) revert InvalidMinLoan();
         assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
@@ -143,8 +143,8 @@ abstract contract BasePool is IBasePool {
         maxLoanPerColl = _maxLoanPerColl;
         r1 = _r1;
         r2 = _r2;
-        tvl1 = _tvl1;
-        tvl2 = _tvl2;
+        liquidityBnd1 = _liquidityBnd1;
+        liquidityBnd2 = _liquidityBnd2;
         minLoan = _minLoan;
         loanIdx = 1;
         COLL_TOKEN_DECIMALS = IERC20Metadata(_collCcyToken).decimals();
@@ -157,8 +157,8 @@ abstract contract BasePool is IBasePool {
             _maxLoanPerColl,
             _r1,
             _r2,
-            _tvl1,
-            _tvl2,
+            _liquidityBnd1,
+            _liquidityBnd2,
             _minLoan
         );
     }
@@ -662,15 +662,8 @@ abstract contract BasePool is IBasePool {
         if (loan < minLoan) revert TooSmallLoan();
         uint256 postLiquidity = _totalLiquidity - loan;
         assert(postLiquidity >= MIN_LIQUIDITY);
-        uint256 rate;
-        if (postLiquidity < tvl1) {
-            rate = (r1 * tvl1) / postLiquidity;
-        } else if (postLiquidity < tvl2) {
-            rate = ((r1 - r2) * (tvl2 - postLiquidity)) / (tvl2 - tvl1) + r2;
-        } else {
-            rate = r2;
-        }
-        uint256 repayment = (loan * (BASE + rate)) / BASE;
+        uint256 avgRate = (getRate(_totalLiquidity) + getRate(postLiquidity))/2;
+        uint256 repayment = loan * (BASE + avgRate) / BASE;
         // return terms (as uint128)
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
@@ -1070,6 +1063,23 @@ abstract contract BasePool is IBasePool {
         // return claims
         repayments = (repayments * _shares) / BASE;
         collateral = (collateral * _shares) / BASE;
+    }
+
+    function getRate(uint256 _liquidity) internal view returns (uint256 rate) {
+        if (_liquidity < liquidityBnd1) {
+            rate = (r1 * liquidityBnd1) / _liquidity;
+        } else if (_liquidity <= liquidityBnd2) {
+            rate = r2 + ((r1 - r2) * (liquidityBnd2 - _liquidity)) / (liquidityBnd2 - liquidityBnd1);
+        } else {
+            rate = r2;
+        }
+    }
+
+    function getRateParams() external view returns(uint256 _liquidityBnd1, uint256 _liquidityBnd2, uint256 _r1, uint256 _r2) {
+        _liquidityBnd1 = liquidityBnd1;
+        _liquidityBnd2 = liquidityBnd2;
+        _r1 = r1;
+        _r2 = r2;
     }
 
     function getCollCcyTransferFee(uint128 _transferAmount)
