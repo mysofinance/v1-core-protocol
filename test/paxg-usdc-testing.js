@@ -725,9 +725,37 @@ describe("PAXG-USDC Pool Testing", function () {
     postBal = await USDC.balanceOf(lp2.address);
     await expect(postBal.sub(preBal)).to.be.equal(ONE_USDC.mul(10000).sub(MIN_LIQUIDITY));
   })
-
+  
   it("Should allow repaying on behalf", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
 
+    loanTerms = await paxgPool.loanTerms(ONE_PAXG);
+    minLoanLimit = loanTerms[0].mul(98).div(100);
+    maxRepayLimit = loanTerms[1].mul(102).div(100);
+
+    // borrow
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+
+    // get loan info
+    loanInfo = await paxgPool.loanIdxToLoanInfo(1);
+
+    // check that lp is not entitled to repay
+    await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWith("UnapprovedSender");
+
+    // should still fail with wrong approval
+    await paxgPool.connect(borrower).setApprovals(lp1.address, [false, true, true, true, true]);
+    await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWith("UnapprovedSender");
+
+    // check that lp can repay
+    await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, false, false, false]);
+    preBal = await PAXG.balanceOf(lp1.address); 
+    await paxgPool.connect(lp1).repay(1, lp1.address, loanInfo.repayment);
+    postBal = await PAXG.balanceOf(lp1.address);
+    transferFee = await PAXG.getFeeFor(loanInfo.collateral);
+    postFeeReclaimable = (loanInfo.collateral).sub(transferFee);
+    await expect(postBal.sub(preBal)).to.be.equal(postFeeReclaimable);
   })
 
   it("Should allow rolling over on behalf", async function () {
