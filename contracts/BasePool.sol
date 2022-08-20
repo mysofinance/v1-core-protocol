@@ -988,7 +988,7 @@ abstract contract BasePool is IBasePool {
                 _lpInfo.loanIdxsWhereSharesChanged[_loanIdxsLen - 1] ==
                 _loanIdx)
         ) {
-            _lpInfo.sharesOverTime[_sharesLen - 1] = currShares;
+            _lpInfo.sharesOverTime[_sharesLen - 1] = newShares;
         } else {
             // if the previous conditions are not met then push newShares onto shares over time array
             // and push global loan index onto loanIdxsWhereSharesChanged
