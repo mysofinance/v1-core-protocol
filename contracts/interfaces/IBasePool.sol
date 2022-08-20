@@ -10,8 +10,8 @@ interface IBasePool {
         uint128 maxLoanPerColl,
         uint256 r1,
         uint256 r2,
-        uint256 tvl1,
-        uint256 tvl2,
+        uint256 liquidityBnd1,
+        uint256 liquidityBnd2,
         uint256 minLoan
     );
     event AddLiquidity(
@@ -266,9 +266,9 @@ interface IBasePool {
 
     function r2() external view returns (uint256);
 
-    function tvl1() external view returns (uint256);
+    function liquidityBnd1() external view returns (uint256);
 
-    function tvl2() external view returns (uint256);
+    function liquidityBnd2() external view returns (uint256);
 
     function minLoan() external view returns (uint256);
 
