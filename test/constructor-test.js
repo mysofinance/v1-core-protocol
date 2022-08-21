@@ -1,0 +1,40 @@
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("Constructor Testing", function () {
+
+  const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
+  const ONE_USDC = ethers.BigNumber.from("1000000");
+  const ONE_ETH = MONE;
+  const _loanCcyToken = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; 
+  const _collCcyToken = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const _loanTenor = 86400;
+  const _maxLoanPerColl = ONE_USDC.mul(1000);
+  const _r1 = MONE.mul(2).div(10)
+  const _r2 = MONE.mul(2).div(100)
+  const _liquidityBnd1 = ONE_USDC.mul(100000);
+  const _liquidityBnd2 = ONE_USDC.mul(1000000);
+  const _minLoan = ONE_USDC.mul(100);
+
+  it("Should test revert conditions in the constructor", async function () {
+    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
+
+    // deploy pool
+    ConstructorTest = await ethers.getContractFactory("ConstructorTest");
+    ConstructorTest = await ConstructorTest.connect(deployer);
+    constructorTest = await ConstructorTest.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
+    await constructorTest.deployed();
+
+    //test constructor reverts
+    await expect(ConstructorTest.deploy(ZERO_ADDRESS, _collCcyToken, 800, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("LoanCcyCannotBeZeroAddress()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, ZERO_ADDRESS, 800, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("CollCcyCannotBeZeroAddress()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, _loanCcyToken, 800, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("CollAndLoanCcyCannotBeEqual()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, _collCcyToken, 800, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidLoanTenor()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, _collCcyToken, _loanTenor, 0, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidMaxLoanPerColl()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, 0, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidRateParams()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, 0, 100, 0)).to.be.revertedWith("InvalidMinLoan()");
+    await expect(ConstructorTest.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 150, 0)).to.be.reverted;
+    await expect(ConstructorTest.deploy(_loanCcyToken, _collCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, ONE_ETH)).to.be.revertedWith("ProtocolFeeTooHigh()");
+  })
+})

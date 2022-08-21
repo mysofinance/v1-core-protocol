@@ -3,8 +3,7 @@ node_modules
 coverage
 coverage.json
 typechain
-contract-venv
-orderBook
+orderbook-venv
 
 #Hardhat files
 cache

@@ -61,14 +61,6 @@ describe("WETH-USDC Pool Testing", function () {
     poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
     await poolWethUsdc.deployed();
 
-    //test constructor reverts
-    await expect(PoolWethUsdc.deploy(800, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidLoanTenor()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, 0, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidMaxLoanPerColl()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, 0, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidRateParams()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, 0, 100, 0)).to.be.revertedWith("InvalidMinLoan()");
-    //await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidBaseAggrBucketSize()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, ONE_ETH)).to.be.revertedWith("ProtocolFeeTooHigh()");
-
     // approve DAI and WETH balances
     USDC.connect(lp1).approve(poolWethUsdc.address, MAX_UINT128);
     USDC.connect(lp2).approve(poolWethUsdc.address, MAX_UINT128);
