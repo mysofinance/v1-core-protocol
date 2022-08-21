@@ -232,8 +232,7 @@ abstract contract BasePool is IBasePool {
         totalLiquidity = _totalLiquidity - liquidityRemoved;
 
         // update lp arrays and check for auto increment
-        adjustLpArrays(lpInfo, numShares, false);
-
+        updateLpArrays(lpInfo, numShares, false);
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
@@ -833,10 +832,10 @@ abstract contract BasePool is IBasePool {
          * this is why the fromLoanIdx needs to be updated before the current share pointer increments
          **/
         uint256 currSharePtr = _lpInfo.currSharePtr;
-        if (
-            _lpInfo.sharesOverTime[currSharePtr] == 0 &&
-            currSharePtr < _lpInfo.sharesOverTime.length - 1
-        ) {
+        if (_lpInfo.sharesOverTime[currSharePtr] == 0) {
+            //if share ptr at end of shares over time array, then LP still has 0 shares and should revert right away
+            if (currSharePtr == _lpInfo.sharesOverTime.length - 1)
+                revert ZeroShareClaim();
             _lpInfo.fromLoanIdx = uint32(
                 _lpInfo.loanIdxsWhereSharesChanged[currSharePtr]
             );
@@ -870,8 +869,6 @@ abstract contract BasePool is IBasePool {
 
         // get applicable number of shares for pro-rata calculations (given current share pointer position)
         _applicableShares = _lpInfo.sharesOverTime[currSharePtr];
-        // check if shares are 0
-        if (_applicableShares == 0) revert ZeroShareClaim();
     }
 
     /**
@@ -958,13 +955,13 @@ abstract contract BasePool is IBasePool {
             lpInfo.sharesOverTime.push(newLpShares);
         } else {
             //update both lp arrays and check for auto increment
-            adjustLpArrays(lpInfo, newLpShares, true);
+            updateLpArrays(lpInfo, newLpShares, true);
         }
         earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
         lpInfo.earliestRemove = earliestRemove;
     }
 
-    function adjustLpArrays(
+    function updateLpArrays(
         LpInfo storage _lpInfo,
         uint256 _newLpShares,
         bool _add
