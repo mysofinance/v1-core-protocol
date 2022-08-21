@@ -13,8 +13,8 @@ describe("WETH-DAI Pool Testing", function () {
   const _maxLoanPerColl = ONE_DAI.mul(500);
   const _r1 = MONE.mul(2).div(10)
   const _r2 = MONE.mul(2).div(100)
-  const _tvl1 = ONE_DAI.mul(100000);
-  const _tvl2 = ONE_DAI.mul(1000000);
+  const _liquidityBnd1 = ONE_DAI.mul(100000);
+  const _liquidityBnd2 = ONE_DAI.mul(1000000);
   const _minLoan = ONE_DAI.mul(300);
   const MIN_LIQUIDITY = ethers.BigNumber.from("100000000"); //100*10**6
   const DAI_HOLDER = "0x6c6bc977e13df9b0de53b251522280bb72383700";
@@ -54,7 +54,7 @@ describe("WETH-DAI Pool Testing", function () {
     // deploy pool
     PoolWethDai = await ethers.getContractFactory("PoolWethDai");
     PoolWethDai = await PoolWethDai.connect(deployer);
-    poolWethDai = await PoolWethDai.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
+    poolWethDai = await PoolWethDai.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
     await poolWethDai.deployed();
 
     // approve DAI and WETH balances

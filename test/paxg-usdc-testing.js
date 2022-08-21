@@ -12,8 +12,8 @@ describe("PAXG-USDC Pool Testing", function () {
   const _maxLoanPerColl = ONE_USDC.mul(1000);
   const _r1 = MONE.mul(2).div(10)
   const _r2 = MONE.mul(2).div(100)
-  const _tvl1 = ONE_USDC.mul(100000);
-  const _tvl2 = ONE_USDC.mul(1000000);
+  const _liquidityBnd1 = ONE_USDC.mul(100000);
+  const _liquidityBnd2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(300);
   const MIN_LIQUIDITY = ONE_USDC.mul(100);
   const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
@@ -69,7 +69,7 @@ describe("PAXG-USDC Pool Testing", function () {
     PoolPaxg = await ethers.getContractFactory("PoolPaxgUsdc");
     PoolPaxg = await PoolPaxg.connect(deployer);
 
-    paxgPool = await PoolPaxg.deploy(_loanCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
+    paxgPool = await PoolPaxg.deploy(_loanCcyToken, _loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
     await paxgPool.deployed();
 
     // set allowances

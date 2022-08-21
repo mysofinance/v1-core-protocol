@@ -4,6 +4,7 @@ coverage
 coverage.json
 typechain
 contract-venv
+orderBook
 
 #Hardhat files
 cache

@@ -13,10 +13,10 @@ contract PoolWethDai is BasePool {
         uint128 _maxLoanPerColl,
         uint256 _r1,
         uint256 _r2,
-        uint256 _tvl1,
-        uint256 _tvl2,
+        uint256 _liquidityBnd1,
+        uint256 _liquidityBnd2,
         uint256 _minLoan,
-        uint256 _firstLengthPerClaimInterval,
+        uint256 _baseAggrBucketSize,
         uint128 _protocolFee
     )
         BasePool(
@@ -26,10 +26,10 @@ contract PoolWethDai is BasePool {
             _maxLoanPerColl,
             _r1,
             _r2,
-            _tvl1,
-            _tvl2,
+            _liquidityBnd1,
+            _liquidityBnd2,
             _minLoan,
-            _firstLengthPerClaimInterval,
+            _baseAggrBucketSize,
             _protocolFee
         )
     {}
