@@ -71,7 +71,7 @@ abstract contract BasePool is IBasePool {
     uint256 liquidityBnd2;
     uint256 public minLoan;
 
-    //must be a multiple of 100
+    // must be a multiple of 100
     uint256 public immutable baseAggrBucketSize;
 
     mapping(address => LpInfo) public addrToLpInfo;
@@ -231,8 +231,9 @@ abstract contract BasePool is IBasePool {
         totalLpShares -= uint128(numShares);
         totalLiquidity = _totalLiquidity - liquidityRemoved;
 
-        //update lp arrays and check for auto increment
+        // update lp arrays and check for auto increment
         adjustLpArrays(lpInfo, numShares, false);
+
 
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
@@ -353,7 +354,7 @@ abstract contract BasePool is IBasePool {
             loanInfo.repayment = repaymentAmountAfterFees;
         }
         uint128 _collateral = loanInfo.collateral;
-        //update the aggregation mappings
+        // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             _collateral,
@@ -471,7 +472,7 @@ abstract contract BasePool is IBasePool {
 
         // verify lp info and eligibility
         uint256 loanIdxsLen = _loanIdxs.length;
-        //length of sharesOverTime array for LP
+        // length of sharesOverTime array for LP
         uint256 sharesOverTimeLen = lpInfo.sharesOverTime.length;
         if (loanIdxsLen * sharesOverTimeLen == 0) revert NothingToClaim();
         if (_loanIdxs[0] == 0) revert InvalidLoanIdx();
@@ -540,10 +541,10 @@ abstract contract BasePool is IBasePool {
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
         // verify lp info and eligibility
-        //length of loanIdxs array lp wants to claim
+        // length of loanIdxs array lp wants to claim
         uint256 lengthArr = _aggIdxs.length;
-        //checks if length loanIds passed in is less than 2 (hence does not make even one valid claim interval)
-        //OR if sharesOverTime array is empty.
+        // checks if length loanIds passed in is less than 2 (hence does not make even one valid claim interval)
+        // OR if sharesOverTime array is empty.
         if (lpInfo.sharesOverTime.length == 0 || lengthArr < 2)
             revert NothingToClaim();
 
@@ -683,39 +684,39 @@ abstract contract BasePool is IBasePool {
     ) public view returns (uint256 repayments, uint256 collateral) {
         uint256 fromToDiff = _toLoanIdx - _fromLoanIdx;
         uint256 _baseAggrBucketSize = baseAggrBucketSize;
-        // check that the difference in the from and to indices
-        // span one of allowable intervals and that _toLoanIdx is
-        // also the correct modulus for that difference
-        if (
-            !((_toLoanIdx % _baseAggrBucketSize == 0 &&
-                fromToDiff == _baseAggrBucketSize) ||
-                (_toLoanIdx % (10 * _baseAggrBucketSize) == 0 &&
-                    fromToDiff == _baseAggrBucketSize * 10) ||
-                (_toLoanIdx % (100 * _baseAggrBucketSize) == 0 &&
-                    fromToDiff == _baseAggrBucketSize * 100))
-        ) revert InvalidSubAggregation();
-        //expiry check to make sure last loan in aggregation (one prior to _toLoanIdx for bucket) was taken out and expired
+        // expiry check to make sure last loan in aggregation (one prior to _toLoanIdx for bucket) was taken out and expired
         uint32 expiryCheck = loanIdxToLoanInfo[_toLoanIdx - 1].expiry;
         if (expiryCheck == 0 || expiryCheck + 1 > block.timestamp) {
             revert InvalidSubAggregation();
         }
         AggClaimsInfo memory aggClaimsInfo;
-        //find which bucket to which the current aggregation belongs and get aggClaimsInfo
-        if (fromToDiff == _baseAggrBucketSize) {
+        // find which bucket to which the current aggregation belongs and get aggClaimsInfo
+        if (
+            _toLoanIdx % _baseAggrBucketSize == 0 &&
+            fromToDiff == _baseAggrBucketSize
+        ) {
             aggClaimsInfo = collAndRepayTotalBaseAgg1[
                 _fromLoanIdx / _baseAggrBucketSize + 1
             ];
-        } else if (fromToDiff == _baseAggrBucketSize * 10) {
+        } else if (
+            _toLoanIdx % (10 * _baseAggrBucketSize) == 0 &&
+            fromToDiff == _baseAggrBucketSize * 10
+        ) {
             aggClaimsInfo = collAndRepayTotalBaseAgg2[
                 (_fromLoanIdx / (_baseAggrBucketSize * 10)) + 1
             ];
-        } else {
+        } else if (
+            _toLoanIdx % (100 * _baseAggrBucketSize) == 0 &&
+            fromToDiff == _baseAggrBucketSize * 100
+        ) {
             aggClaimsInfo = collAndRepayTotalBaseAgg3[
                 (_fromLoanIdx / (_baseAggrBucketSize * 100)) + 1
             ];
+        } else {
+            revert InvalidSubAggregation();
         }
 
-        //return repayment and collateral amounts
+        // return repayment and collateral amounts
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
