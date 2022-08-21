@@ -1012,7 +1012,7 @@ abstract contract BasePool is IBasePool {
         */
         else if (loanCheck) {
             /**
-                Additionally, the value in the shares array before the last array
+                The value in the shares array before the last array
                 In this case we are going to pop off the last values.
                 Since we know that if currSharePtr was at end of array and loan id is still equal to last value
                 on the loanIdxsWhereSharesUnchanged array, this would have meant that fromLoanIdx == loanIdx

@@ -12,8 +12,8 @@ describe("WETH-USDC Pool Testing", function () {
   const _maxLoanPerColl = ONE_USDC.mul(1000);
   const _r1 = MONE.mul(2).div(10)
   const _r2 = MONE.mul(2).div(100)
-  const _tvl1 = ONE_USDC.mul(100000);
-  const _tvl2 = ONE_USDC.mul(1000000);
+  const _liquidityBnd1 = ONE_USDC.mul(100000);
+  const _liquidityBnd2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(100);
   const MIN_LIQUIDITY = ONE_USDC.mul(100);
   const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
@@ -58,16 +58,16 @@ describe("WETH-USDC Pool Testing", function () {
     // deploy pool
     PoolWethUsdc = await ethers.getContractFactory("PoolWethUsdc");
     PoolWethUsdc = await PoolWethUsdc.connect(deployer);
-    poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
+    poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
     await poolWethUsdc.deployed();
 
     //test constructor reverts
-    await expect(PoolWethUsdc.deploy(800, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidLoanTenor()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, 0, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidMaxLoanPerColl()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, 0, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidRateParams()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, 0, 100, 0)).to.be.revertedWith("InvalidMinLoan()");
-    //await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidBaseAggrBucketSize()");
-    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, ONE_ETH)).to.be.revertedWith("ProtocolFeeTooHigh()");
+    await expect(PoolWethUsdc.deploy(800, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidLoanTenor()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, 0, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidMaxLoanPerColl()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, 0, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidRateParams()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, 0, 100, 0)).to.be.revertedWith("InvalidMinLoan()");
+    //await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0)).to.be.revertedWith("InvalidBaseAggrBucketSize()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, ONE_ETH)).to.be.revertedWith("ProtocolFeeTooHigh()");
 
     // approve DAI and WETH balances
     USDC.connect(lp1).approve(poolWethUsdc.address, MAX_UINT128);
@@ -954,6 +954,9 @@ describe("WETH-USDC Pool Testing", function () {
       }
     }
 
+    let postLoanIndexCheck = await poolWethUsdc.loanIdx();
+    expect(postLoanIndexCheck).to.be.equal(11);
+
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
@@ -1000,6 +1003,9 @@ describe("WETH-USDC Pool Testing", function () {
         console.log(i, error)
       }
     }
+
+    postLoanIndexCheck = await poolWethUsdc.loanIdx();
+    expect(postLoanIndexCheck).to.be.equal(21);
 
     //this add should push onto both arrays [B - 2 - ii on picture]
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+6000, 0);
