@@ -215,7 +215,7 @@ interface IBasePool {
      * @return fromLoanIdx Lower bound loan idx (incl.) from which Lp is entitled to claim
      * @return earliestRemove Earliest timestamp from which Lp is allowed to remove liquidity
      * @return currSharePtr Current pointer for the shares over time array
-     * @return sharesOverTime Array with elements representing number of Lp shares for their past and current positions 
+     * @return sharesOverTime Array with elements representing number of Lp shares for their past and current positions
      * @return loanIdxsWhereSharesChanged Array with elements representing upper loan idx bounds (excl.), where Lp can claim
      */
     function getLpInfo(address _lpAddr)

@@ -9,8 +9,7 @@ import {IBasePool} from "./interfaces/IBasePool.sol";
 abstract contract BasePool is IBasePool {
     using SafeERC20 for IERC20Metadata;
 
-    error LoanCcyCannotBeZeroAddress();
-    error CollCcyCannotBeZeroAddress();
+    error CannotBeZeroAddress();
     error CollAndLoanCcyCannotBeEqual();
     error InvalidLoanTenor();
     error InvalidMaxLoanPerColl();
@@ -41,7 +40,7 @@ abstract contract BasePool is IBasePool {
     error InvalidNewSharePointer();
     error UnentitledFromLoanIdx();
     error LoanIdxsWithChangingShares();
-    error InvalidBaseAggrBucketSize();
+    error InvalidBaseAggrSize();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
     error ProtocolFeeTooHigh();
@@ -54,7 +53,7 @@ abstract contract BasePool is IBasePool {
     uint8 immutable COLL_TOKEN_DECIMALS;
 
     uint256 constant BASE = 10**18;
-    uint256 constant MIN_LIQUIDITY = 100 * 10**6;
+    uint256 constant MIN_LIQUIDITY = 10 * 10**6;
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
     address public immutable loanCcyToken;
@@ -124,8 +123,8 @@ abstract contract BasePool is IBasePool {
         uint256 _baseAggrBucketSize,
         uint128 _protocolFee
     ) {
-        if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
-        if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
+        if (_loanCcyToken == address(0) || _collCcyToken == address(0))
+            revert CannotBeZeroAddress();
         if (_collCcyToken == _loanCcyToken)
             revert CollAndLoanCcyCannotBeEqual();
         if (_loanTenor < 86400) revert InvalidLoanTenor();
@@ -133,10 +132,9 @@ abstract contract BasePool is IBasePool {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
             revert InvalidLiquidityBnds();
-        if (_minLoan == 0) revert InvalidMinLoan();
-        assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
+        if (_minLoan <= MIN_LIQUIDITY) revert InvalidMinLoan();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
-            revert InvalidBaseAggrBucketSize();
+            revert InvalidBaseAggrSize();
         if (_protocolFee > MAX_PROTOCOL_FEE) revert ProtocolFeeTooHigh();
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;

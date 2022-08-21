@@ -15,7 +15,7 @@ describe("PAXG-USDC Pool Testing", function () {
   const _liquidityBnd1 = ONE_USDC.mul(100000);
   const _liquidityBnd2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(300);
-  const MIN_LIQUIDITY = ONE_USDC.mul(100);
+  const MIN_LIQUIDITY = ONE_USDC.mul(10);
   const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
   const SUPPLY_CONTROLLER = "0xE25a329d385f77df5D4eD56265babe2b99A5436e";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
