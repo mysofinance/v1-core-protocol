@@ -1026,7 +1026,7 @@ describe("WETH-USDC Pool Testing", function () {
     //on picture this is [B - 2 - i - a]
     await poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, fourthlp3NumShares.sharesOverTime[2].sub(fourthlp3NumShares.sharesOverTime[1]));
     //reverted because pulling out too many shares
-    await expect(poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, fourthlp3NumShares.sharesOverTime[2])).to.be.revertedWith("InvalidRemovalAmount()");
+    await expect(poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, fourthlp3NumShares.sharesOverTime[2])).to.be.revertedWith("InvalidRemove()");
 
     const fifthlp3NumShares = await poolWethUsdc.getLpInfo(lp3.address);
     lp3Info = await poolWethUsdc.getLpInfo(lp3.address);
