@@ -163,8 +163,7 @@ describe("PAXG-USDC Pool Testing", function () {
 
     // remove liquidity
     let lp1InfoPre = await paxgPool.getLpArrayInfo(lp1.address);
-    console.log("TTTTTTTTTTTTTTTTTTTTTTTEEEEEEEEEEEEEEEEEEEEEEESSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTTTTTT")
-    console.log(lp1InfoPre)
+
     // check lengths of arrays for Lp
     await expect(lp1InfoPre.sharesOverTime.length).to.be.equal(1);
     await expect(lp1InfoPre.loanIdxsWhereSharesChanged.length).to.be.equal(0);
@@ -175,7 +174,6 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1InfoPre.sharesOverTime[0])).to.be.revertedWith("InvalidRemove");
 
     lp2InfoPost = await paxgPool.getLpArrayInfo(lp1.address);
-    console.log(lp2InfoPost)
     await expect(lp2InfoPost.sharesOverTime.length).to.be.equal(1);
     await expect(lp2InfoPost.loanIdxsWhereSharesChanged.length).to.be.equal(0);
     await expect(lp2InfoPost.sharesOverTime[0]).to.be.equal(0); // should have been overwritten to zero because LP already claimed to curr loan idx

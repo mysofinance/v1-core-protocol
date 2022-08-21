@@ -74,7 +74,7 @@ abstract contract BasePool is IBasePool {
     uint256 public immutable baseAggrBucketSize;
 
     mapping(address => LpInfo) addrToLpInfo;
-    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
+    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo; //TODO: make loanIdxToLoanInfo and loanIdxToBorrower non public and add combined getter function for both
     mapping(uint256 => address) public loanIdxToBorrower;
 
     mapping(address => mapping(address => mapping(IBasePool.ApprovalTypes => bool)))
