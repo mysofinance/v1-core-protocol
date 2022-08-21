@@ -61,6 +61,14 @@ describe("WETH-USDC Pool Testing", function () {
     poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0);
     await poolWethUsdc.deployed();
 
+    //test constructor reverts
+    await expect(PoolWethUsdc.deploy(800, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidLoanTenor()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, 0, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidMaxLoanPerColl()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, 0, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidRateParams()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, 0, 100, 0)).to.be.revertedWith("InvalidMinLoan()");
+    //await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, 0)).to.be.revertedWith("InvalidBaseAggrBucketSize()");
+    await expect(PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _tvl1, _tvl2, _minLoan, 100, ONE_ETH)).to.be.revertedWith("ProtocolFeeTooHigh()");
+
     // approve DAI and WETH balances
     USDC.connect(lp1).approve(poolWethUsdc.address, MAX_UINT128);
     USDC.connect(lp2).approve(poolWethUsdc.address, MAX_UINT128);
@@ -1005,13 +1013,21 @@ describe("WETH-USDC Pool Testing", function () {
     await expect(lp3Info.currSharePtr).to.be.equal(1);
     expect(fourthlp3NumShares.sharesOverTime[2].gt(thirdlp3NumShares.sharesOverTime[1]));
 
+    //revert because remove too early
+    await expect(poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, fourthlp3NumShares.sharesOverTime[2].sub(fourthlp3NumShares.sharesOverTime[1]))).to.be.revertedWith("BeforeEarliestRemove()");
+    //go ahead and revert non lp case
+    await expect(poolWethUsdc.connect(lp5).removeLiquidity(lp5.address, 100)).to.be.revertedWith("NothingToRemove()");
+    
+
     //move forward past earliest remove
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
-    
+
     //this remove goes back to exactly next to last position when lastLoanIdx == current loan Id and should pop arrays
     //on picture this is [B - 2 - i - a]
     await poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, fourthlp3NumShares.sharesOverTime[2].sub(fourthlp3NumShares.sharesOverTime[1]));
+    //reverted because pulling out too many shares
+    await expect(poolWethUsdc.connect(lp3).removeLiquidity(lp3.address, fourthlp3NumShares.sharesOverTime[2])).to.be.revertedWith("InvalidRemovalAmount()");
 
     const fifthlp3NumShares = await poolWethUsdc.getLpArrayInfo(lp3.address);
     lp3Info = await poolWethUsdc.addrToLpInfo(lp3.address);
