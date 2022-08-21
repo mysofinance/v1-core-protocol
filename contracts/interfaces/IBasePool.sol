@@ -37,7 +37,7 @@ interface IBasePool {
         uint256 protocolFee,
         uint16 referralCode
     );
-    event Roll(uint256 oldLoanIdx, uint256 newLoanIdx, uint16 referralCode);
+    event Roll(uint256 oldLoanIdx, uint256 newLoanIdx);
 
     event ClaimFromAggregated(
         uint256 fromLoanIdx,
@@ -129,14 +129,12 @@ interface IBasePool {
      * @param _minLoanLimit Minimum amount of loan currency acceptable from new loan.
      * @param _maxRepayLimit Maximum allowable loan currency amount borrower for new loan.
      * @param _deadline Timestamp after which transaction will be void
-     * @param _referralCode Code for later possible rewards in referral program
      */
     function rollOver(
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline,
-        uint16 _referralCode
+        uint256 _deadline
     ) external;
 
     /**
@@ -210,8 +208,17 @@ interface IBasePool {
     function setApprovals(address _approvee, bool[5] calldata _approvals)
         external;
 
-    // TODO: update docs
-    function getLpArrayInfo(address _lpAddr)
+    /**
+     * @notice Function which gets all Lp info
+     * @dev fromLoanIdx = 0 can be utilized for checking if someone had been an Lp in the pool
+     * @param _lpAddr Address for which Lp info is being retrieved
+     * @return fromLoanIdx Lower bound loan idx (incl.) from which Lp is entitled to claim
+     * @return earliestRemove Earliest timestamp from which Lp is allowed to remove liquidity
+     * @return currSharePtr Current pointer for the shares over time array
+     * @return sharesOverTime Array with elements representing number of Lp shares for their past and current positions 
+     * @return loanIdxsWhereSharesChanged Array with elements representing upper loan idx bounds (excl.), where Lp can claim
+     */
+    function getLpInfo(address _lpAddr)
         external
         view
         returns (

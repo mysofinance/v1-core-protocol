@@ -74,7 +74,7 @@ abstract contract BasePool is IBasePool {
     uint256 public immutable baseAggrBucketSize;
 
     mapping(address => LpInfo) addrToLpInfo;
-    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo; //TODO: make loanIdxToLoanInfo and loanIdxToBorrower non public and add combined getter function for both
+    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
 
     mapping(address => mapping(address => mapping(IBasePool.ApprovalTypes => bool)))
@@ -87,13 +87,14 @@ abstract contract BasePool is IBasePool {
     struct LpInfo {
         // lower bound loan idx (incl.) from which lp is entitled to claim
         uint32 fromLoanIdx;
-        // timestamp from which on lp is allowed to remove liquidty
+        // timestamp from which on lp is allowed to remove liquidity
         uint32 earliestRemove;
         // current pointer...
         uint32 currSharePtr;
         // array of len n, with elements representing number of sharesOverTime and new elements being added for consecutive adding/removing of liquidity
         uint256[] sharesOverTime;
-        // array of len n-1, with elements representing upper bound loan idx bounds (excl.), where lp can claim until loanIdxsWhereSharesChanged[i] with sharesOverTime[i]; and if index i is outside of bounds of loanIdxsWhereSharesChanged[] then lp can claim up until latest loan idx with sharesOverTime[i]
+        // array of len n-1, with elements representing upper bound loan idx bounds (excl.), where lp can claim until loanIdxsWhereSharesChanged[i] with
+        // sharesOverTime[i]; and if index i is outside of bounds of loanIdxsWhereSharesChanged[] then lp can claim up until latest loan idx with sharesOverTime[i]
         uint256[] loanIdxsWhereSharesChanged;
     }
 
@@ -378,8 +379,7 @@ abstract contract BasePool is IBasePool {
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline,
-        uint16 _referralCode
+        uint256 _deadline
     ) external override {
         uint256 timestamp = checkTimestamp(_deadline);
         // verify loan info and eligibility
@@ -445,7 +445,7 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(collCcyToken).safeTransfer(TREASURY, _protocolFee);
         }
         // spawn event
-        emit Roll(_loanIdx, loanIdx - 1, _referralCode);
+        emit Roll(_loanIdx, loanIdx - 1);
     }
 
     function claim(
@@ -616,8 +616,7 @@ abstract contract BasePool is IBasePool {
         }
     }
 
-    // TODO: rename to getLpInfo
-    function getLpArrayInfo(address _lpAddr)
+    function getLpInfo(address _lpAddr)
         external
         view
         returns (
@@ -635,6 +634,26 @@ abstract contract BasePool is IBasePool {
         sharesOverTime = lpInfo.sharesOverTime;
         loanIdxsWhereSharesChanged = lpInfo.loanIdxsWhereSharesChanged;
     }
+
+    // function getOwnerAndInfoFromLoanIdx(
+    //     uint256 _loanIdx
+    // ) external view returns (
+    //     address owner,
+    //     uint128 repayment,
+    //     uint128 collateral,
+    //     uint128 totalLpShares,
+    //     uint32 expiry,
+    //     bool repaid
+    // ){
+    //     owner = loanIdxToBorrower[_loanIdx];
+    //     LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdx];
+    //     repayment = loanInfo.repayment;
+    //     collateral = loanInfo.collateral;
+    //     totalLpShares = loanInfo.totalLpShares;
+    //     expiry = loanInfo.expiry;
+    //     repaid = loanInfo.repaid;
+
+    // }
 
     function loanTerms(uint128 _inAmountAfterFees)
         public

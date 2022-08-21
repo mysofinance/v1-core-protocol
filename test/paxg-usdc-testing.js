@@ -162,7 +162,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
 
     // remove liquidity
-    let lp1InfoPre = await paxgPool.getLpArrayInfo(lp1.address);
+    let lp1InfoPre = await paxgPool.getLpInfo(lp1.address);
 
     // check lengths of arrays for Lp
     await expect(lp1InfoPre.sharesOverTime.length).to.be.equal(1);
@@ -173,7 +173,7 @@ describe("PAXG-USDC Pool Testing", function () {
     // cannot remove without shares
     await expect(paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1InfoPre.sharesOverTime[0])).to.be.revertedWith("InvalidRemove");
 
-    lp2InfoPost = await paxgPool.getLpArrayInfo(lp1.address);
+    lp2InfoPost = await paxgPool.getLpInfo(lp1.address);
     await expect(lp2InfoPost.sharesOverTime.length).to.be.equal(1);
     await expect(lp2InfoPost.loanIdxsWhereSharesChanged.length).to.be.equal(0);
     await expect(lp2InfoPost.sharesOverTime[0]).to.be.equal(0); // should have been overwritten to zero because LP already claimed to curr loan idx
@@ -464,9 +464,9 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100, 200], false, timestamp+9999999);
 
     // remove liquidity
-    const lp1NumShares = await paxgPool.getLpArrayInfo(lp1.address);
-    const lp2NumShares = await paxgPool.getLpArrayInfo(lp2.address);
-    const lp3NumShares = await paxgPool.getLpArrayInfo(lp3.address);
+    const lp1NumShares = await paxgPool.getLpInfo(lp1.address);
+    const lp2NumShares = await paxgPool.getLpInfo(lp2.address);
+    const lp3NumShares = await paxgPool.getLpInfo(lp3.address);
 
     await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
     await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
@@ -521,9 +521,9 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await paxgPool.getLpArrayInfo(lp1.address);
-    const lp2NumShares = await paxgPool.getLpArrayInfo(lp2.address);
-    const lp3NumShares = await paxgPool.getLpArrayInfo(lp3.address);
+    const lp1NumShares = await paxgPool.getLpInfo(lp1.address);
+    const lp2NumShares = await paxgPool.getLpInfo(lp2.address);
+    const lp3NumShares = await paxgPool.getLpInfo(lp3.address);
 
     await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
     await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
@@ -575,7 +575,7 @@ describe("PAXG-USDC Pool Testing", function () {
 
     loanTerms = await paxgPool.loanTerms(loanInfo.collateral);
     balTestTokenPre = await USDC.balanceOf(borrower.address);
-    await paxgPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0);
+    await paxgPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000);
     balTestTokenPost = await USDC.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
@@ -694,8 +694,8 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
 
     // check lp shares
-    lpArrayInfo1 = await paxgPool.getLpArrayInfo(lp1.address);
-    lpArrayInfo2 = await paxgPool.getLpArrayInfo(lp2.address);
+    lpArrayInfo1 = await paxgPool.getLpInfo(lp1.address);
+    lpArrayInfo2 = await paxgPool.getLpInfo(lp2.address);
     await expect(lpArrayInfo1.sharesOverTime[0]).to.be.equal(ONE_USDC.mul(10000));
     await expect(lpArrayInfo2.sharesOverTime.length).to.be.equal(0);
   })
@@ -771,11 +771,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
 
     // check that lp is not entitled to repay
-    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000)).to.be.revertedWith("UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, true, true, true]);
-    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000)).to.be.revertedWith("UnapprovedSender");
 
     // check new loan terms
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
@@ -789,7 +789,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(borrower).setApprovals(lp1.address, [false, true, false, false, false]);
     preBalColl = await PAXG.balanceOf(lp1.address); 
     preBalLoanCcy = await USDC.balanceOf(lp1.address);
-    await paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0);
+    await paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000);
     postBalColl = await PAXG.balanceOf(lp1.address);
     postBalLoanCcy = await USDC.balanceOf(lp1.address);
     await expect(preBalColl).to.be.equal(postBalColl);
