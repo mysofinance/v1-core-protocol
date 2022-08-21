@@ -9,7 +9,6 @@ import {IPAXG} from "../../interfaces/IPAXG.sol";
 
 contract PoolPaxgUsdc is BasePool {
     constructor(
-        address _loanCcyToken,
         uint24 _loanTenor,
         uint128 _maxLoanPerColl,
         uint256 _r1,
@@ -21,7 +20,7 @@ contract PoolPaxgUsdc is BasePool {
         uint128 _protocolFee
     )
         BasePool(
-            _loanCcyToken,
+            0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
             0x45804880De22913dAFE09f4980848ECE6EcbAf78,
             _loanTenor,
             _maxLoanPerColl,

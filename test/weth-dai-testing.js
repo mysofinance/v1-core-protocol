@@ -158,7 +158,7 @@ describe("WETH-DAI Pool Testing", function () {
     await expect(poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre)).to.be.reverted;
 
     lp1NumSharesPost = await poolWethDai.getLpArrayInfo(lp1.address);
-    await expect(lp1NumSharesPost.sharesOverTime[1]).to.be.equal(0);
+    await expect(lp1NumSharesPost.sharesOverTime[0]).to.be.equal(0); // shares get overwritten to zero because LP claimed up until curr loan idx
 
     //ensure new lp cannot claim on previous loan
     blocknum = await ethers.provider.getBlockNumber();
