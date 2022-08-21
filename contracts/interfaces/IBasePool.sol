@@ -37,13 +37,7 @@ interface IBasePool {
         uint256 protocolFee,
         uint16 referralCode
     );
-    event Roll(
-        uint256 oldLoanIdx,
-        uint256 newLoanIdx,
-        uint256 collateral,
-        uint256 refinancingCost,
-        uint16 referralCode
-    );
+    event Roll(uint256 oldLoanIdx, uint256 newLoanIdx, uint16 referralCode);
 
     event ClaimFromAggregated(
         uint256 fromLoanIdx,
@@ -216,16 +210,14 @@ interface IBasePool {
     function setApprovals(address _approvee, bool[5] calldata _approvals)
         external;
 
-    /**
-     * @notice Function which gets the shares over time and loan indices where shares changed
-     * @param _lpAddr Address of LP for which the info is being gathered
-     * @return sharesOverTime array of number of shares Lp owned over time
-     * @return loanIdxsWhereSharesChanged array of loan indices where the Lp changed number of shares
-     */
+    // TODO: update docs
     function getLpArrayInfo(address _lpAddr)
         external
         view
         returns (
+            uint32 fromLoanIdx,
+            uint32 earliestRemove,
+            uint32 currSharePtr,
             uint256[] memory sharesOverTime,
             uint256[] memory loanIdxsWhereSharesChanged
         );

@@ -19,12 +19,10 @@ abstract contract BasePool is IBasePool {
     error InvalidMinLoan();
     error PastDeadline();
     error InvalidAddAmount();
-    error TooBigAddToLaterClaimOnRepay();
-    error TooBigAddToLaterClaimColl();
-    error NothingToRemove();
+    error PotentiallyZeroRoundedFutureClaims();
     error BeforeEarliestRemove();
     error InsufficientLiquidity();
-    error InvalidRemovalAmount();
+    error InvalidRemove();
     error TooSmallLoan();
     error LoanBelowLimit();
     error ErroneousLoanTerms();
@@ -36,6 +34,7 @@ abstract contract BasePool is IBasePool {
     error CannotRepayAfterExpiry();
     error AlreadyRepaid();
     error CannotRepayInSameBlock();
+    error InvalidRollOver();
     error InvalidSendAmount();
     error NothingToClaim();
     error MustBeLp();
@@ -74,7 +73,7 @@ abstract contract BasePool is IBasePool {
     // must be a multiple of 100
     uint256 public immutable baseAggrBucketSize;
 
-    mapping(address => LpInfo) public addrToLpInfo;
+    mapping(address => LpInfo) addrToLpInfo;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
 
@@ -218,9 +217,10 @@ abstract contract BasePool is IBasePool {
 
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
         uint256 shareLength = lpInfo.sharesOverTime.length;
-        if (shareLength * numShares == 0) revert NothingToRemove();
-        if (lpInfo.sharesOverTime[shareLength - 1] < numShares)
-            revert InvalidRemovalAmount();
+        if (
+            shareLength * numShares == 0 ||
+            lpInfo.sharesOverTime[shareLength - 1] < numShares
+        ) revert InvalidRemove();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
         uint256 _totalLiquidity = getTotalLiquidity();
@@ -384,10 +384,8 @@ abstract contract BasePool is IBasePool {
         uint256 timestamp = checkTimestamp(_deadline);
         // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
-        checkSenderApproval(
-            loanIdxToBorrower[_loanIdx],
-            IBasePool.ApprovalTypes.ROLLOVER
-        );
+        address loanOwner = loanIdxToBorrower[_loanIdx];
+        checkSenderApproval(loanOwner, IBasePool.ApprovalTypes.ROLLOVER);
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         {
             if (timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
@@ -407,20 +405,21 @@ abstract contract BasePool is IBasePool {
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
-        uint128 rollOverCost = loanInfo.repayment - loanAmount;
-        // update the aggregation mappings
+        if (loanAmount > loanInfo.repayment) revert InvalidRollOver();
+        // update the aggregation mapping for repaid loan
         updateAggregations(
             _loanIdx,
             _collateral,
-            rollOverCost + loanAmount,
+            loanInfo.repayment,
             loanInfo.totalLpShares,
             true
         );
 
         {
+            uint128 rollOverCost = loanInfo.repayment - loanAmount;
             // set new loan info
             loanInfo.repaid = true;
-            loanIdxToBorrower[loanIdx] = msg.sender;
+            loanIdxToBorrower[loanIdx] = loanOwner;
             LoanInfo memory loanInfoNew;
             loanInfoNew.expiry = expiry;
             loanInfoNew.totalLpShares = totalLpShares;
@@ -440,20 +439,13 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                rollOverCost + getLoanCcyTransferFee(rollOverCost)
+                rollOverCost + getLoanCcyTransferFee(rollOverCost) //TODO: this slightly overshoots the actual transfer amount needed to pay for transfer fees
             );
-
             // transfer protocol fee to treasury in collateral ccy
             IERC20Metadata(collCcyToken).safeTransfer(TREASURY, _protocolFee);
         }
         // spawn event
-        emit Roll(
-            _loanIdx,
-            loanIdx - 1,
-            pledgeAmount,
-            rollOverCost,
-            _referralCode
-        );
+        emit Roll(_loanIdx, loanIdx - 1, _referralCode);
     }
 
     function claim(
@@ -462,7 +454,7 @@ abstract contract BasePool is IBasePool {
         bool _isReinvested,
         uint256 _deadline
     ) external override {
-        //check if reinvested is chosen that deadline is valid and sender can add liquidity on behalf of
+        // check if reinvested is chosen that deadline is valid and sender can add liquidity on behalf of
         if (_isReinvested) {
             claimReinvestmentCheck(_deadline, _onBehalfOf);
         }
@@ -532,7 +524,7 @@ abstract contract BasePool is IBasePool {
         bool _isReinvested,
         uint256 _deadline
     ) external override {
-        //check if reinvested is chosen that deadline is valid and sender can add liquidity on behalf of
+        // check if reinvested is chosen that deadline is valid and sender can add liquidity on behalf of
         if (_isReinvested) {
             claimReinvestmentCheck(_deadline, _onBehalfOf);
         }
@@ -556,27 +548,27 @@ abstract contract BasePool is IBasePool {
                 lpInfo
             );
 
-        //local variables to track repayments and collateral claimed
+        // local variables to track repayments and collateral claimed
         uint256 totalRepayments;
         uint256 totalCollateral;
 
-        //local variables for each iteration's repayments and collateral
+        // local variables for each iteration's repayments and collateral
         uint256 repayments;
         uint256 collateral;
 
-        //iterate over the length of the passed in array
+        // iterate over the length of the passed in array
         for (uint256 counter = 0; counter < lengthArr - 1; ) {
-            //make sure input loan indices are strictly increasing
+            // make sure input loan indices are strictly increasing
             if (_aggIdxs[counter] >= _aggIdxs[counter + 1])
                 revert NonAscendingLoanIdxs();
 
-            //get aggregated claims
+            // get aggregated claims
             (repayments, collateral) = getClaimsFromAggregated(
                 _aggIdxs[counter],
                 _aggIdxs[counter + 1],
                 applicableShares
             );
-            //update total repayment amount and total collateral amount
+            // update total repayment amount and total collateral amount
             totalRepayments += repayments;
             totalCollateral += collateral;
 
@@ -624,15 +616,22 @@ abstract contract BasePool is IBasePool {
         }
     }
 
+    // TODO: rename to getLpInfo
     function getLpArrayInfo(address _lpAddr)
         external
         view
         returns (
+            uint32 fromLoanIdx,
+            uint32 earliestRemove,
+            uint32 currSharePtr,
             uint256[] memory sharesOverTime,
             uint256[] memory loanIdxsWhereSharesChanged
         )
     {
         LpInfo memory lpInfo = addrToLpInfo[_lpAddr];
+        fromLoanIdx = lpInfo.fromLoanIdx;
+        earliestRemove = lpInfo.earliestRemove;
+        currSharePtr = lpInfo.currSharePtr;
         sharesOverTime = lpInfo.sharesOverTime;
         loanIdxsWhereSharesChanged = lpInfo.loanIdxsWhereSharesChanged;
     }
@@ -787,11 +786,11 @@ abstract contract BasePool is IBasePool {
         uint256 _currSharePtr,
         uint256 _sharesUnchangedUntilLoanIdx
     ) internal {
-        //update LPs from loan index
+        // update LPs from loan index
         _lpInfo.fromLoanIdx = uint32(_lastIdxFromUserInput) + 1;
-        //if current share pointer is not already at end and
-        //the last loan claimed was exactly one below the currentToLoanIdx
-        //then increment the current share pointer
+        // if current share pointer is not already at end and
+        // the last loan claimed was exactly one below the currentToLoanIdx
+        // then increment the current share pointer
         if (
             _currSharePtr < _lpInfo.sharesOverTime.length - 1 &&
             _lastIdxFromUserInput + 1 == _sharesUnchangedUntilLoanIdx
@@ -833,7 +832,7 @@ abstract contract BasePool is IBasePool {
          **/
         uint256 currSharePtr = _lpInfo.currSharePtr;
         if (_lpInfo.sharesOverTime[currSharePtr] == 0) {
-            //if share ptr at end of shares over time array, then LP still has 0 shares and should revert right away
+            // if share ptr at end of shares over time array, then LP still has 0 shares and should revert right away
             if (currSharePtr == _lpInfo.sharesOverTime.length - 1)
                 revert ZeroShareClaim();
             _lpInfo.fromLoanIdx = uint32(
@@ -887,7 +886,7 @@ abstract contract BasePool is IBasePool {
     ) internal {
         if (_repayments > 0) {
             if (_isReinvested) {
-                //allows reinvestment and transfer of any dust from claim functions
+                // allows reinvestment and transfer of any dust from claim functions
                 (
                     uint256 dust,
                     uint256 newLpShares,
@@ -905,7 +904,7 @@ abstract contract BasePool is IBasePool {
                 );
             }
         }
-        //transfer collateral
+        // transfer collateral
         if (_collateral > 0) {
             IERC20Metadata(collCcyToken).safeTransfer(msg.sender, _collateral);
         }
@@ -941,12 +940,12 @@ abstract contract BasePool is IBasePool {
             );
         }
         totalLpShares += uint128(newLpShares);
-        if (((minLoan * BASE) / totalLpShares) == 0)
-            revert TooBigAddToLaterClaimOnRepay();
         if (
-            ((((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
-                totalLpShares) == 0
-        ) revert TooBigAddToLaterClaimColl();
+            (minLoan * BASE) / totalLpShares == 0 ||
+            (((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /
+                totalLpShares ==
+            0
+        ) revert PotentiallyZeroRoundedFutureClaims();
         totalLiquidity = _totalLiquidity + _inAmountAfterFees;
         // update lp info
         bool isFirstAddLiquidity = lpInfo.fromLoanIdx == 0;
@@ -954,7 +953,7 @@ abstract contract BasePool is IBasePool {
             lpInfo.fromLoanIdx = uint32(loanIdx);
             lpInfo.sharesOverTime.push(newLpShares);
         } else {
-            //update both lp arrays and check for auto increment
+            // update both lp arrays and check for auto increment
             updateLpArrays(lpInfo, newLpShares, true);
         }
         earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
@@ -1022,8 +1021,8 @@ abstract contract BasePool is IBasePool {
                 _lpInfo.sharesOverTime.pop();
                 _lpInfo.loanIdxsWhereSharesChanged.pop();
             }
-            //if next to last shares over time value is not same as newShares,
-            //then just overwrite last share value
+            // if next to last shares over time value is not same as newShares,
+            // then just overwrite last share value
             else {
                 _lpInfo.sharesOverTime[_originalSharesLen - 1] = newShares;
             }
