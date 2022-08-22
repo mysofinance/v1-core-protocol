@@ -83,33 +83,6 @@ abstract contract BasePool is IBasePool {
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg2;
     mapping(uint256 => AggClaimsInfo) collAndRepayTotalBaseAgg3;
 
-    struct LpInfo {
-        // lower bound loan idx (incl.) from which LP is entitled to claim
-        uint32 fromLoanIdx;
-        // timestamp from which on LP is allowed to remove liquidity
-        uint32 earliestRemove;
-        // current pointer...
-        uint32 currSharePtr;
-        // array of len n, with elements representing number of sharesOverTime and new elements being added for consecutive adding/removing of liquidity
-        uint256[] sharesOverTime;
-        // array of len n-1, with elements representing upper bound loan idx bounds (excl.), where LP can claim until loanIdxsWhereSharesChanged[i] with
-        // sharesOverTime[i]; and if index i is outside of bounds of loanIdxsWhereSharesChanged[] then LP can claim up until latest loan idx with sharesOverTime[i]
-        uint256[] loanIdxsWhereSharesChanged;
-    }
-
-    struct LoanInfo {
-        uint128 repayment;
-        uint128 collateral;
-        uint128 totalLpShares;
-        uint32 expiry;
-        bool repaid;
-    }
-
-    struct AggClaimsInfo {
-        uint128 repayments;
-        uint128 collateral;
-    }
-
     constructor(
         address _loanCcyToken,
         address _collCcyToken,

@@ -72,15 +72,15 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.deployed();
 
     // set allowances
-    PAXG.connect(borrower).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    PAXG.connect(pledger).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(lp1).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(lp2).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(lp3).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(lp4).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(lp5).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(borrower).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    USDC.connect(pledger).approve(paxgPool.address, "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    PAXG.connect(borrower).approve(paxgPool.address, MAX_UINT128);
+    PAXG.connect(pledger).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(lp1).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(lp2).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(lp3).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(lp4).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(lp5).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(borrower).approve(paxgPool.address, MAX_UINT128);
+    USDC.connect(pledger).approve(paxgPool.address, MAX_UINT128);
   });
   
   it("Should have correct initial values", async function () {
@@ -89,6 +89,12 @@ describe("PAXG-USDC Pool Testing", function () {
 
     loanIdx = await paxgPool.loanIdx();
     expect(loanIdx).to.be.equal(1);
+
+    rateParams = await paxgPool.getRateParams();
+    expect(rateParams._r1).to.be.equal(_r1);
+    expect(rateParams._r2).to.be.equal(_r2);
+    expect(rateParams._liquidityBnd1).to.be.equal(_liquidityBnd1);
+    expect(rateParams._liquidityBnd2).to.be.equal(_liquidityBnd2);
   });
 
   it("Should fail on loan terms without LPs", async function () {
@@ -801,6 +807,51 @@ describe("PAXG-USDC Pool Testing", function () {
   })
 
   it("Should allow claiming on behalf", async function () {
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
 
+    // 1 loan is taken out and repaid
+    pledgeAmount = ONE_PAXG
+    transferFee = await PAXG.getFeeFor(ONE_PAXG);
+    pledgeAmountAfterFees = pledgeAmount.sub(transferFee);
+    loanTerms = await paxgPool.loanTerms(pledgeAmountAfterFees);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+60, 0);
+    loanInfo1 = await paxgPool.loanIdxToLoanInfo(1);
+    await paxgPool.connect(borrower).repay(1, borrower.address, loanInfo1.repayment);
+
+    // 1 loan is taken out and defaults
+    pledgeAmount = ONE_PAXG
+    transferFee = await PAXG.getFeeFor(ONE_PAXG);
+    pledgeAmountAfterFees = pledgeAmount.sub(transferFee);
+    loanTerms = await paxgPool.loanTerms(pledgeAmountAfterFees);
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+60, 0);
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    timestamp = timestamp + 24*60*60+1
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp])
+    await ethers.provider.send("evm_mine");
+
+    // check that lp2 is not entitled to claim on lp1's behalf
+    await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender");
+
+    // should still fail with wrong approval
+    await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, true, false]);
+    await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender");
+
+    // set correct approval
+    await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, false, false, true]);
+
+    // check that lp2 can claim on behalf of lp1
+    preBalColl = await PAXG.balanceOf(lp2.address); 
+    preBalLoanCcy = await USDC.balanceOf(lp2.address);
+    await paxgPool.connect(lp2).claim(lp1.address, [1, 2], false, timestamp+9999999);
+    postBalColl = await PAXG.balanceOf(lp2.address);
+    postBalLoanCcy = await USDC.balanceOf(lp2.address);
+    loanInfo2 = await paxgPool.loanIdxToLoanInfo(2);
+    transferFee = await PAXG.getFeeFor(loanInfo2.collateral);
+    collateralForLp = loanInfo2.collateral.sub(transferFee);
+    await expect(postBalColl.sub(preBalColl)).to.be.equal(collateralForLp);
+    await expect(postBalLoanCcy.sub(preBalLoanCcy)).to.be.equal(loanInfo1.repayment);
   })
 });
