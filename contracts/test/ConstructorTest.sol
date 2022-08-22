@@ -3,7 +3,6 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {BasePool} from "../BasePool.sol";
 import {IPAXG} from "../interfaces/IPAXG.sol";
 

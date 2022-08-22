@@ -501,59 +501,93 @@ describe("PAXG-USDC Pool Testing", function () {
     totalRepayments = ethers.BigNumber.from(0);
     totalLeftColl = ethers.BigNumber.from(0);
 
-    //1st borrow & repay
+    // 1st borrow & repay
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
     totalRepayments = totalRepayments.add(loanInfo[0]);
     await paxgPool.connect(borrower).repay(1, borrower.address, loanInfo.repayment);
 
-    //2nd borrow & repay
+    // 2nd borrow & repay
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     loanInfo = await paxgPool.loanIdxToLoanInfo(2);
     totalRepayments = totalRepayments.add(loanInfo[0]);
     await paxgPool.connect(borrower).repay(2, borrower.address, loanInfo.repayment);
 
-    //3rd borrow & default
+    // 3rd borrow & default
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
     totalLeftColl = totalLeftColl.add(ONE_PAXG);
 
-    //move forward to loan expiry
+    // move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
 
-    //claim
+    // claim
     await paxgPool.connect(lp1).claim(lp1.address, [1, 2, 3], false, timestamp+9999999);
     await paxgPool.connect(lp2).claim(lp2.address, [1, 2, 3], false, timestamp+9999999);
     await paxgPool.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
-    //remove liquidity
-    const lp1NumShares = await paxgPool.getLpInfo(lp1.address);
-    const lp2NumShares = await paxgPool.getLpInfo(lp2.address);
-    const lp3NumShares = await paxgPool.getLpInfo(lp3.address);
+    // remove liquidity
+    const lp1Info = await paxgPool.getLpInfo(lp1.address);
+    const lp2Info = await paxgPool.getLpInfo(lp2.address);
+    const lp3Info = await paxgPool.getLpInfo(lp3.address);
 
-    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
-    await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
-    await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3NumShares.sharesOverTime[0]);
+    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1Info.sharesOverTime[0]);
+    await paxgPool.connect(lp2).removeLiquidity(lp2.address, lp2Info.sharesOverTime[0]);
+    await paxgPool.connect(lp3).removeLiquidity(lp3.address, lp3Info.sharesOverTime[0]);
 
     balEth = await PAXG.balanceOf(paxgPool.address); //await ethers.provider.getBalance(paxgPool.address);
     balTestToken = await USDC.balanceOf(paxgPool.address);
     console.log("balEth:", balEth);
     console.log("balTestToken:", balTestToken);
 
-    //add liquidity with dust should automatically transfer
+    // add liquidity with dust should automatically transfer
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+1000, 0);
 
-    //check dust was transferred to treasury
+    // check dust was transferred to treasury
     balTreasury = await USDC.balanceOf("0x1234567890000000000000000000000000000001");
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
-    //check lp shares
+    // check lp shares
     totalLpShares = await paxgPool.totalLpShares();
     await expect(totalLpShares).to.be.equal(ONE_USDC.mul(500000));
   })
 
+  it("Should transfer dust when there are no more active LPs but previous LP claims and reinvests", async function () {
+    // LP adds liquidity
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+60, 0);
+
+    // borrower takes out loan
+    await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
+
+    // move forward past LP lockup
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_mine");
+    
+    // LP removes liquidity
+    lpInfo = await paxgPool.getLpInfo(lp1.address);
+    await paxgPool.connect(lp1).removeLiquidity(lp1.address, lpInfo.sharesOverTime[0]);
+    
+    // borrower repays loan
+    loanInfo = await paxgPool.loanIdxToLoanInfo(1);
+    await paxgPool.connect(borrower).repay(1, borrower.address, loanInfo.repayment);
+
+    totalLiquidity = await paxgPool.getTotalLiquidity();
+    console.log(totalLiquidity)
+    // get pre-claim treasury balance
+    preBalTreasury = await USDC.balanceOf("0x1234567890000000000000000000000000000001");
+
+    // claim and reinvest
+    await paxgPool.connect(lp1).claim(lp1.address, [1], true, timestamp+9999999);
+
+    // check post-claim treasury balance
+    postBalTreasury = await USDC.balanceOf("0x1234567890000000000000000000000000000001");
+    expect(postBalTreasury.sub(preBalTreasury)).to.be.equal(MIN_LIQUIDITY);
+  })
+  
   it("Should never fall below MIN_LIQUIDITY", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
