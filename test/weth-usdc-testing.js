@@ -1125,7 +1125,7 @@ describe("WETH-USDC Pool Testing", function () {
     let totalRepayments = ethers.BigNumber.from(0);
     let totalLeftColl = ethers.BigNumber.from(0);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5000; i++) {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.div(2), 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+1);
@@ -1137,7 +1137,7 @@ describe("WETH-USDC Pool Testing", function () {
     
     expect(await poolWethUsdc.loanIdx()).to.be.equal(5001);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5000; i++) {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.div(2), 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+5001);
