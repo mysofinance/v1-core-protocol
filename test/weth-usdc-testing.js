@@ -1160,7 +1160,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 10000], false, timestamp+1000000000);
     postClaimBalLoanCcy = await USDC.balanceOf(lp1.address);
     postClaimBalCollCcy = await WETH.balanceOf(lp1.address);
-    expect(postClaimBalCollCcy.sub(preClaimBalCollCcy)).to.be.equal(totalLeftColl);
-    expect(postClaimBalLoanCcy.sub(preClaimBalLoanCcy)).to.be.equal(totalRepayments);
+    expect(postClaimBalCollCcy.sub(preClaimBalCollCcy)).to.be.equal(totalLeftColl.div(5));
+    expect(postClaimBalLoanCcy.sub(preClaimBalLoanCcy)).to.be.equal(totalRepayments.div(5));
   })
 });
