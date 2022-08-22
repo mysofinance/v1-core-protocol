@@ -4,6 +4,7 @@ coverage
 coverage.json
 typechain
 orderbook-venv
+docs/*
 
 #Hardhat files
 cache
