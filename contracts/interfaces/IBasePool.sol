@@ -83,7 +83,7 @@ interface IBasePool {
      * @dev This function will update loanIdxsWhereSharesChanged and
      * shareOverTime arrays in lpInfo. If address on behalf of is not
      * sender, then sender must have permission to remove on behalf of owner.
-     * @param _onBehalfOf Owner of the Lp shares
+     * @param _onBehalfOf Owner of the LP shares
      * @param numSharesRemove Amount of LP shares to remove
      */
     function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
@@ -141,13 +141,13 @@ interface IBasePool {
 
     /**
      * @notice Function which handles individual claiming by LPs
-     * @dev This function is more expensive, but needs to be used when Lp
+     * @dev This function is more expensive, but needs to be used when LP
      * changes position size in the middle of smallest aggregation block
      * or if LP wants to claim some of the loans before the expiry time
      * of the last loan in the aggregation block. _loanIdxs must be increasing array.
      * If address on behalf of is not sender, then sender must have permission to claim.
      * As well if reinvestment ootion is chosen, sender must have permission to add liquidity
-     * @param _onBehalfOf Lp address which is owner or has approved sender to claim on their behalf (and possibly reinvest)
+     * @param _onBehalfOf LP address which is owner or has approved sender to claim on their behalf (and possibly reinvest)
      * @param _loanIdxs Loan indices on which LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
@@ -160,11 +160,11 @@ interface IBasePool {
     ) external;
 
     /**
-     * @notice Function will update the share pointer for the lp
-     * @dev This function will allow an lp to skip his pointer ahead but
-     * caution should be used since once an Lp has updated their from index
+     * @notice Function will update the share pointer for the LP
+     * @dev This function will allow an LP to skip his pointer ahead but
+     * caution should be used since once an LP has updated their from index
      * they lose all rights to any outstanding claims before that from index
-     * @param _newSharePointer New location of the Lp's current share pointer
+     * @param _newSharePointer New location of the LP's current share pointer
      */
     function overrideSharePointer(uint256 _newSharePointer) external;
 
@@ -176,7 +176,7 @@ interface IBasePool {
      * indices are the end loan indexes of the intervals he wants to claim.
      * If address on behalf of is not sender, then sender must have permission to claim.
      * As well if reinvestment option is chosen, sender must have permission to add liquidity
-     * @param _onBehalfOf Lp address which is owner or has approved sender to claim on their behalf (and possibly reinvest)
+     * @param _onBehalfOf LP address which is owner or has approved sender to claim on their behalf (and possibly reinvest)
      * @param _aggIdxs From index and end indices of the aggregation that LP wants to claim
      * @param _isReinvested Flag for if LP wants claimed loanCcy to be re-invested
      * @param _deadline Deadline if reinvestment occurs. (If no reinvestment, this is ignored)
@@ -197,14 +197,14 @@ interface IBasePool {
         external;
 
     /**
-     * @notice Function which gets all Lp info
-     * @dev fromLoanIdx = 0 can be utilized for checking if someone had been an Lp in the pool
-     * @param _lpAddr Address for which Lp info is being retrieved
-     * @return fromLoanIdx Lower bound loan idx (incl.) from which Lp is entitled to claim
-     * @return earliestRemove Earliest timestamp from which Lp is allowed to remove liquidity
+     * @notice Function which gets all LP info
+     * @dev fromLoanIdx = 0 can be utilized for checking if someone had been an LP in the pool
+     * @param _lpAddr Address for which LP info is being retrieved
+     * @return fromLoanIdx Lower bound loan idx (incl.) from which LP is entitled to claim
+     * @return earliestRemove Earliest timestamp from which LP is allowed to remove liquidity
      * @return currSharePtr Current pointer for the shares over time array
-     * @return sharesOverTime Array with elements representing number of Lp shares for their past and current positions
-     * @return loanIdxsWhereSharesChanged Array with elements representing upper loan idx bounds (excl.), where Lp can claim
+     * @return sharesOverTime Array with elements representing number of LP shares for their past and current positions
+     * @return loanIdxsWhereSharesChanged Array with elements representing upper loan idx bounds (excl.), where LP can claim
      */
     function getLpInfo(address _lpAddr)
         external
@@ -243,7 +243,7 @@ interface IBasePool {
      * which are unnecessary if it was solely an internal function
      * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
      * @param _toLoanIdx End loan index of the aggregation
-     * @param _shares Amount of sharesOverTime which the Lp owned over this given aggregation period
+     * @param _shares Amount of sharesOverTime which the LP owned over this given aggregation period
      */
     function getClaimsFromAggregated(
         uint256 _fromLoanIdx,
