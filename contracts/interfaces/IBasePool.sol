@@ -306,6 +306,12 @@ interface IBasePool {
     ) external view returns (uint256 repayments, uint256 collateral);
 
     /**
+     * @notice Getter which returns the pool's total liquidity available for new loans
+     * @return The liquidity of the pool that is available for new loans
+     */
+    function getTotalLiquidity() external view returns (uint256);
+
+    /**
      * @notice Getter which returns the pool's collateral currency
      * @return The collateral currency token address
      */
