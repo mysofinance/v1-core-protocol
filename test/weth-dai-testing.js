@@ -81,7 +81,7 @@ describe("WETH-DAI Pool Testing", function () {
   });
 
   it("Should fail on loan terms without LPs", async function () {
-    await expect(poolWethDai.loanTerms(ONE_ETH)).to.be.reverted;
+    await expect(poolWethDai.loanTerms(ONE_ETH)).to.be.revertedWith("InsufficientLiquidity");
   });
 
   it("Should allow LPs to add liquidity", async function () {
@@ -155,7 +155,7 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre.sharesOverTime[0]);
 
     //cannot remove twice
-    await expect(poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre)).to.be.reverted;
+    await expect(poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre.sharesOverTime[0])).to.be.revertedWith("InvalidRemove");
 
     lp1NumSharesPost = await poolWethDai.getLpInfo(lp1.address);
     await expect(lp1NumSharesPost.sharesOverTime[0]).to.be.equal(0); // shares get overwritten to zero because LP claimed up until curr loan idx
@@ -164,13 +164,13 @@ describe("WETH-DAI Pool Testing", function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await poolWethDai.connect(lp4).addLiquidity(lp4.address, ONE_DAI.mul(1000), timestamp+60, 0);
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1], false, timestamp+9999999)).to.be.reverted;
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [2], false, timestamp+9999999)).to.be.reverted;
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [3], false, timestamp+9999999)).to.be.reverted;
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1,2], false, timestamp+9999999)).to.be.reverted;
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [2,3], false, timestamp+9999999)).to.be.reverted;
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1,3], false, timestamp+9999999)).to.be.reverted;
-    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1,2,3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [2], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1,2], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [2,3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1,3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(poolWethDai.connect(lp4).claim(lp4.address, [1,2,3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
   });
   
   it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
@@ -225,7 +225,7 @@ describe("WETH-DAI Pool Testing", function () {
 
     await poolWethDai.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999);
     //cannot claim twice
-    await expect(poolWethDai.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethDai.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
 
     await poolWethDai.connect(lp2).claim(lp2.address, loanIds, false, timestamp+9999999);
     await poolWethDai.connect(lp3).claim(lp3.address, loanIds, false, timestamp+9999999);
