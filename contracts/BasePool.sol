@@ -9,8 +9,7 @@ import {IBasePool} from "./interfaces/IBasePool.sol";
 abstract contract BasePool is IBasePool {
     using SafeERC20 for IERC20Metadata;
 
-    error LoanCcyCannotBeZeroAddress();
-    error CollCcyCannotBeZeroAddress();
+    error CannotBeZeroAddress();
     error CollAndLoanCcyCannotBeEqual();
     error InvalidLoanTenor();
     error InvalidMaxLoanPerColl();
@@ -41,7 +40,7 @@ abstract contract BasePool is IBasePool {
     error InvalidNewSharePointer();
     error UnentitledFromLoanIdx();
     error LoanIdxsWithChangingShares();
-    error InvalidBaseAggrBucketSize();
+    error InvalidBaseAggrSize();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
     error ProtocolFeeTooHigh();
@@ -54,7 +53,7 @@ abstract contract BasePool is IBasePool {
     uint8 immutable COLL_TOKEN_DECIMALS;
 
     uint256 constant BASE = 10**18;
-    uint256 constant MIN_LIQUIDITY = 100 * 10**6;
+    uint256 constant MIN_LIQUIDITY = 10 * 10**6;
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
     address public immutable loanCcyToken;
@@ -74,7 +73,7 @@ abstract contract BasePool is IBasePool {
     uint256 public immutable baseAggrBucketSize;
 
     mapping(address => LpInfo) addrToLpInfo;
-    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo; //TODO: make loanIdxToLoanInfo and loanIdxToBorrower non public and add combined getter function for both
+    mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
 
     mapping(address => mapping(address => mapping(IBasePool.ApprovalTypes => bool)))
@@ -87,13 +86,14 @@ abstract contract BasePool is IBasePool {
     struct LpInfo {
         // lower bound loan idx (incl.) from which lp is entitled to claim
         uint32 fromLoanIdx;
-        // timestamp from which on lp is allowed to remove liquidty
+        // timestamp from which on lp is allowed to remove liquidity
         uint32 earliestRemove;
         // current pointer...
         uint32 currSharePtr;
         // array of len n, with elements representing number of sharesOverTime and new elements being added for consecutive adding/removing of liquidity
         uint256[] sharesOverTime;
-        // array of len n-1, with elements representing upper bound loan idx bounds (excl.), where lp can claim until loanIdxsWhereSharesChanged[i] with sharesOverTime[i]; and if index i is outside of bounds of loanIdxsWhereSharesChanged[] then lp can claim up until latest loan idx with sharesOverTime[i]
+        // array of len n-1, with elements representing upper bound loan idx bounds (excl.), where lp can claim until loanIdxsWhereSharesChanged[i] with
+        // sharesOverTime[i]; and if index i is outside of bounds of loanIdxsWhereSharesChanged[] then lp can claim up until latest loan idx with sharesOverTime[i]
         uint256[] loanIdxsWhereSharesChanged;
     }
 
@@ -123,8 +123,8 @@ abstract contract BasePool is IBasePool {
         uint256 _baseAggrBucketSize,
         uint128 _protocolFee
     ) {
-        if (_loanCcyToken == address(0)) revert LoanCcyCannotBeZeroAddress();
-        if (_collCcyToken == address(0)) revert CollCcyCannotBeZeroAddress();
+        if (_loanCcyToken == address(0) || _collCcyToken == address(0))
+            revert CannotBeZeroAddress();
         if (_collCcyToken == _loanCcyToken)
             revert CollAndLoanCcyCannotBeEqual();
         if (_loanTenor < 86400) revert InvalidLoanTenor();
@@ -132,10 +132,9 @@ abstract contract BasePool is IBasePool {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
             revert InvalidLiquidityBnds();
-        if (_minLoan == 0) revert InvalidMinLoan();
-        assert(MIN_LIQUIDITY != 0 && MIN_LIQUIDITY <= _minLoan);
+        if (_minLoan <= MIN_LIQUIDITY) revert InvalidMinLoan();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
-            revert InvalidBaseAggrBucketSize();
+            revert InvalidBaseAggrSize();
         if (_protocolFee > MAX_PROTOCOL_FEE) revert ProtocolFeeTooHigh();
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
@@ -378,8 +377,7 @@ abstract contract BasePool is IBasePool {
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline,
-        uint16 _referralCode
+        uint256 _deadline
     ) external override {
         uint256 timestamp = checkTimestamp(_deadline);
         // verify loan info and eligibility
@@ -445,7 +443,7 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(collCcyToken).safeTransfer(TREASURY, _protocolFee);
         }
         // spawn event
-        emit Roll(_loanIdx, loanIdx - 1, _referralCode);
+        emit Roll(_loanIdx, loanIdx - 1);
     }
 
     function claim(
@@ -616,8 +614,7 @@ abstract contract BasePool is IBasePool {
         }
     }
 
-    // TODO: rename to getLpInfo
-    function getLpArrayInfo(address _lpAddr)
+    function getLpInfo(address _lpAddr)
         external
         view
         returns (
@@ -635,6 +632,26 @@ abstract contract BasePool is IBasePool {
         sharesOverTime = lpInfo.sharesOverTime;
         loanIdxsWhereSharesChanged = lpInfo.loanIdxsWhereSharesChanged;
     }
+
+    // function getOwnerAndInfoFromLoanIdx(
+    //     uint256 _loanIdx
+    // ) external view returns (
+    //     address owner,
+    //     uint128 repayment,
+    //     uint128 collateral,
+    //     uint128 totalLpShares,
+    //     uint32 expiry,
+    //     bool repaid
+    // ){
+    //     owner = loanIdxToBorrower[_loanIdx];
+    //     LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdx];
+    //     repayment = loanInfo.repayment;
+    //     collateral = loanInfo.collateral;
+    //     totalLpShares = loanInfo.totalLpShares;
+    //     expiry = loanInfo.expiry;
+    //     repaid = loanInfo.repaid;
+
+    // }
 
     function loanTerms(uint128 _inAmountAfterFees)
         public

@@ -16,7 +16,7 @@ describe("WETH-DAI Pool Testing", function () {
   const _liquidityBnd1 = ONE_DAI.mul(100000);
   const _liquidityBnd2 = ONE_DAI.mul(1000000);
   const _minLoan = ONE_DAI.mul(300);
-  const MIN_LIQUIDITY = ethers.BigNumber.from("100000000"); //100*10**6
+  const MIN_LIQUIDITY = ethers.BigNumber.from("10000000"); //100*10**6
   const DAI_HOLDER = "0x6c6bc977e13df9b0de53b251522280bb72383700";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
@@ -151,13 +151,13 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
 
     //remove liquidity
-    let lp1NumSharesPre = await poolWethDai.getLpArrayInfo(lp1.address);
+    let lp1NumSharesPre = await poolWethDai.getLpInfo(lp1.address);
     await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre.sharesOverTime[0]);
 
     //cannot remove twice
     await expect(poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumSharesPre)).to.be.reverted;
 
-    lp1NumSharesPost = await poolWethDai.getLpArrayInfo(lp1.address);
+    lp1NumSharesPost = await poolWethDai.getLpInfo(lp1.address);
     await expect(lp1NumSharesPost.sharesOverTime[0]).to.be.equal(0); // shares get overwritten to zero because LP claimed up until curr loan idx
 
     //ensure new lp cannot claim on previous loan
@@ -443,9 +443,9 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp2).claimFromAggregated(lp2.address, [0, 100,200], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await poolWethDai.getLpArrayInfo(lp1.address);
-    const lp2NumShares = await poolWethDai.getLpArrayInfo(lp2.address);
-    const lp3NumShares = await poolWethDai.getLpArrayInfo(lp3.address);
+    const lp1NumShares = await poolWethDai.getLpInfo(lp1.address);
+    const lp2NumShares = await poolWethDai.getLpInfo(lp2.address);
+    const lp3NumShares = await poolWethDai.getLpInfo(lp3.address);
 
     await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
     await poolWethDai.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
@@ -500,9 +500,9 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     //remove liquidity
-    const lp1NumShares = await poolWethDai.getLpArrayInfo(lp1.address);
-    const lp2NumShares = await poolWethDai.getLpArrayInfo(lp2.address);
-    const lp3NumShares = await poolWethDai.getLpArrayInfo(lp3.address);
+    const lp1NumShares = await poolWethDai.getLpInfo(lp1.address);
+    const lp2NumShares = await poolWethDai.getLpInfo(lp2.address);
+    const lp3NumShares = await poolWethDai.getLpInfo(lp3.address);
 
     await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lp1NumShares.sharesOverTime[0]);
     await poolWethDai.connect(lp2).removeLiquidity(lp2.address, lp2NumShares.sharesOverTime[0]);
@@ -559,7 +559,7 @@ describe("WETH-DAI Pool Testing", function () {
 
     loanTerms = await poolWethDai.loanTerms(loanInfo.collateral);
     balTestTokenPre = await DAI.balanceOf(borrower.address);
-    await poolWethDai.connect(borrower).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0);
+    await poolWethDai.connect(borrower).rollOver(1, 0, MAX_UINT128, timestamp+1000000000);
     balTestTokenPost = await DAI.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
