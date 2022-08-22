@@ -575,7 +575,7 @@ describe("PAXG-USDC Pool Testing", function () {
 
     loanTerms = await paxgPool.loanTerms(loanInfo.collateral);
     balTestTokenPre = await USDC.balanceOf(borrower.address);
-    await paxgPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000);
+    await paxgPool.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000,loanInfo.repayment.sub(loanTerms[0]));
     balTestTokenPost = await USDC.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
@@ -771,11 +771,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
 
     // check that lp is not entitled to repay
-    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith("UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, true, true, true]);
-    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith("UnapprovedSender");
 
     // check new loan terms
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
@@ -789,7 +789,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(borrower).setApprovals(lp1.address, [false, true, false, false, false]);
     preBalColl = await PAXG.balanceOf(lp1.address); 
     preBalLoanCcy = await USDC.balanceOf(lp1.address);
-    await paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000);
+    await paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, rollOverCost);
     postBalColl = await PAXG.balanceOf(lp1.address);
     postBalLoanCcy = await USDC.balanceOf(lp1.address);
     await expect(preBalColl).to.be.equal(postBalColl);
