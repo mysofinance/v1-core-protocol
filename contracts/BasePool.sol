@@ -1047,6 +1047,20 @@ abstract contract BasePool is IBasePool {
         }
     }
 
+    /**
+     * @notice Helper function when user is borrowing
+     * @dev This function is called by borrow and rollover
+     * @param _inAmountAfterFees Net amount of what was sent by borrower minus fees
+     * @param _minLoanLimit Minimum loan currency amount acceptable to borrower
+     * @param _maxRepayLimit Maximum allowable loan currency amount borrower is willing to repay
+     * @param _timestamp Time that is used to set loan expiry
+     * @return loanAmount Amount of loan Ccy given to the borrower
+     * @return repaymentAmount Amount of loan Ccy borrower needs to repay to claim collateral
+     * @return pledgeAmount Amount of collCcy reclaimable upon repayment
+     * @return expiry Timestamp after which loan expires
+     * @return _protocolFee Per transaction fee which levied for using the protocol
+     * @return _totalLiquidity Updated total liquidity after the borrow
+     */
     function _borrow(
         uint128 _inAmountAfterFees,
         uint128 _minLoanLimit,
