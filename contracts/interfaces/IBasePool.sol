@@ -325,7 +325,7 @@ interface IBasePool {
 
     /**
      * @notice Function returns if owner or beneficiary has approved a sender address for a given type
-     * @param _ownerOrBeneficiary Address which will be owner of beneficiary of transaction if approved
+     * @param _ownerOrBeneficiary Address which will be owner or beneficiary of transaction if approved
      * @param _sender Address which will be sending request on behalf of _ownerOrBeneficiary
      * @param _approvalType Type of approval requested { REPAY, ROLLOVER, ADD_LIQUIDITY, REMOVE_LIQUIDITY, CLAIM }
      * @return _approved True if approved, false otherwise

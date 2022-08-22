@@ -1159,7 +1159,7 @@ abstract contract BasePool is IBasePool {
      * @notice Helper function checks if function caller is a valid sender
      * @dev This function is called by addLiquidity, removeLiquidity, repay,
      * rollOver, claim, claimFromAggregated, claimReinvestmentCheck (ADD_LIQUIDITY)
-     * @param _ownerOrBeneficiary Address which will be owner of beneficiary of transaction if approved
+     * @param _ownerOrBeneficiary Address which will be owner or beneficiary of transaction if approved
      * @param _approvalType Type of approval requested { REPAY, ROLLOVER, ADD_LIQUIDITY, REMOVE_LIQUIDITY, CLAIM }
      */
     function checkSenderApproval(
