@@ -1237,12 +1237,20 @@ abstract contract BasePool is IBasePool {
         }
     }
 
+    /**
+    * @notice Function which gets fees (if any) on the collCcy
+    * @param _transferAmount Amount of collCcy to be transferred
+     */
     function getCollCcyTransferFee(uint128 _transferAmount)
         internal
         view
         virtual
         returns (uint128);
 
+    /**
+    * @notice Function which gets fees (if any) on the loanCcy
+    * @param _transferAmount Amount of loanCcy to be transferred
+     */
     function getLoanCcyTransferFee(uint128 _transferAmount)
         internal
         view
