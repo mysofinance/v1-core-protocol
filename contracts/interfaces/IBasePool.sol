@@ -278,7 +278,7 @@ interface IBasePool {
      * @return repaymentAmount Amount of loan currency borrower must repay to reclaim collateral
      * @return pledgeAmount Amount of collateral currency borrower retrieves upon repayment
      * @return _protocolFee Amount of collateral currency to be transferred to treasury
-     * @return _totalLiquidity Total liquidity of the pool
+     * @return _totalLiquidity Total liquidity of the pool (pre-borrow)
      */
     function loanTerms(uint128 _inAmountAfterFees)
         external
@@ -305,22 +305,60 @@ interface IBasePool {
         uint256 _shares
     ) external view returns (uint256 repayments, uint256 collateral);
 
+    /**
+     * @notice Getter which returns the pool's collateral currency
+     * @return The collateral currency token address
+     */
     function collCcyToken() external view returns (address);
 
+    /**
+     * @notice Getter which returns the pool's loan currency
+     * @return The collateral loan token address
+     */
     function loanCcyToken() external view returns (address);
 
+    /**
+     * @notice Getter which returns the pool's maximum loan per pledged collateral unit
+     * @return The maximum loan per pledged collateral unit
+     */
     function maxLoanPerColl() external view returns (uint256);
 
+    /**
+     * @notice Getter which returns the pool's protocol fee
+     * @return The protocol fee
+     */
     function protocolFee() external view returns (uint128);
 
+    /**
+     * @notice Getter which returns the pool's total outstanding LP shares
+     * @return The total outstanding LP shares
+     */
     function totalLpShares() external view returns (uint128);
 
+    /**
+     * @notice Getter which returns the pool's current loan idx counter; the next incoming
+     * loan will receive this loan idx;
+     * @return The current loan idx counter
+     */
     function loanIdx() external view returns (uint256);
 
+    /**
+     * @notice Getter which returns the pool's minimum loan size
+     * @return The minimum loan size
+     */
     function minLoan() external view returns (uint256);
 
-    function loanIdxToBorrower(uint256) external view returns (address);
+    /**
+     * @notice Getter which returns the borrower for a given loan idx
+     * @param loanIdx The loan idx
+     * @return The borrower address
+     */
+    function loanIdxToBorrower(uint256 loanIdx) external view returns (address);
 
+    /**
+     * @notice Getter which returns the base aggregation size
+     * @return The base aggregation size
+     */
     function baseAggrBucketSize() external view returns (uint256);
 
     /**

@@ -1092,7 +1092,7 @@ abstract contract BasePool is IBasePool {
      * @return pledgeAmount Amount of collCcy reclaimable upon repayment
      * @return expiry Timestamp after which loan expires
      * @return _protocolFee Per transaction fee which levied for using the protocol
-     * @return _totalLiquidity Updated total liquidity after the borrow
+     * @return _totalLiquidity Updated total liquidity (pre-borrow)
      */
     function _borrow(
         uint128 _inAmountAfterFees,
