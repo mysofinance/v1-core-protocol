@@ -377,7 +377,8 @@ abstract contract BasePool is IBasePool {
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline
+        uint256 _deadline,
+        uint128 _sendAmount
     ) external override {
         uint256 timestamp = checkTimestamp(_deadline);
         // verify loan info and eligibility
@@ -404,6 +405,19 @@ abstract contract BasePool is IBasePool {
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
         if (loanAmount > loanInfo.repayment) revert InvalidRollOver();
+        if (
+            _sendAmount - getLoanCcyTransferFee(_sendAmount) <
+            loanInfo.repayment - loanAmount
+        ) revert InvalidSendAmount();
+        if (
+            _sendAmount - getLoanCcyTransferFee(_sendAmount) !=
+            loanInfo.repayment - loanAmount
+        ) {
+            loanInfo.repayment =
+                _sendAmount +
+                loanAmount -
+                getLoanCcyTransferFee(_sendAmount);
+        }
         // update the aggregation mapping for repaid loan
         updateAggregations(
             _loanIdx,
@@ -414,7 +428,6 @@ abstract contract BasePool is IBasePool {
         );
 
         {
-            uint128 rollOverCost = loanInfo.repayment - loanAmount;
             // set new loan info
             loanInfo.repaid = true;
             loanIdxToBorrower[loanIdx] = loanOwner;
@@ -437,7 +450,7 @@ abstract contract BasePool is IBasePool {
             IERC20Metadata(loanCcyToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                rollOverCost + getLoanCcyTransferFee(rollOverCost) //TODO: this slightly overshoots the actual transfer amount needed to pay for transfer fees
+                _sendAmount
             );
             // transfer protocol fee to treasury in collateral ccy
             IERC20Metadata(collCcyToken).safeTransfer(TREASURY, _protocolFee);
@@ -632,26 +645,6 @@ abstract contract BasePool is IBasePool {
         sharesOverTime = lpInfo.sharesOverTime;
         loanIdxsWhereSharesChanged = lpInfo.loanIdxsWhereSharesChanged;
     }
-
-    // function getOwnerAndInfoFromLoanIdx(
-    //     uint256 _loanIdx
-    // ) external view returns (
-    //     address owner,
-    //     uint128 repayment,
-    //     uint128 collateral,
-    //     uint128 totalLpShares,
-    //     uint32 expiry,
-    //     bool repaid
-    // ){
-    //     owner = loanIdxToBorrower[_loanIdx];
-    //     LoanInfo memory loanInfo = loanIdxToLoanInfo[_loanIdx];
-    //     repayment = loanInfo.repayment;
-    //     collateral = loanInfo.collateral;
-    //     totalLpShares = loanInfo.totalLpShares;
-    //     expiry = loanInfo.expiry;
-    //     repaid = loanInfo.repaid;
-
-    // }
 
     function loanTerms(uint128 _inAmountAfterFees)
         public
@@ -927,6 +920,17 @@ abstract contract BasePool is IBasePool {
         }
     }
 
+    /**
+     * @notice Helper function when adding liquidity
+     * @dev This function is called by addLiquidity, but also
+     * by claimants who would like to reinvest their loanCcy
+     * portion of the claim
+     * @param _onBehalfOf Recipient of the LP shares
+     * @param _inAmountAfterFees Net amount of what was sent by Lp minus fees
+     * @return dust If no Lp shares, dust is any remaining excess liquidity (i.e. rounding)
+     * @return newLpShares Amount of new Lp shares to be credited to Lp.
+     * @return earliestRemove Earliest timestamp from which Lp is allowed to remove liquidity
+     */
     function _addLiquidity(address _onBehalfOf, uint256 _inAmountAfterFees)
         internal
         returns (
@@ -977,6 +981,16 @@ abstract contract BasePool is IBasePool {
         lpInfo.earliestRemove = earliestRemove;
     }
 
+    /**
+     * @notice Function which updates array (and possibly array pointer) info
+     * @dev There are many different cases depending on if shares over time is length 1,
+     * if the Lp fromLoanId = loanIdx, if last value of loanIdxsWhereSharesChanged = loanIdx,
+     * and possibly on the value of the penultimate shares over time array = newShares...
+     * further discussion of all cases is provided in gitbook documentation
+     * @param _lpInfo Struct of the info for the current Lp
+     * @param _newLpShares Amount of new Lp shares to add/remove from current Lp position
+     * @param _add Flag that allows for addition of shares for addLiquidity and subtraction for remove.
+     */
     function updateLpArrays(
         LpInfo storage _lpInfo,
         uint256 _newLpShares,

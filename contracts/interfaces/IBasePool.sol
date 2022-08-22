@@ -129,12 +129,14 @@ interface IBasePool {
      * @param _minLoanLimit Minimum amount of loan currency acceptable from new loan.
      * @param _maxRepayLimit Maximum allowable loan currency amount borrower for new loan.
      * @param _deadline Timestamp after which transaction will be void
+     * @param _sendAmount Amount of loan currency borrower needs to send to pay difference in repayment and loan amount
      */
     function rollOver(
         uint256 _loanIdx,
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
-        uint256 _deadline
+        uint256 _deadline,
+        uint128 _sendAmount
     ) external;
 
     /**
@@ -187,20 +189,6 @@ interface IBasePool {
     ) external;
 
     /**
-     * @notice Function which returns claims for a given aggregated from and to index and amount of sharesOverTime
-     * @dev This function is called internally, but also can be used by other protocols so has some checks
-     * which are unnecessary if it was solely an internal function
-     * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
-     * @param _toLoanIdx End loan index of the aggregation
-     * @param _shares Amount of sharesOverTime which the Lp owned over this given aggregation period
-     */
-    function getClaimsFromAggregated(
-        uint256 _fromLoanIdx,
-        uint256 _toLoanIdx,
-        uint256 _shares
-    ) external view returns (uint256 repayments, uint256 collateral);
-
-    /**
      * @notice Function which sets approval for another to perform a certain function on sender's behalf
      * @param _approvee This address is being given approval for the action(s) by the current sender
      * @param _approvals Array of flags to set which actions are approved or not approved
@@ -248,6 +236,20 @@ interface IBasePool {
             uint128 _protocolFee,
             uint256 _totalLiquidity
         );
+
+    /**
+     * @notice Function which returns claims for a given aggregated from and to index and amount of sharesOverTime
+     * @dev This function is called internally, but also can be used by other protocols so has some checks
+     * which are unnecessary if it was solely an internal function
+     * @param _fromLoanIdx Loan index on which he wants to start aggregate claim (must be mod 0 wrt 100)
+     * @param _toLoanIdx End loan index of the aggregation
+     * @param _shares Amount of sharesOverTime which the Lp owned over this given aggregation period
+     */
+    function getClaimsFromAggregated(
+        uint256 _fromLoanIdx,
+        uint256 _toLoanIdx,
+        uint256 _shares
+    ) external view returns (uint256 repayments, uint256 collateral);
 
     function collCcyToken() external view returns (address);
 

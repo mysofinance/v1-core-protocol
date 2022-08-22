@@ -16,7 +16,7 @@ describe("WETH-DAI Pool Testing", function () {
   const _liquidityBnd1 = ONE_DAI.mul(100000);
   const _liquidityBnd2 = ONE_DAI.mul(1000000);
   const _minLoan = ONE_DAI.mul(300);
-  const MIN_LIQUIDITY = ethers.BigNumber.from("10000000"); //100*10**6
+  const MIN_LIQUIDITY = ethers.BigNumber.from("10000000"); //10*10**6
   const DAI_HOLDER = "0x6c6bc977e13df9b0de53b251522280bb72383700";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
@@ -559,7 +559,7 @@ describe("WETH-DAI Pool Testing", function () {
 
     loanTerms = await poolWethDai.loanTerms(loanInfo.collateral);
     balTestTokenPre = await DAI.balanceOf(borrower.address);
-    await poolWethDai.connect(borrower).rollOver(1, 0, MAX_UINT128, timestamp+1000000000);
+    await poolWethDai.connect(borrower).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, loanInfo.repayment.sub(loanTerms[0]));
     balTestTokenPost = await DAI.balanceOf(borrower.address);
 
     expRollCost = loanInfo.repayment.sub(loanTerms[0]);
