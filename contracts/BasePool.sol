@@ -599,6 +599,9 @@ abstract contract BasePool is IBasePool {
             isApproved[msg.sender][_approvee][
                 IBasePool.ApprovalTypes(index)
             ] = _approvals[index];
+            if(_approvals[index]){
+                emit Approval(msg.sender, _approvee, index);
+            }
             unchecked {
                 index++;
             }

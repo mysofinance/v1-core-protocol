@@ -53,6 +53,11 @@ interface IBasePool {
         uint256 newLpShares,
         uint256 earliestRemove
     );
+    event Approval(
+        address ownerOrBeneficiary,
+        address sender,
+        uint256 index
+    );
 
     enum ApprovalTypes {
         REPAY,
