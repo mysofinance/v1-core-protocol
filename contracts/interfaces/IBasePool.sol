@@ -278,7 +278,7 @@ interface IBasePool {
      * @return repaymentAmount Amount of loan currency borrower must repay to reclaim collateral
      * @return pledgeAmount Amount of collateral currency borrower retrieves upon repayment
      * @return _protocolFee Amount of collateral currency to be transferred to treasury
-     * @return _totalLiquidity Total liquidity of the pool (pre-borrow)
+     * @return _totalLiquidity The total liquidity of the pool (pre-borrow) that is available for new loans 
      */
     function loanTerms(uint128 _inAmountAfterFees)
         external
@@ -307,7 +307,7 @@ interface IBasePool {
 
     /**
      * @notice Getter which returns the pool's total liquidity available for new loans
-     * @return The liquidity of the pool that is available for new loans
+     * @return The total liquidity of the pool that is available for new loans
      */
     function getTotalLiquidity() external view returns (uint256);
 
@@ -319,13 +319,13 @@ interface IBasePool {
 
     /**
      * @notice Getter which returns the pool's loan currency
-     * @return The collateral loan token address
+     * @return The loan currency token address
      */
     function loanCcyToken() external view returns (address);
 
     /**
-     * @notice Getter which returns the pool's maximum loan per pledged collateral unit
-     * @return The maximum loan per pledged collateral unit
+     * @notice Getter which returns the pool's maximum loan amount per pledged collateral unit
+     * @return The maximum loan amount per pledged collateral unit
      */
     function maxLoanPerColl() external view returns (uint256);
 
