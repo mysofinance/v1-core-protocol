@@ -53,7 +53,7 @@ interface IBasePool {
         uint256 newLpShares,
         uint256 earliestRemove
     );
-    event Approval(
+    event ApprovalUpdate(
         address ownerOrBeneficiary,
         address sender,
         uint256 index

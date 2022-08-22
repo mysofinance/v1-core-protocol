@@ -599,8 +599,8 @@ abstract contract BasePool is IBasePool {
             isApproved[msg.sender][_approvee][
                 IBasePool.ApprovalTypes(index)
             ] = _approvals[index];
-            if(_approvals[index]){
-                emit Approval(msg.sender, _approvee, index);
+            if (_approvals[index]) {
+                emit ApprovalUpdate(msg.sender, _approvee, index);
             }
             unchecked {
                 index++;
@@ -1241,8 +1241,8 @@ abstract contract BasePool is IBasePool {
     }
 
     /**
-    * @notice Function which gets fees (if any) on the collCcy
-    * @param _transferAmount Amount of collCcy to be transferred
+     * @notice Function which gets fees (if any) on the collCcy
+     * @param _transferAmount Amount of collCcy to be transferred
      */
     function getCollCcyTransferFee(uint128 _transferAmount)
         internal
@@ -1251,8 +1251,8 @@ abstract contract BasePool is IBasePool {
         returns (uint128);
 
     /**
-    * @notice Function which gets fees (if any) on the loanCcy
-    * @param _transferAmount Amount of loanCcy to be transferred
+     * @notice Function which gets fees (if any) on the loanCcy
+     * @param _transferAmount Amount of loanCcy to be transferred
      */
     function getLoanCcyTransferFee(uint128 _transferAmount)
         internal
