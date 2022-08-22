@@ -62,6 +62,41 @@ interface IBasePool {
         CLAIM
     }
 
+    struct LpInfo {
+        // lower bound loan idx (incl.) from which LP is entitled to claim; gets updated with every claim
+        uint32 fromLoanIdx;
+        // timestamp from which on LP is allowed to remove liquidity
+        uint32 earliestRemove;
+        // current share pointer to indicate which sharesOverTime element to be used fromLoanIdx until loanIdxsWhereSharesChanged[currSharePtr] or, if
+        // out-of-bounds, until global loan idx
+        uint32 currSharePtr;
+        // array of len n, with elements representing number of sharesOverTime and new elements being added for consecutive adding/removing of liquidity
+        uint256[] sharesOverTime;
+        // array of len n-1, with elements representing upper bound loan idx bounds (excl.); LP can claim until loanIdxsWhereSharesChanged[i] with
+        // sharesOverTime[i]; and if index i is out-of-bounds of loanIdxsWhereSharesChanged[] then LP can claim up until latest loan idx with sharesOverTime[i]
+        uint256[] loanIdxsWhereSharesChanged;
+    }
+
+    struct LoanInfo {
+        // repayment amount due (post potential fees) to reclaim collateral
+        uint128 repayment;
+        // reclaimable collateral amount
+        uint128 collateral;
+        // number of shares for which repayment, respectively collateral, needs to be split
+        uint128 totalLpShares;
+        // timestamp until repayment is possible and after which borrower forfeits collateral
+        uint32 expiry;
+        // flag whether loan was repaid or not
+        bool repaid;
+    }
+
+    struct AggClaimsInfo {
+        // aggregated repayment amount
+        uint128 repayments;
+        // aggregated collateral amount
+        uint128 collateral;
+    }
+
     /**
      * @notice Function which adds to an LPs current position
      * @dev This function will update loanIdxsWhereSharesChanged only if not
