@@ -624,6 +624,22 @@ abstract contract BasePool is IBasePool {
         loanIdxsWhereSharesChanged = lpInfo.loanIdxsWhereSharesChanged;
     }
 
+    function getRateParams()
+        external
+        view
+        returns (
+            uint256 _liquidityBnd1,
+            uint256 _liquidityBnd2,
+            uint256 _r1,
+            uint256 _r2
+        )
+    {
+        _liquidityBnd1 = liquidityBnd1;
+        _liquidityBnd2 = liquidityBnd2;
+        _r1 = r1;
+        _r2 = r2;
+    }
+
     function loanTerms(uint128 _inAmountAfterFees)
         public
         view
@@ -1048,6 +1064,23 @@ abstract contract BasePool is IBasePool {
     }
 
     /**
+     * @notice Helper function that pushes onto both LP Info arrays
+     * @dev This function is called by updateLpArrays function in two cases when both
+     * LP Info arrays, sharesOverTime and loanIdxsWhereSharesChanged, are pushed onto
+     * @param _lpInfo Struct of the info for the current LP
+     * @param _newShares New amount of LP shares pushed onto sharesOverTime array
+     * @param _loanIdx Current global loanIdx pushed onto loanIdxsWhereSharesChanged array
+     */
+    function pushLpArrays(
+        LpInfo storage _lpInfo,
+        uint256 _newShares,
+        uint256 _loanIdx
+    ) internal {
+        _lpInfo.sharesOverTime.push(_newShares);
+        _lpInfo.loanIdxsWhereSharesChanged.push(_loanIdx);
+    }
+
+    /**
      * @notice Helper function when user is borrowing
      * @dev This function is called by borrow and rollover
      * @param _inAmountAfterFees Net amount of what was sent by borrower minus fees
@@ -1092,6 +1125,13 @@ abstract contract BasePool is IBasePool {
         expiry = uint32(_timestamp) + LOAN_TENOR;
     }
 
+    /**
+     * @notice Helper function called whenever a function needs to check a deadline
+     * @dev This function is called by addLiquidity, borrow, rollover, and if reinvestment on claiming,
+     * it will be called by claimReinvestmentCheck
+     * @param _deadline Last timestamp after which function will revert
+     * @return timestamp Current timestamp passed back to function
+     */
     function checkTimestamp(uint256 _deadline)
         internal
         view
@@ -1101,6 +1141,12 @@ abstract contract BasePool is IBasePool {
         if (timestamp > _deadline) revert PastDeadline();
     }
 
+    /**
+     * @notice Helper function called whenever reinvestment is possible
+     * @dev This function is called by claim and claimFromAggregated if reinvestment is desired
+     * @param _deadline Last timestamp after which function will revert
+     * @param _onBehalfOf Recipient of the reinvested LP shares
+     */
     function claimReinvestmentCheck(uint256 _deadline, address _onBehalfOf)
         internal
         view
@@ -1109,6 +1155,13 @@ abstract contract BasePool is IBasePool {
         checkSenderApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
     }
 
+    /**
+     * @notice Helper function checks if function caller is a valid sender
+     * @dev This function is called by addLiquidity, removeLiquidity, repay,
+     * rollOver, claim, claimFromAggregated, claimReinvestmentCheck (ADD_LIQUIDITY)
+     * @param _ownerOrBeneficiary Address which will be owner of beneficiary of transaction if approved
+     * @param _approvalType Type of approval requested { REPAY, ROLLOVER, ADD_LIQUIDITY, REMOVE_LIQUIDITY, CLAIM }
+     */
     function checkSenderApproval(
         address _ownerOrBeneficiary,
         IBasePool.ApprovalTypes _approvalType
@@ -1119,6 +1172,16 @@ abstract contract BasePool is IBasePool {
         ) revert UnapprovedSender();
     }
 
+    /**
+     * @notice Helper function used by claim function
+     * @dev This function is called by claim to check the passed array
+     * is valid and return the repayment and collateral amounts
+     * @param _loanIdxs Array of loan Idxs over which the LP would like to claim
+     * @param arrayLen Length of the loanIdxs array
+     * @param _shares The LP shares owned by the LP during the period of the claims
+     * @return repayments The amount of loanCcy over claims to which LP is entitled
+     * @return collateral The amount of collCcy over claims to which LP is entitled
+     */
     function getClaimsFromList(
         uint256[] calldata _loanIdxs,
         uint256 arrayLen,
@@ -1172,31 +1235,6 @@ abstract contract BasePool is IBasePool {
         } else {
             rate = r2;
         }
-    }
-
-    function getRateParams()
-        external
-        view
-        returns (
-            uint256 _liquidityBnd1,
-            uint256 _liquidityBnd2,
-            uint256 _r1,
-            uint256 _r2
-        )
-    {
-        _liquidityBnd1 = liquidityBnd1;
-        _liquidityBnd2 = liquidityBnd2;
-        _r1 = r1;
-        _r2 = r2;
-    }
-
-    function pushLpArrays(
-        LpInfo storage _lpInfo,
-        uint256 _newShares,
-        uint256 _loanIdx
-    ) internal {
-        _lpInfo.sharesOverTime.push(_newShares);
-        _lpInfo.loanIdxsWhereSharesChanged.push(_loanIdx);
     }
 
     function getCollCcyTransferFee(uint128 _transferAmount)

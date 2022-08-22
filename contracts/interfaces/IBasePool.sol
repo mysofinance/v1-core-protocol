@@ -253,6 +253,25 @@ interface IBasePool {
         );
 
     /**
+     * @notice Function which returns rate parameters need for interest rate calculation
+     * @dev This function can be used to get parameters needed for interest rate calculations
+     * @param _liquidityBnd1 Amount of liquidity the pool needs to end the reciprocal (hyperbola)
+     * range and start "target" range
+     * @param _liquidityBnd2 Amount of liquidity the pool needs to end the "target" range and start flat rate
+     * @param _r1 Rate that is used at start of target range
+     * @param _r2 Minimum rate at end of target range. This is minimum allowable rate
+     */
+    function getRateParams()
+        external
+        view
+        returns (
+            uint256 _liquidityBnd1,
+            uint256 _liquidityBnd2,
+            uint256 _r1,
+            uint256 _r2
+        );
+
+    /**
      * @notice Function which calculates loan terms
      * @param _inAmountAfterFees Amount of collateral currency after fees are deducted
      * @return loanAmount Amount of loan currency to be trasnferred to the borrower
@@ -298,24 +317,21 @@ interface IBasePool {
 
     function loanIdx() external view returns (uint256);
 
-    function getRateParams()
-        external
-        view
-        returns (
-            uint256 _liquidityBnd1,
-            uint256 _liquidityBnd2,
-            uint256 _r1,
-            uint256 _r2
-        );
-
     function minLoan() external view returns (uint256);
 
     function loanIdxToBorrower(uint256) external view returns (address);
 
     function baseAggrBucketSize() external view returns (uint256);
 
+    /**
+     * @notice Function returns if owner or beneficiary has approved a sender address for a given type
+     * @param _ownerOrBeneficiary Address which will be owner of beneficiary of transaction if approved
+     * @param _sender Address which will be sending request on behalf of _ownerOrBeneficiary
+     * @param _approvalType Type of approval requested { REPAY, ROLLOVER, ADD_LIQUIDITY, REMOVE_LIQUIDITY, CLAIM }
+     * @return _approved True if approved, false otherwise
+     */
     function isApproved(
-        address _ownerOrBenficiary,
+        address _ownerOrBeneficiary,
         address _sender,
         ApprovalTypes _approvalType
     ) external view returns (bool _approved);
