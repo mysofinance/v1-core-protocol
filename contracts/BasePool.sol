@@ -48,16 +48,16 @@ abstract contract BasePool is IBasePool {
     error ZeroShareClaim();
 
     address constant TREASURY = 0x1234567890000000000000000000000000000001;
-    uint24 immutable LOAN_TENOR;
-    uint32 constant MIN_LPING_PERIOD = 30;
-    uint8 immutable COLL_TOKEN_DECIMALS;
+    uint256 immutable LOAN_TENOR;
+    uint256 constant MIN_LPING_PERIOD = 30;
+    uint256 immutable COLL_TOKEN_DECIMALS;
 
     uint256 constant BASE = 10**18;
     uint256 constant MIN_LIQUIDITY = 10 * 10**6;
     uint256 public immutable maxLoanPerColl;
     address public immutable collCcyToken;
     address public immutable loanCcyToken;
-    uint128 constant MAX_PROTOCOL_FEE = 5 * 10**15;
+    uint256 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
     uint128 public immutable protocolFee;
     uint128 public totalLpShares;
@@ -86,8 +86,8 @@ abstract contract BasePool is IBasePool {
     constructor(
         address _loanCcyToken,
         address _collCcyToken,
-        uint24 _loanTenor,
-        uint128 _maxLoanPerColl,
+        uint256 _loanTenor,
+        uint256 _maxLoanPerColl,
         uint256 _r1,
         uint256 _r2,
         uint256 _liquidityBnd1,
@@ -976,7 +976,7 @@ abstract contract BasePool is IBasePool {
             // update both LP arrays and check for auto increment
             updateLpArrays(lpInfo, newLpShares, true);
         }
-        earliestRemove = uint32(block.timestamp) + MIN_LPING_PERIOD;
+        earliestRemove = uint32(block.timestamp + MIN_LPING_PERIOD);
         lpInfo.earliestRemove = earliestRemove;
     }
 
@@ -1122,7 +1122,7 @@ abstract contract BasePool is IBasePool {
         assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
-        expiry = uint32(_timestamp) + LOAN_TENOR;
+        expiry = uint32(_timestamp + LOAN_TENOR);
     }
 
     /**

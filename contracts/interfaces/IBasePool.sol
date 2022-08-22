@@ -6,8 +6,8 @@ interface IBasePool {
     event NewSubPool(
         address collCcyToken,
         address loanCcyToken,
-        uint24 loanTenor,
-        uint128 maxLoanPerColl,
+        uint256 loanTenor,
+        uint256 maxLoanPerColl,
         uint256 r1,
         uint256 r2,
         uint256 liquidityBnd1,
