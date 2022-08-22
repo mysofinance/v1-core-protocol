@@ -229,7 +229,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claim(lp3.address, loanIds, false, timestamp+9999999);
   });
   
-  it("Should handle aggregate claims correctly test (1/2)", async function () {
+  it("Should handle aggregate claims correctly (1/2)", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+60, 0);
@@ -278,7 +278,7 @@ describe("WETH-USDC Pool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     // cannot claim twice
-    await expect(poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [1, 100], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [1, 100], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
     
     // lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
@@ -289,7 +289,7 @@ describe("WETH-USDC Pool Testing", function () {
     await expect(benchmarkDiff).to.be.equal(diff);
 
     // cannot claim twice
-    await expect(poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
 
     // lp3 claims
     preClaimBal = await USDC.balanceOf(lp3.address);
@@ -344,7 +344,7 @@ describe("WETH-USDC Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await USDC.balanceOf(lp1.address);
-    await expect(poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [1, 3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [1, 3], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
     await poolWethUsdc.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
     postClaimEthBal = await WETH.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await USDC.balanceOf(lp1.address);
@@ -366,7 +366,7 @@ describe("WETH-USDC Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     preClaimTokenBal = await USDC.balanceOf(lp2.address);
-    await expect(poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [1, 3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [1, 3], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
     await poolWethUsdc.connect(lp2).claim(lp2.address, [1,2,3], false, timestamp+9999999);
     postClaimEthBal = await WETH.balanceOf(lp2.address); //await ethers.provider.getBalance(lp2.address);
     postClaimTokenBal = await USDC.balanceOf(lp2.address);
@@ -388,7 +388,7 @@ describe("WETH-USDC Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await USDC.balanceOf(lp3.address);
-    await expect(poolWethUsdc.connect(lp3).claimFromAggregated(lp3.address, [1, 3], false, timestamp+9999999)).to.be.reverted;
+    await expect(poolWethUsdc.connect(lp3).claimFromAggregated(lp3.address, [1, 3], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
     await poolWethUsdc.connect(lp3).claim(lp3.address, [1,2,3], false, timestamp+9999999);
     postClaimEthBal = await WETH.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await USDC.balanceOf(lp3.address);
