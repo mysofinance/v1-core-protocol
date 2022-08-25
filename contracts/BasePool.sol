@@ -964,6 +964,7 @@ abstract contract BasePool is IBasePool {
         }
         totalLpShares += uint128(newLpShares);
         // purposefully multiply after division
+        // newLpShares only needs to be multiplied once to test if newLpShares = 0
         if (
             ((minLoan * BASE) / totalLpShares) * newLpShares == 0 ||
             (((10**COLL_TOKEN_DECIMALS * minLoan) / maxLoanPerColl) * BASE) /

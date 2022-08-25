@@ -1122,15 +1122,15 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp4).addLiquidity(lp4.address, ONE_USDC.mul(1000000000000), timestamp+60, 0);
     await poolWethUsdc.connect(lp5).addLiquidity(lp5.address, ONE_USDC.mul(1000000000000), timestamp+60, 0);
 
-    let totalRepayments = ethers.BigNumber.from(0);
-    let totalLeftColl = ethers.BigNumber.from(0);
+    let aggregateRepaymentsPerShare = ethers.BigNumber.from(0);
+    let aggregateCollPerShare = ethers.BigNumber.from(0);
     const totalLpShares = await poolWethUsdc.totalLpShares();
 
     for (let i = 0; i < 5000; i++) {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.div(2), 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+1);
-        totalLeftColl = totalLeftColl.add(loanInfo[1].mul(MONE).div(totalLpShares));
+        aggregateCollPerShare = aggregateCollPerShare.add(loanInfo[1].mul(MONE).div(totalLpShares));
       } catch(error) {
         console.log(i, error)
       }
@@ -1142,7 +1142,7 @@ describe("WETH-USDC Pool Testing", function () {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.div(2), 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+5001);
-        totalRepayments = totalRepayments.add(loanInfo[0].mul(MONE).div(totalLpShares));
+        aggregateRepaymentsPerShare = aggregateRepaymentsPerShare.add(loanInfo[0].mul(MONE).div(totalLpShares));
         await poolWethUsdc.connect(borrower).repay(i+5001, borrower.address, loanInfo.repayment);
       } catch(error) {
         console.log(i, error)
@@ -1162,7 +1162,7 @@ describe("WETH-USDC Pool Testing", function () {
     postClaimBalLoanCcy = await USDC.balanceOf(lp1.address);
     postClaimBalCollCcy = await WETH.balanceOf(lp1.address);
     const firstLpShares = ONE_USDC.mul(1000000000000);
-    expect(postClaimBalCollCcy.sub(preClaimBalCollCcy)).to.be.equal(totalLeftColl.mul(firstLpShares).div(MONE));
-    expect(postClaimBalLoanCcy.sub(preClaimBalLoanCcy)).to.be.equal(totalRepayments.mul(firstLpShares).div(MONE));
+    expect(postClaimBalCollCcy.sub(preClaimBalCollCcy)).to.be.equal(aggregateCollPerShare.mul(firstLpShares).div(MONE));
+    expect(postClaimBalLoanCcy.sub(preClaimBalLoanCcy)).to.be.equal(aggregateRepaymentsPerShare.mul(firstLpShares).div(MONE));
   })
 });
