@@ -655,8 +655,8 @@ abstract contract BasePool is IBasePool {
         )
     {
         // compute terms (as uint256)
-        _protocolFee = uint128((_inAmountAfterFees * protocolFee) / BASE);
-        uint256 pledge = _inAmountAfterFees - _protocolFee;
+        uint256 _tempProtocolFee = (_inAmountAfterFees * protocolFee) / BASE;
+        uint256 pledge = _inAmountAfterFees - _tempProtocolFee;
         _totalLiquidity = getTotalLiquidity();
         if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
         uint256 loan = (pledge *
@@ -680,6 +680,7 @@ abstract contract BasePool is IBasePool {
         // return terms (as uint128)
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
+        _protocolFee = uint128(_tempProtocolFee);
         pledgeAmount = uint128(pledge);
         if (
             repaymentAmount <= loanAmount ||
