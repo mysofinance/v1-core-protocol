@@ -12,7 +12,8 @@ interface IBasePool {
         uint256 r2,
         uint256 liquidityBnd1,
         uint256 liquidityBnd2,
-        uint256 minLoan
+        uint256 minLoan,
+        uint128 protocolFee
     );
     event AddLiquidity(
         uint256 amount,
@@ -315,30 +316,6 @@ interface IBasePool {
      * @return The total liquidity of the pool that is available for new loans
      */
     function getTotalLiquidity() external view returns (uint256);
-
-    /**
-     * @notice Getter which returns the pool's collateral currency
-     * @return The collateral currency token address
-     */
-    function collCcyToken() external view returns (address);
-
-    /**
-     * @notice Getter which returns the pool's loan currency
-     * @return The loan currency token address
-     */
-    function loanCcyToken() external view returns (address);
-
-    /**
-     * @notice Getter which returns the pool's maximum loan amount per pledged collateral unit
-     * @return The maximum loan amount per pledged collateral unit
-     */
-    function maxLoanPerColl() external view returns (uint256);
-
-    /**
-     * @notice Getter which returns the pool's protocol fee
-     * @return The protocol fee
-     */
-    function protocolFee() external view returns (uint128);
 
     /**
      * @notice Getter which returns the pool's total outstanding LP shares
