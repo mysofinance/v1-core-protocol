@@ -51,7 +51,7 @@ abstract contract BasePool is IBasePool {
     address immutable loanCcyToken;
     uint256 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
-    uint128 immutable protocolFee;
+    uint256 immutable protocolFee;
     uint128 public totalLpShares;
     uint256 totalLiquidity;
     uint256 public loanIdx;
@@ -87,7 +87,7 @@ abstract contract BasePool is IBasePool {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _protocolFee
+        uint256 _protocolFee
     ) {
         if (_loanCcyToken == address(0) || _collCcyToken == address(0))
             revert InvalidConstructorParam({code: 1});
@@ -232,7 +232,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(
                 _inAmountAfterFees,
@@ -373,7 +373,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
@@ -650,13 +650,13 @@ abstract contract BasePool is IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         )
     {
         // compute terms (as uint256)
-        uint256 _tempProtocolFee = (_inAmountAfterFees * protocolFee) / BASE;
-        uint256 pledge = _inAmountAfterFees - _tempProtocolFee;
+        _protocolFee = (_inAmountAfterFees * protocolFee) / BASE;
+        uint256 pledge = _inAmountAfterFees - _protocolFee;
         _totalLiquidity = getTotalLiquidity();
         if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
         uint256 loan = (pledge *
@@ -680,7 +680,6 @@ abstract contract BasePool is IBasePool {
         // return terms (as uint128)
         loanAmount = uint128(loan);
         repaymentAmount = uint128(repayment);
-        _protocolFee = uint128(_tempProtocolFee);
         pledgeAmount = uint128(pledge);
         if (
             repaymentAmount <= loanAmount ||
@@ -1114,7 +1113,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         )
     {

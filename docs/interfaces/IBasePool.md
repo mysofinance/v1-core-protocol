@@ -259,7 +259,7 @@ Getter which returns the borrower for a given loan idx
 ### loanTerms
 
 ```solidity
-function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint128 _protocolFee, uint256 _totalLiquidity)
+function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint256 _protocolFee, uint256 _totalLiquidity)
 ```
 
 Function which calculates loan terms
@@ -279,7 +279,7 @@ Function which calculates loan terms
 | loanAmount | uint128 | Amount of loan currency to be trasnferred to the borrower |
 | repaymentAmount | uint128 | Amount of loan currency borrower must repay to reclaim collateral |
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
-| _protocolFee | uint128 | Amount of collateral currency to be transferred to treasury |
+| _protocolFee | uint256 | Amount of collateral currency to be transferred to treasury |
 | _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
 ### minLoan
@@ -526,7 +526,7 @@ event FeeUpdate(uint128 oldFee, uint128 newFee)
 ### NewSubPool
 
 ```solidity
-event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan, uint128 protocolFee)
+event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan, uint256 protocolFee)
 ```
 
 
@@ -546,7 +546,7 @@ event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, 
 | liquidityBnd1  | uint256 | undefined |
 | liquidityBnd2  | uint256 | undefined |
 | minLoan  | uint256 | undefined |
-| protocolFee  | uint128 | undefined |
+| protocolFee  | uint256 | undefined |
 
 ### Reinvest
 

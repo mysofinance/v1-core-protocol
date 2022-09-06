@@ -13,7 +13,7 @@ interface IBasePool {
         uint256 liquidityBnd1,
         uint256 liquidityBnd2,
         uint256 minLoan,
-        uint128 protocolFee
+        uint256 protocolFee
     );
     event AddLiquidity(
         uint256 amount,
@@ -293,7 +293,7 @@ interface IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         );
 
