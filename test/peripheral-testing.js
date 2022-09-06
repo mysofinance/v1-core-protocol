@@ -58,7 +58,7 @@ describe("Peripheral testing", function () {
     peripheral = await Peripheral.deploy(poolWethUsdc.address, _loanCcyToken, _collCcyToken);
     await peripheral.deployed();
 
-    // approve DAI and WETH balances
+    // approve USDC and WETH balances
     await USDC.connect(lp).approve(poolWethUsdc.address, MAX_UINT128);
     await USDC.connect(borrower).approve(peripheral.address, MAX_UINT128);
     await WETH.connect(borrower).approve(peripheral.address, MAX_UINT128);
@@ -86,5 +86,43 @@ describe("Peripheral testing", function () {
     pledgeAmount = ONE_ETH;
     loanTerms = await poolWethUsdc.loanTerms(ONE_ETH);
     await expect(peripheral.connect(borrower).borrowAndRollOver(pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600, 1)).to.be.revertedWith("CannotRepayInSameBlock");
+  });
+
+  it("Should revert when trying to atomically add liquidity and borrow", async function () {
+    // deploy Borrow contract
+    Borrow = await ethers.getContractFactory("Borrow");
+    Borrow = await Borrow.connect(deployer);
+    borrow = await Borrow.deploy(poolWethUsdc.address, _loanCcyToken, _collCcyToken);
+    await borrow.deployed();
+
+    // deploy AddLiquidityAndBorrow contract
+    AddLiquidityAndBorrow = await ethers.getContractFactory("AddLiquidityAndBorrow");
+    AddLiquidityAndBorrow = await AddLiquidityAndBorrow.connect(deployer);
+    addLiquidityAndBorrow = await AddLiquidityAndBorrow.deploy(poolWethUsdc.address, _loanCcyToken, _collCcyToken, borrow.address);
+    await addLiquidityAndBorrow.deployed();
+
+    // approve USDC and WETH balances
+    await USDC.connect(borrower).approve(poolWethUsdc.address, MAX_UINT128);
+    await USDC.connect(borrower).approve(addLiquidityAndBorrow.address, MAX_UINT128);
+    await WETH.connect(borrower).approve(borrow.address, MAX_UINT128);
+
+    // do dummy add liquidity to check post loan terms
+    addAmount = ONE_USDC.mul(100000);
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await poolWethUsdc.connect(borrower).addLiquidity(borrower.address, addAmount, timestamp+60, 0);
+    pledgeAmount = ONE_ETH;
+    loanTerms = await poolWethUsdc.loanTerms(pledgeAmount);
+    console.log("loanTerms: ", loanTerms);
+
+    // move forward and remove dummy liquidity again
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_mine");
+    await poolWethUsdc.connect(borrower).removeLiquidity(borrower.address, addAmount);
+
+    // do atomic add liquidity and borrow
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await addLiquidityAndBorrow.connect(borrower).addLiquidityAndBorrow(addAmount, pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600);
   });
 });

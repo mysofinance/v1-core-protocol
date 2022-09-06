@@ -9,13 +9,7 @@ import {IBasePool} from "./interfaces/IBasePool.sol";
 abstract contract BasePool is IBasePool {
     using SafeERC20 for IERC20Metadata;
 
-    error CannotBeZeroAddress();
-    error CollAndLoanCcyCannotBeEqual();
-    error InvalidLoanTenor();
-    error InvalidMaxLoanPerColl();
-    error InvalidRateParams();
-    error InvalidLiquidityBnds();
-    error InvalidMinLoan();
+    error InvalidConstructorParam(uint256 code);
     error PastDeadline();
     error InvalidAddAmount();
     error PotentiallyZeroRoundedFutureClaims();
@@ -40,10 +34,8 @@ abstract contract BasePool is IBasePool {
     error InvalidNewSharePointer();
     error UnentitledFromLoanIdx();
     error LoanIdxsWithChangingShares();
-    error InvalidBaseAggrSize();
     error NonAscendingLoanIdxs();
     error CannotClaimWithUnsettledLoan();
-    error ProtocolFeeTooHigh();
     error InvalidApprovalAddress();
     error ZeroShareClaim();
 
@@ -73,6 +65,7 @@ abstract contract BasePool is IBasePool {
     uint256 public immutable baseAggrBucketSize;
 
     mapping(address => LpInfo) addrToLpInfo;
+    mapping(address => uint256) lpOrigin;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
 
@@ -97,18 +90,20 @@ abstract contract BasePool is IBasePool {
         uint128 _protocolFee
     ) {
         if (_loanCcyToken == address(0) || _collCcyToken == address(0))
-            revert CannotBeZeroAddress();
+            revert InvalidConstructorParam({code: 1});
         if (_collCcyToken == _loanCcyToken)
-            revert CollAndLoanCcyCannotBeEqual();
-        if (_loanTenor < 86400) revert InvalidLoanTenor();
-        if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
-        if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
+            revert InvalidConstructorParam({code: 2});
+        if (_loanTenor < 86400) revert InvalidConstructorParam({code: 3});
+        if (_maxLoanPerColl == 0) revert InvalidConstructorParam({code: 4});
+        if (_r1 <= _r2 || _r2 == 0) revert InvalidConstructorParam({code: 5});
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
-            revert InvalidLiquidityBnds();
-        if (_minLoan <= MIN_LIQUIDITY) revert InvalidMinLoan();
+            revert InvalidConstructorParam({code: 6});
+        if (_minLoan <= MIN_LIQUIDITY)
+            revert InvalidConstructorParam({code: 7});
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
-            revert InvalidBaseAggrSize();
-        if (_protocolFee > MAX_PROTOCOL_FEE) revert ProtocolFeeTooHigh();
+            revert InvalidConstructorParam({code: 8});
+        if (_protocolFee > MAX_PROTOCOL_FEE)
+            revert InvalidConstructorParam({code: 9});
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
         LOAN_TENOR = _loanTenor;
@@ -226,6 +221,8 @@ abstract contract BasePool is IBasePool {
         uint16 _referralCode
     ) external override {
         uint256 _timestamp = checkTimestamp(_deadline);
+        if (lpOrigin[tx.origin] == uint32(_timestamp + MIN_LPING_PERIOD))
+            revert InvalidAddAmount();
         uint128 _inAmountAfterFees = _sendAmount -
             getCollCcyTransferFee(_sendAmount);
         // get borrow terms and do checks
@@ -983,6 +980,7 @@ abstract contract BasePool is IBasePool {
         }
         earliestRemove = uint32(block.timestamp + MIN_LPING_PERIOD);
         lpInfo.earliestRemove = earliestRemove;
+        lpOrigin[tx.origin] = earliestRemove;
     }
 
     /**

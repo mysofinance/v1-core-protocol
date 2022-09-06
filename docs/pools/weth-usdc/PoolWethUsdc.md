@@ -340,7 +340,7 @@ Function which calculates loan terms
 | repaymentAmount | uint128 | Amount of loan currency borrower must repay to reclaim collateral |
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
 | _protocolFee | uint128 | Amount of collateral currency to be transferred to treasury |
-| _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans  |
+| _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
 ### maxLoanPerColl
 
@@ -737,17 +737,6 @@ error BeforeEarliestRemove()
 
 
 
-### CannotBeZeroAddress
-
-```solidity
-error CannotBeZeroAddress()
-```
-
-
-
-
-
-
 ### CannotClaimWithUnsettledLoan
 
 ```solidity
@@ -774,17 +763,6 @@ error CannotRepayAfterExpiry()
 
 ```solidity
 error CannotRepayInSameBlock()
-```
-
-
-
-
-
-
-### CollAndLoanCcyCannotBeEqual
-
-```solidity
-error CollAndLoanCcyCannotBeEqual()
 ```
 
 
@@ -836,27 +814,21 @@ error InvalidApprovalAddress()
 
 
 
-### InvalidBaseAggrSize
+### InvalidConstructorParam
 
 ```solidity
-error InvalidBaseAggrSize()
+error InvalidConstructorParam(uint256 code)
 ```
 
 
 
 
 
+#### Parameters
 
-### InvalidLiquidityBnds
-
-```solidity
-error InvalidLiquidityBnds()
-```
-
-
-
-
-
+| Name | Type | Description |
+|---|---|---|
+| code | uint256 | undefined |
 
 ### InvalidLoanIdx
 
@@ -869,54 +841,10 @@ error InvalidLoanIdx()
 
 
 
-### InvalidLoanTenor
-
-```solidity
-error InvalidLoanTenor()
-```
-
-
-
-
-
-
-### InvalidMaxLoanPerColl
-
-```solidity
-error InvalidMaxLoanPerColl()
-```
-
-
-
-
-
-
-### InvalidMinLoan
-
-```solidity
-error InvalidMinLoan()
-```
-
-
-
-
-
-
 ### InvalidNewSharePointer
 
 ```solidity
 error InvalidNewSharePointer()
-```
-
-
-
-
-
-
-### InvalidRateParams
-
-```solidity
-error InvalidRateParams()
 ```
 
 
@@ -1049,17 +977,6 @@ error PastDeadline()
 
 ```solidity
 error PotentiallyZeroRoundedFutureClaims()
-```
-
-
-
-
-
-
-### ProtocolFeeTooHigh
-
-```solidity
-error ProtocolFeeTooHigh()
 ```
 
 

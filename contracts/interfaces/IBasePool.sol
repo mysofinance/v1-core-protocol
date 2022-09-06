@@ -283,7 +283,7 @@ interface IBasePool {
      * @return repaymentAmount Amount of loan currency borrower must repay to reclaim collateral
      * @return pledgeAmount Amount of collateral currency borrower retrieves upon repayment
      * @return _protocolFee Amount of collateral currency to be transferred to treasury
-     * @return _totalLiquidity The total liquidity of the pool (pre-borrow) that is available for new loans 
+     * @return _totalLiquidity The total liquidity of the pool (pre-borrow) that is available for new loans
      */
     function loanTerms(uint128 _inAmountAfterFees)
         external

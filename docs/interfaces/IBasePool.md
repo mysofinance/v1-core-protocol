@@ -314,7 +314,7 @@ Function which calculates loan terms
 | repaymentAmount | uint128 | Amount of loan currency borrower must repay to reclaim collateral |
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
 | _protocolFee | uint128 | Amount of collateral currency to be transferred to treasury |
-| _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans  |
+| _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
 ### maxLoanPerColl
 
