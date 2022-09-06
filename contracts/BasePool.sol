@@ -222,7 +222,7 @@ abstract contract BasePool is IBasePool {
         uint16 _referralCode
     ) external override {
         uint256 _timestamp = checkTimestamp(_deadline);
-        if (lpOrigin[tx.origin] == _timestamp)
+        if (lpOrigin[tx.origin] == _timestamp || _onBehalf == address(0))
             revert InvalidAddAmount();
         uint128 _inAmountAfterFees = _sendAmount -
             getCollCcyTransferFee(_sendAmount);
