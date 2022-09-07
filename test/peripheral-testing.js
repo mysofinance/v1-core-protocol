@@ -123,6 +123,6 @@ describe("Peripheral testing", function () {
     // do atomic add liquidity and borrow
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await addLiquidityAndBorrow.connect(borrower).addLiquidityAndBorrow(addAmount, pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600);
+    await expect(addLiquidityAndBorrow.connect(borrower).addLiquidityAndBorrow(addAmount, pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600)).to.be.revertedWith("Invalid");
   });
 });

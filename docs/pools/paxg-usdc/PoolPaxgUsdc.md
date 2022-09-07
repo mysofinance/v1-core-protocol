@@ -714,10 +714,32 @@ error ErroneousLoanTerms()
 
 
 
+### IdenticalLoanAndCollCcy
+
+```solidity
+error IdenticalLoanAndCollCcy()
+```
+
+
+
+
+
+
 ### InsufficientLiquidity
 
 ```solidity
 error InsufficientLiquidity()
+```
+
+
+
+
+
+
+### Invalid
+
+```solidity
+error Invalid()
 ```
 
 
@@ -747,21 +769,38 @@ error InvalidApprovalAddress()
 
 
 
-### InvalidConstructorParam
+### InvalidBaseAggrSize
 
 ```solidity
-error InvalidConstructorParam(uint256 code)
+error InvalidBaseAggrSize()
 ```
 
 
 
 
 
-#### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| code | uint256 | undefined |
+### InvalidFee
+
+```solidity
+error InvalidFee()
+```
+
+
+
+
+
+
+### InvalidLiquidityBnds
+
+```solidity
+error InvalidLiquidityBnds()
+```
+
+
+
+
+
 
 ### InvalidLoanIdx
 
@@ -774,10 +813,54 @@ error InvalidLoanIdx()
 
 
 
+### InvalidLoanTenor
+
+```solidity
+error InvalidLoanTenor()
+```
+
+
+
+
+
+
+### InvalidMaxLoanPerColl
+
+```solidity
+error InvalidMaxLoanPerColl()
+```
+
+
+
+
+
+
+### InvalidMinLoan
+
+```solidity
+error InvalidMinLoan()
+```
+
+
+
+
+
+
 ### InvalidNewSharePointer
 
 ```solidity
 error InvalidNewSharePointer()
+```
+
+
+
+
+
+
+### InvalidRateParams
+
+```solidity
+error InvalidRateParams()
 ```
 
 
@@ -840,6 +923,17 @@ error InvalidSubAggregation()
 
 
 
+### InvalidZeroAddress
+
+```solidity
+error InvalidZeroAddress()
+```
+
+
+
+
+
+
 ### LoanBelowLimit
 
 ```solidity
@@ -855,6 +949,17 @@ error LoanBelowLimit()
 
 ```solidity
 error LoanIdxsWithChangingShares()
+```
+
+
+
+
+
+
+### LoanTooSmall
+
+```solidity
+error LoanTooSmall()
 ```
 
 
@@ -921,17 +1026,6 @@ error PotentiallyZeroRoundedFutureClaims()
 
 ```solidity
 error RepaymentAboveLimit()
-```
-
-
-
-
-
-
-### TooSmallLoan
-
-```solidity
-error TooSmallLoan()
 ```
 
 

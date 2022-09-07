@@ -213,7 +213,7 @@ describe("PAXG-USDC Pool Testing", function () {
         console.log("loanTerms: ", loanTerms);
       } catch(error) {
         console.log("loanTerms error: ", error);
-        await expect(paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
+        await expect(paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('LoanTooSmall');
         tooSmallLoans = true;
         break;
       }

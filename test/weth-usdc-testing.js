@@ -188,7 +188,7 @@ describe("WETH-USDC Pool Testing", function () {
         console.log("loanTerms: ", loanTerms);
       } catch(error) {
         console.log("loanTerms error: ", error);
-        await expect(poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith('TooSmallLoan');
+        await expect(poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith('LoanTooSmall');
         tooSmallLoans = true;
         break;
       }
