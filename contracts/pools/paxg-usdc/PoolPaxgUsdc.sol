@@ -34,7 +34,7 @@ contract PoolPaxgUsdc is BasePool {
         )
     {}
 
-    function getTotalLiquidity() public view override returns (uint256) {
+    function getTotalLiquidity() internal view override returns (uint256) {
         return totalLiquidity;
     }
 

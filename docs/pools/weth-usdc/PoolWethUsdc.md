@@ -29,23 +29,6 @@ Function which adds to an LPs current position
 | _deadline | uint256 | Last timestamp after which function will revert |
 | _referralCode | uint16 | Will possibly be used later to reward referrals |
 
-### baseAggrBucketSize
-
-```solidity
-function baseAggrBucketSize() external view returns (uint256)
-```
-
-Getter which returns the base aggregation size
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | undefined |
-
 ### borrow
 
 ```solidity
@@ -156,6 +139,31 @@ Function which gets all LP info
 | sharesOverTime | uint256[] | Array with elements representing number of LP shares for their past and current positions |
 | loanIdxsWhereSharesChanged | uint256[] | Array with elements representing upper loan idx bounds (excl.), where LP can claim |
 
+### getPoolInfo
+
+```solidity
+function getPoolInfo() external view returns (address _loanCcyToken, address _collCcyToken, uint256 _maxLoanPerColl, uint256 _minLoan, uint256 _loanTenor, uint256 _totalLiquidity, uint256 _totalLpShares, uint256 _baseAggrBucketSize, uint256 _loanIdx)
+```
+
+Function which returns pool information
+
+*This function can be used to get pool information*
+
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _loanCcyToken | address | Loan currency |
+| _collCcyToken | address | Collateral currency |
+| _maxLoanPerColl | uint256 | Maximum loan amount per pledged collateral unit |
+| _minLoan | uint256 | Minimum loan size |
+| _loanTenor | uint256 | Loan tenor |
+| _totalLiquidity | uint256 | Total liquidity available for loans |
+| _totalLpShares | uint256 | Total LP shares |
+| _baseAggrBucketSize | uint256 | Base aggregation level |
+| _loanIdx | uint256 | Loan index for the next incoming loan |
+
 ### getRateParams
 
 ```solidity
@@ -171,27 +179,10 @@ Function which returns rate parameters need for interest rate calculation
 
 | Name | Type | Description |
 |---|---|---|
-| _liquidityBnd1 | uint256 | undefined |
-| _liquidityBnd2 | uint256 | undefined |
-| _r1 | uint256 | undefined |
-| _r2 | uint256 | undefined |
-
-### getTotalLiquidity
-
-```solidity
-function getTotalLiquidity() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s total liquidity available for new loans
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The total liquidity of the pool that is available for new loans |
+| _liquidityBnd1 | uint256 | Amount of liquidity the pool needs to end the reciprocal (hyperbola) range and start &quot;target&quot; range |
+| _liquidityBnd2 | uint256 | Amount of liquidity the pool needs to end the &quot;target&quot; range and start flat rate |
+| _r1 | uint256 | Rate that is used at start of target range |
+| _r2 | uint256 | Minimum rate at end of target range. This is minimum allowable rate |
 
 ### isApproved
 
@@ -216,23 +207,6 @@ Function returns if owner or beneficiary has approved a sender address for a giv
 | Name | Type | Description |
 |---|---|---|
 | _0 | bool | undefined |
-
-### loanIdx
-
-```solidity
-function loanIdx() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s current loan idx counter; the next incoming loan will receive this loan idx;
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | undefined |
 
 ### loanIdxToBorrower
 
@@ -307,23 +281,6 @@ Function which calculates loan terms
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
 | _protocolFee | uint256 | Amount of collateral currency to be transferred to treasury |
 | _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
-
-### minLoan
-
-```solidity
-function minLoan() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s minimum loan size
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | undefined |
 
 ### overrideSharePointer
 
@@ -412,23 +369,6 @@ Function which sets approval for another to perform a certain function on sender
 |---|---|---|
 | _approvee | address | This address is being given approval for the action(s) by the current sender |
 | _approvals | bool[5] | Array of flags to set which actions are approved or not approved |
-
-### totalLpShares
-
-```solidity
-function totalLpShares() external view returns (uint128)
-```
-
-Getter which returns the pool&#39;s total outstanding LP shares
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint128 | undefined |
 
 
 

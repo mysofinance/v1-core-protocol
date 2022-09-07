@@ -261,11 +261,11 @@ interface IBasePool {
     /**
      * @notice Function which returns rate parameters need for interest rate calculation
      * @dev This function can be used to get parameters needed for interest rate calculations
-     * @param _liquidityBnd1 Amount of liquidity the pool needs to end the reciprocal (hyperbola)
+     * @return _liquidityBnd1 Amount of liquidity the pool needs to end the reciprocal (hyperbola)
      * range and start "target" range
-     * @param _liquidityBnd2 Amount of liquidity the pool needs to end the "target" range and start flat rate
-     * @param _r1 Rate that is used at start of target range
-     * @param _r2 Minimum rate at end of target range. This is minimum allowable rate
+     * @return _liquidityBnd2 Amount of liquidity the pool needs to end the "target" range and start flat rate
+     * @return _r1 Rate that is used at start of target range
+     * @return _r2 Minimum rate at end of target range. This is minimum allowable rate
      */
     function getRateParams()
         external
@@ -275,6 +275,34 @@ interface IBasePool {
             uint256 _liquidityBnd2,
             uint256 _r1,
             uint256 _r2
+        );
+
+    /**
+     * @notice Function which returns pool information
+     * @dev This function can be used to get pool information
+     * @return _loanCcyToken Loan currency
+     * @return _collCcyToken Collateral currency
+     * @return _maxLoanPerColl Maximum loan amount per pledged collateral unit
+     * @return _minLoan Minimum loan size
+     * @return _loanTenor Loan tenor
+     * @return _totalLiquidity Total liquidity available for loans
+     * @return _totalLpShares Total LP shares
+     * @return _baseAggrBucketSize Base aggregation level
+     * @return _loanIdx Loan index for the next incoming loan
+     */
+    function getPoolInfo()
+        external
+        view
+        returns (
+            address _loanCcyToken,
+            address _collCcyToken,
+            uint256 _maxLoanPerColl,
+            uint256 _minLoan,
+            uint256 _loanTenor,
+            uint256 _totalLiquidity,
+            uint256 _totalLpShares,
+            uint256 _baseAggrBucketSize,
+            uint256 _loanIdx
         );
 
     /**
@@ -312,42 +340,11 @@ interface IBasePool {
     ) external view returns (uint256 repayments, uint256 collateral);
 
     /**
-     * @notice Getter which returns the pool's total liquidity available for new loans
-     * @return The total liquidity of the pool that is available for new loans
-     */
-    function getTotalLiquidity() external view returns (uint256);
-
-    /**
-     * @notice Getter which returns the pool's total outstanding LP shares
-     * @return The total outstanding LP shares
-     */
-    function totalLpShares() external view returns (uint128);
-
-    /**
-     * @notice Getter which returns the pool's current loan idx counter; the next incoming
-     * loan will receive this loan idx;
-     * @return The current loan idx counter
-     */
-    function loanIdx() external view returns (uint256);
-
-    /**
-     * @notice Getter which returns the pool's minimum loan size
-     * @return The minimum loan size
-     */
-    function minLoan() external view returns (uint256);
-
-    /**
      * @notice Getter which returns the borrower for a given loan idx
      * @param loanIdx The loan idx
      * @return The borrower address
      */
     function loanIdxToBorrower(uint256 loanIdx) external view returns (address);
-
-    /**
-     * @notice Getter which returns the base aggregation size
-     * @return The base aggregation size
-     */
-    function baseAggrBucketSize() external view returns (uint256);
 
     /**
      * @notice Function returns if owner or beneficiary has approved a sender address for a given type
