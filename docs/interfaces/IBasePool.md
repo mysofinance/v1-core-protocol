@@ -105,23 +105,6 @@ Function which handles aggregate claiming by LPs
 | _isReinvested | bool | Flag for if LP wants claimed loanCcy to be re-invested |
 | _deadline | uint256 | Deadline if reinvestment occurs. (If no reinvestment, this is ignored) |
 
-### collCcyToken
-
-```solidity
-function collCcyToken() external view returns (address)
-```
-
-Getter which returns the pool&#39;s collateral currency
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | The collateral currency token address |
-
 ### getClaimsFromAggregated
 
 ```solidity
@@ -234,23 +217,6 @@ Function returns if owner or beneficiary has approved a sender address for a giv
 |---|---|---|
 | _approved | bool | True if approved, false otherwise |
 
-### loanCcyToken
-
-```solidity
-function loanCcyToken() external view returns (address)
-```
-
-Getter which returns the pool&#39;s loan currency
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | The loan currency token address |
-
 ### loanIdx
 
 ```solidity
@@ -293,7 +259,7 @@ Getter which returns the borrower for a given loan idx
 ### loanTerms
 
 ```solidity
-function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint128 _protocolFee, uint256 _totalLiquidity)
+function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint256 _protocolFee, uint256 _totalLiquidity)
 ```
 
 Function which calculates loan terms
@@ -313,25 +279,8 @@ Function which calculates loan terms
 | loanAmount | uint128 | Amount of loan currency to be trasnferred to the borrower |
 | repaymentAmount | uint128 | Amount of loan currency borrower must repay to reclaim collateral |
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
-| _protocolFee | uint128 | Amount of collateral currency to be transferred to treasury |
+| _protocolFee | uint256 | Amount of collateral currency to be transferred to treasury |
 | _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
-
-### maxLoanPerColl
-
-```solidity
-function maxLoanPerColl() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s maximum loan amount per pledged collateral unit
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The maximum loan amount per pledged collateral unit |
 
 ### minLoan
 
@@ -365,23 +314,6 @@ Function will update the share pointer for the LP
 | Name | Type | Description |
 |---|---|---|
 | _newSharePointer | uint256 | New location of the LP&#39;s current share pointer |
-
-### protocolFee
-
-```solidity
-function protocolFee() external view returns (uint128)
-```
-
-Getter which returns the pool&#39;s protocol fee
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint128 | The protocol fee |
 
 ### removeLiquidity
 
@@ -594,7 +526,7 @@ event FeeUpdate(uint128 oldFee, uint128 newFee)
 ### NewSubPool
 
 ```solidity
-event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan)
+event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan, uint256 protocolFee)
 ```
 
 
@@ -614,6 +546,7 @@ event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, 
 | liquidityBnd1  | uint256 | undefined |
 | liquidityBnd2  | uint256 | undefined |
 | minLoan  | uint256 | undefined |
+| protocolFee  | uint256 | undefined |
 
 ### Reinvest
 

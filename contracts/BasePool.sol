@@ -46,12 +46,12 @@ abstract contract BasePool is IBasePool {
 
     uint256 constant BASE = 10**18;
     uint256 constant MIN_LIQUIDITY = 10 * 10**6;
-    uint256 public immutable maxLoanPerColl;
-    address public immutable collCcyToken;
-    address public immutable loanCcyToken;
+    uint256 immutable maxLoanPerColl;
+    address immutable collCcyToken;
+    address immutable loanCcyToken;
     uint256 constant MAX_PROTOCOL_FEE = 5 * 10**15;
 
-    uint128 public immutable protocolFee;
+    uint256 immutable protocolFee;
     uint128 public totalLpShares;
     uint256 totalLiquidity;
     uint256 public loanIdx;
@@ -87,7 +87,7 @@ abstract contract BasePool is IBasePool {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _protocolFee
+        uint256 _protocolFee
     ) {
         if (_loanCcyToken == address(0) || _collCcyToken == address(0))
             revert InvalidConstructorParam({code: 1});
@@ -126,7 +126,8 @@ abstract contract BasePool is IBasePool {
             _r2,
             _liquidityBnd1,
             _liquidityBnd2,
-            _minLoan
+            _minLoan,
+            _protocolFee
         );
     }
 
@@ -221,7 +222,7 @@ abstract contract BasePool is IBasePool {
         uint16 _referralCode
     ) external override {
         uint256 _timestamp = checkTimestamp(_deadline);
-        if (lpOrigin[tx.origin] == uint32(_timestamp + MIN_LPING_PERIOD))
+        if (lpOrigin[tx.origin] == _timestamp || _onBehalf == address(0))
             revert InvalidAddAmount();
         uint128 _inAmountAfterFees = _sendAmount -
             getCollCcyTransferFee(_sendAmount);
@@ -231,7 +232,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(
                 _inAmountAfterFees,
@@ -351,6 +352,8 @@ abstract contract BasePool is IBasePool {
         uint128 _sendAmount
     ) external override {
         uint256 timestamp = checkTimestamp(_deadline);
+        if (lpOrigin[tx.origin] == timestamp)
+            revert InvalidAddAmount();
         // verify loan info and eligibility
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         address loanOwner = loanIdxToBorrower[_loanIdx];
@@ -370,7 +373,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
@@ -647,12 +650,12 @@ abstract contract BasePool is IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         )
     {
         // compute terms (as uint256)
-        _protocolFee = uint128((_inAmountAfterFees * protocolFee) / BASE);
+        _protocolFee = (_inAmountAfterFees * protocolFee) / BASE;
         uint256 pledge = _inAmountAfterFees - _protocolFee;
         _totalLiquidity = getTotalLiquidity();
         if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
@@ -980,7 +983,7 @@ abstract contract BasePool is IBasePool {
         }
         earliestRemove = uint32(block.timestamp + MIN_LPING_PERIOD);
         lpInfo.earliestRemove = earliestRemove;
-        lpOrigin[tx.origin] = earliestRemove;
+        lpOrigin[tx.origin] = block.timestamp;
     }
 
     /**
@@ -1110,7 +1113,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint128 _protocolFee,
+            uint256 _protocolFee,
             uint256 _totalLiquidity
         )
     {
