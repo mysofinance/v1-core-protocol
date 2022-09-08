@@ -72,11 +72,9 @@ describe("WETH-USDC Pool Testing", function () {
   });
   
   it("Should have correct initial values", async function () {
-    totalLiquidity = await poolWethUsdc.getTotalLiquidity();
-    expect(totalLiquidity).to.be.equal(0);
-
-    loanIdx = await poolWethUsdc.loanIdx();
-    expect(loanIdx).to.be.equal(1);
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    expect(poolInfo._totalLiquidity).to.be.equal(0);
+    expect(poolInfo._loanIdx).to.be.equal(1);
   });
 
   it("Should fail on loan terms without LPs", async function () {
@@ -89,8 +87,8 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(1111), timestamp+60, 0);
     await poolWethUsdc.connect(lp2).addLiquidity(lp2.address, ONE_USDC.mul(10111), timestamp+60, 0);
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(130111), timestamp+60, 0);
-    totalLiquidity = await poolWethUsdc.getTotalLiquidity();
-    expect(totalLiquidity).to.be.equal(ONE_USDC.mul(141333));
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    expect(poolInfo._totalLiquidity).to.be.equal(ONE_USDC.mul(141333));
   });
 
   it("Should allow borrowing with ETH", async function () {
@@ -214,7 +212,6 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(100000), timestamp+60, 0);
 
     for (let i = 0; i < 100; i++) {
-      totalLiquidity = await poolWethUsdc.getTotalLiquidity();
       loanTerms = await poolWethUsdc.loanTerms(ONE_ETH);
       await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
       await poolWethUsdc.connect(borrower).repay(i+1, borrower.address, loanTerms.repaymentAmount);
@@ -243,7 +240,6 @@ describe("WETH-USDC Pool Testing", function () {
     preBorrBal = await USDC.balanceOf(borrower.address);
     pledgeAmount = ONE_ETH.mul(2);
     for (let i = 0; i < 99; i++) {
-      totalLiquidity = await poolWethUsdc.getTotalLiquidity();
       // indicative repayment
       loanTerms = await poolWethUsdc.loanTerms(pledgeAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
@@ -468,15 +464,14 @@ describe("WETH-USDC Pool Testing", function () {
 
     balEth = await WETH.balanceOf(poolWethUsdc.address); //await ethers.provider.getBalance(poolWethUsdc.address);
     balTestToken = await USDC.balanceOf(poolWethUsdc.address);
-    totalLiquidity = await poolWethUsdc.getTotalLiquidity();
-    totalLpShares = await poolWethUsdc.totalLpShares();
+    poolInfo = await poolWethUsdc.getPoolInfo();
 
-    await expect(totalLiquidity).to.be.equal(MIN_LIQUIDITY);
-    await expect(totalLpShares).to.be.equal(0);
+    await expect(poolInfo._totalLiquidity).to.be.equal(MIN_LIQUIDITY);
+    await expect(poolInfo._totalLpShares).to.be.equal(0);
     console.log("(2/2) balEth:", balEth);
     console.log("(2/2) balTestToken:", balTestToken);
-    console.log("(2/2) totalLiquidity:", totalLiquidity);
-    console.log("(2/2) totalLpShares:", totalLpShares);
+    console.log("(2/2) totalLiquidity:", poolInfo._totalLiquidity);
+    console.log("(2/2) totalLpShares:", poolInfo._totalLpShares);
   })
   
   it("Should allow adding liquidity again after removing and claiming", async function () {
@@ -537,21 +532,22 @@ describe("WETH-USDC Pool Testing", function () {
     console.log("balTestToken:", balTestToken);
 
     // dust is total liquidity after all LPs have removed
-    dust = await poolWethUsdc.getTotalLiquidity();
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    dust = poolInfo._totalLiquidity;
 
     // add liquidity with dust should automatically transfer
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    preBalTreasury = await USDC.balanceOf("0x1234567890000000000000000000000000000001");
+    preBalTreasury = await USDC.balanceOf(deployer.address);
     await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+1000, 0);
 
     // check dust was transferred to treasury
-    postBalTreasury = await USDC.balanceOf("0x1234567890000000000000000000000000000001");
+    postBalTreasury = await USDC.balanceOf(deployer.address);
     await expect(postBalTreasury.sub(preBalTreasury)).to.be.equal(dust);
 
     // check lp shares
-    totalLpShares = await poolWethUsdc.totalLpShares();
-    await expect(totalLpShares).to.be.equal(ONE_USDC.mul(500000));
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    await expect(poolInfo._totalLpShares).to.be.equal(ONE_USDC.mul(500000));
   })
   
   it("Should never fall below MIN_LIQUIDITY", async function () {
@@ -567,12 +563,12 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.mul(10000), 0, MAX_UINT128, timestamp+1000000000, 0);
     
     // check total liquidity & balance
-    totalLiquidity = await poolWethUsdc.getTotalLiquidity();
+    poolInfo = await poolWethUsdc.getPoolInfo();
     balance = await USDC.balanceOf(poolWethUsdc.address);
-    console.log("totalLiquidity:", totalLiquidity);
+    console.log("totalLiquidity:", poolInfo._totalLiquidity);
     console.log("balance:", balance)
-    expect(totalLiquidity).to.be.equal(balance);
-    expect(totalLiquidity).to.be.gte(MIN_LIQUIDITY);
+    expect(poolInfo._totalLiquidity).to.be.equal(balance);
+    expect(poolInfo._totalLiquidity).to.be.gte(MIN_LIQUIDITY);
   })
 
   it("Should allow rolling over loan", async function () {
@@ -659,10 +655,9 @@ describe("WETH-USDC Pool Testing", function () {
     const initialLp3NumShares = await poolWethUsdc.getLpInfo(lp3.address);
     const initialLp4NumShares = await poolWethUsdc.getLpInfo(lp4.address);
 
-    let totalLpShares = await poolWethUsdc.totalLpShares();
-    await expect(initialLp1NumShares.sharesOverTime[0]).to.be.equal(totalLpShares.div(3));
+    let poolInfo = await poolWethUsdc.getPoolInfo();
+    await expect(initialLp1NumShares.sharesOverTime[0]).to.be.equal(poolInfo._totalLpShares.div(3));
     
-
     await poolWethUsdc.connect(lp1).removeLiquidity(lp1.address, initialLp1NumShares.sharesOverTime[0]/2);
     await poolWethUsdc.connect(lp2).removeLiquidity(lp2.address, initialLp2NumShares.sharesOverTime[0]);
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+6000, 0);
@@ -783,7 +778,8 @@ describe("WETH-USDC Pool Testing", function () {
     // lp_1 : sharesOverTime: [100000000000000, 50000000000000] loanIdxsWhereSharesChanged: [131]
     // fromIndex : 300 , currSharePtr : 1
 
-    const currLoanIdx = await poolWethUsdc.loanIdx();
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    const currLoanIdx = poolInfo._loanIdx;
 
     await expect(poolWethUsdc.connect(lp2).claim(lp1.address, [300, 310], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender()");
     await expect(poolWethUsdc.connect(lp1).claim(lp1.address, [300, 310, 330, 340, currLoanIdx], false, timestamp+9999999)).to.be.revertedWith("LoanIdxsWithChangingShares()");
@@ -935,7 +931,8 @@ describe("WETH-USDC Pool Testing", function () {
       }
     }
 
-    let postLoanIndexCheck = await poolWethUsdc.loanIdx();
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    postLoanIndexCheck = poolInfo._loanIdx;
     expect(postLoanIndexCheck).to.be.equal(11);
 
     await poolWethUsdc.connect(lp3).addLiquidity(lp3.address, ONE_USDC.mul(40000000), timestamp+60, 0);
@@ -985,7 +982,8 @@ describe("WETH-USDC Pool Testing", function () {
       }
     }
 
-    postLoanIndexCheck = await poolWethUsdc.loanIdx();
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    postLoanIndexCheck = poolInfo._loanIdx;
     expect(postLoanIndexCheck).to.be.equal(21);
 
     // this add should push onto both arrays [B - 2 - ii on picture]
@@ -1124,32 +1122,34 @@ describe("WETH-USDC Pool Testing", function () {
 
     let aggregateRepaymentsPerShare = ethers.BigNumber.from(0);
     let aggregateCollPerShare = ethers.BigNumber.from(0);
-    const totalLpShares = await poolWethUsdc.totalLpShares();
+    poolInfo = await poolWethUsdc.getPoolInfo();
 
     for (let i = 0; i < 5000; i++) {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.div(2), 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+1);
-        aggregateCollPerShare = aggregateCollPerShare.add(loanInfo[1].mul(MONE).div(totalLpShares));
+        aggregateCollPerShare = aggregateCollPerShare.add(loanInfo[1].mul(MONE).div(poolInfo._totalLpShares));
       } catch(error) {
         console.log(i, error)
       }
     }
     
-    expect(await poolWethUsdc.loanIdx()).to.be.equal(5001);
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    expect(poolInfo._loanIdx).to.be.equal(5001);
 
     for (let i = 0; i < 4999; i++) {
       try {
         await poolWethUsdc.connect(borrower).borrow(borrower.address, ONE_ETH.div(2), 0, MAX_UINT128, timestamp+1000000000, 0);
         loanInfo = await poolWethUsdc.loanIdxToLoanInfo(i+5001);
-        aggregateRepaymentsPerShare = aggregateRepaymentsPerShare.add(loanInfo[0].mul(MONE).div(totalLpShares));
+        aggregateRepaymentsPerShare = aggregateRepaymentsPerShare.add(loanInfo[0].mul(MONE).div(poolInfo._totalLpShares));
         await poolWethUsdc.connect(borrower).repay(i+5001, borrower.address, loanInfo.repayment);
       } catch(error) {
         console.log(i, error)
       }
     }
     
-    expect(await poolWethUsdc.loanIdx()).to.be.equal(10000);
+    poolInfo = await poolWethUsdc.getPoolInfo();
+    expect(poolInfo._loanIdx).to.be.equal(10000);
 
     // move forward to loan expiry
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])

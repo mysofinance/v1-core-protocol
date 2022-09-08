@@ -4,8 +4,8 @@ pragma solidity 0.8.15;
 
 interface IBasePool {
     event NewSubPool(
-        address collCcyToken,
         address loanCcyToken,
+        address collCcyToken,
         uint256 loanTenor,
         uint256 maxLoanPerColl,
         uint256 r1,
@@ -13,7 +13,7 @@ interface IBasePool {
         uint256 liquidityBnd1,
         uint256 liquidityBnd2,
         uint256 minLoan,
-        uint256 protocolFee
+        uint256 creatorFee
     );
     event AddLiquidity(
         uint256 amount,
@@ -21,7 +21,7 @@ interface IBasePool {
         uint256 totalLiquidity,
         uint256 totalLpShares,
         uint256 earliestRemove,
-        uint16 referralCode
+        uint16 indexed referralCode
     );
     event RemoveLiquidity(
         uint256 amount,
@@ -34,9 +34,9 @@ interface IBasePool {
         uint256 collateral,
         uint256 loanAmount,
         uint256 repaymentAmount,
-        uint256 expiry,
-        uint256 protocolFee,
-        uint16 referralCode
+        uint256 indexed expiry,
+        uint256 fee,
+        uint16 indexed referralCode
     );
     event Roll(uint256 oldLoanIdx, uint256 newLoanIdx);
 
@@ -47,7 +47,6 @@ interface IBasePool {
         uint256 collateral
     );
     event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral);
-    event FeeUpdate(uint128 oldFee, uint128 newFee);
     event Repay(uint256 loanIdx);
     event Reinvest(
         uint256 repayments,

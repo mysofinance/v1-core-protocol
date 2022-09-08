@@ -16,7 +16,7 @@ describe("WETH-DAI Pool Testing", function () {
   const _liquidityBnd1 = ONE_DAI.mul(100000);
   const _liquidityBnd2 = ONE_DAI.mul(1000000);
   const _minLoan = ONE_DAI.mul(300);
-  const MIN_LIQUIDITY = ethers.BigNumber.from("10000000"); //10*10**6
+  const MIN_LIQUIDITY = ONE_DAI.mul(10); //10*10**18
   const DAI_HOLDER = "0x6c6bc977e13df9b0de53b251522280bb72383700";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
@@ -73,11 +73,9 @@ describe("WETH-DAI Pool Testing", function () {
   });
 
   it("Should have correct initial values", async function () {
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    expect(totalLiquidity).to.be.equal(0);
-
-    loanIdx = await poolWethDai.loanIdx();
-    expect(loanIdx).to.be.equal(1);
+    poolInfo = await poolWethDai.getPoolInfo();
+    expect(poolInfo._totalLiquidity).to.be.equal(0);
+    expect(poolInfo._loanIdx).to.be.equal(1);
   });
 
   it("Should fail on loan terms without LPs", async function () {
@@ -89,84 +87,91 @@ describe("WETH-DAI Pool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await poolWethDai.connect(lp1).addLiquidity(lp1.address, ONE_DAI.mul(2000000), timestamp+60, 0);
 
-
     // check loan terms and increasing rate
     loanTerms = await poolWethDai.loanTerms(ONE_ETH);
-    expect(loanTerms.loanAmount).to.be.equal("499875031242189452636");
-    expect(loanTerms.repaymentAmount).to.be.equal("509872531867033241688");
+    expect(loanTerms.loanAmount).to.be.equal("499875030617498712815");
+    expect(loanTerms.repaymentAmount).to.be.equal("509872531229848687071");
     rate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    rate = rate.toNumber()
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(10));
-    expect(loanTerms.loanAmount).to.be.equal("4987531172069825436346");
-    expect(loanTerms.repaymentAmount).to.be.equal("5087281795511221945072");
+    expect(loanTerms.loanAmount).to.be.equal("4987531109880847286021");
+    expect(loanTerms.repaymentAmount).to.be.equal("5087281732078464231741");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.equal(rate); // flat rate case
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(100));
-    expect(loanTerms.loanAmount).to.be.equal("48780487804878048774538");
-    expect(loanTerms.repaymentAmount).to.be.equal("49756097560975609750028");
+    expect(loanTerms.loanAmount).to.be.equal("48780481856009053702700");
+    expect(loanTerms.repaymentAmount).to.be.equal("49756091493129234776754");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.equal(rate); // flat rate case
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(1000));
-    expect(loanTerms.loanAmount).to.be.equal("399999999999999999599999");
-    expect(loanTerms.repaymentAmount).to.be.equal("407999999999999999591998");
+    expect(loanTerms.loanAmount).to.be.equal("399999599998399993599974");
+    expect(loanTerms.repaymentAmount).to.be.equal("407999591998367993471973");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.equal(rate); // flat rate case
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(-1); // rates are increasing for larger loans, but here rounding error
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(10000));
-    expect(loanTerms.loanAmount).to.be.equal("1428571428571428566326530");
-    expect(loanTerms.repaymentAmount).to.be.equal("1518367346938775503148687");
+    expect(loanTerms.loanAmount).to.be.equal("1428566326523323604748006");
+    expect(loanTerms.repaymentAmount).to.be.equal("1518361195329092039186055");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.greaterThan(rate);
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(100000));
-    expect(loanTerms.loanAmount).to.be.equal("1923076923076923067677514");
-    expect(loanTerms.repaymentAmount).to.be.equal("2192307692307692266383135");
+    expect(loanTerms.loanAmount).to.be.equal("1923067677513014906349020");
+    expect(loanTerms.repaymentAmount).to.be.equal("2192267108037695107489193");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.greaterThan(rate);
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(1000000));
-    expect(loanTerms.loanAmount).to.be.equal("1992031872509960149442072");
-    expect(loanTerms.repaymentAmount).to.be.equal("4511952191235056624940476");
+    expect(loanTerms.loanAmount).to.be.equal("1992021952032309801440434");
+    expect(loanTerms.repaymentAmount).to.be.equal("4508821057339827841456022");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.greaterThan(rate);
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(10000000));
-    expect(loanTerms.loanAmount).to.be.equal("1999200319872051169536183");
-    expect(loanTerms.repaymentAmount).to.be.equal("27019192323070459179232332");
+    expect(loanTerms.loanAmount).to.be.equal("1999190327867233762229575");
+    expect(loanTerms.repaymentAmount).to.be.equal("26710538731671834621852309");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.greaterThan(rate);
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(100000000));
-    expect(loanTerms.loanAmount).to.be.equal("1999920003199871995120595");
-    expect(loanTerms.repaymentAmount).to.be.equal("252019919203200620713071860");
+    expect(loanTerms.loanAmount).to.be.equal("1999910003999822007919647");
+    expect(loanTerms.repaymentAmount).to.be.equal("224242007868923219707998854");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.greaterThan(rate);
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
     rate = tmpRate;
 
     loanTerms = await poolWethDai.loanTerms(ONE_ETH.mul(1000000000));
-    expect(loanTerms.loanAmount).to.be.equal("1999992000031999862000591");
-    expect(loanTerms.repaymentAmount).to.be.equal("2502019991916907319548620598");
+    expect(loanTerms.loanAmount).to.be.equal("1999982000111999192005471");
+    expect(loanTerms.repaymentAmount).to.be.equal("1113128006504612418009925543");
     tmpRate = (loanTerms.repaymentAmount).mul(10000).div(loanTerms.loanAmount);
-    tmpRate = tmpRate.toNumber()
-    expect(tmpRate).to.be.greaterThan(rate);
+    rateDiff = tmpRate.sub(rate);
+    rateDiff = rateDiff.toNumber();
+    expect(rateDiff).to.be.greaterThanOrEqual(0);
   });
 
   it("Should allow LPs to add liquidity", async function () {
@@ -175,8 +180,8 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp1).addLiquidity(lp1.address, ONE_DAI.mul(1111), timestamp+60, 0);
     await poolWethDai.connect(lp2).addLiquidity(lp2.address, ONE_DAI.mul(10111), timestamp+60, 0);
     await poolWethDai.connect(lp3).addLiquidity(lp3.address, ONE_DAI.mul(130111), timestamp+60, 0);
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    expect(totalLiquidity).to.be.equal(ONE_DAI.mul(141333));
+    poolInfo = await poolWethDai.getPoolInfo();
+    expect(poolInfo._totalLiquidity).to.be.equal(ONE_DAI.mul(141333));
   });
 
   it("Should allow borrowing with ETH", async function () {
@@ -300,7 +305,6 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp3).addLiquidity(lp3.address, ONE_DAI.mul(100000), timestamp+60, 0);
 
     for (let i = 0; i < 100; i++) {
-      totalLiquidity = await poolWethDai.getTotalLiquidity();
       loanTerms = await poolWethDai.loanTerms(ONE_ETH);
       await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH, 0, MAX_UINT128, timestamp+1000000000, 0);
       loanInfo = await poolWethDai.loanIdxToLoanInfo(i+1);
@@ -331,7 +335,6 @@ describe("WETH-DAI Pool Testing", function () {
     pledgeAmount = ONE_ETH.mul(2);
 
     for (let i = 0; i < 99; i++) {
-      totalLiquidity = await poolWethDai.getTotalLiquidity();
       //indicative repayment
       loanTerms = await poolWethDai.loanTerms(pledgeAmount);
       totalRepaymentsIndicative = totalRepaymentsIndicative.add(loanTerms[1]);
@@ -538,15 +541,14 @@ describe("WETH-DAI Pool Testing", function () {
 
     balEth = await WETH.balanceOf(poolWethDai.address); //await ethers.provider.getBalance(poolWethDai.address);
     balTestToken = await DAI.balanceOf(poolWethDai.address);
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    totalLpShares = await poolWethDai.totalLpShares();
+    poolInfo = await poolWethDai.getPoolInfo();
 
-    await expect(totalLiquidity).to.be.equal(MIN_LIQUIDITY);
-    await expect(totalLpShares).to.be.equal(0);
+    await expect(poolInfo._totalLiquidity).to.be.equal(MIN_LIQUIDITY);
+    await expect(poolInfo._totalLpShares).to.be.equal(0);
     console.log("(2/2) balEth:", balEth);
     console.log("(2/2) balTestToken:", balTestToken);
-    console.log("(2/2) totalLiquidity:", totalLiquidity);
-    console.log("(2/2) totalLpShares:", totalLpShares);
+    console.log("(2/2) totalLiquidity:", poolInfo._totalLiquidity);
+    console.log("(2/2) totalLpShares:", poolInfo._totalLpShares);
   })
 
   it("Should allow adding liquidity again after removing and claiming", async function () {
@@ -604,12 +606,12 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(lp1).addLiquidity(lp1.address, ONE_DAI.mul(500000), timestamp+1000, 0);
     
     //check dust was transferred to treasury
-    balTreasury = await DAI.balanceOf("0x1234567890000000000000000000000000000001");
+    balTreasury = await DAI.balanceOf(deployer.address);
     await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
 
     //check lp shares
-    totalLpShares = await poolWethDai.totalLpShares();
-    await expect(totalLpShares).to.be.equal(ONE_DAI.mul(500000));
+    poolInfo = await poolWethDai.getPoolInfo();
+    await expect(poolInfo._totalLpShares).to.be.equal(ONE_DAI.mul(500000));
   })
 
   it("Should never fall below MIN_LIQUIDITY", async function () {
@@ -625,12 +627,12 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH.mul(10000), 0, MAX_UINT128, timestamp+1000000000, 0);
     
     //check total liquidity & balance
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
+    poolInfo = await poolWethDai.getPoolInfo();
     balance = await DAI.balanceOf(poolWethDai.address);
-    console.log("totalLiquidity:", totalLiquidity);
+    console.log("totalLiquidity:", poolInfo._totalLiquidity);
     console.log("balance:", balance)
-    expect(totalLiquidity).to.be.equal(balance);
-    expect(totalLiquidity).to.be.gte(MIN_LIQUIDITY);
+    expect(poolInfo._totalLiquidity).to.be.equal(balance);
+    expect(poolInfo._totalLiquidity).to.be.gte(MIN_LIQUIDITY);
   })
 
   it("Should allow rolling over loan", async function () {
@@ -665,11 +667,10 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MAX_UINT128, timestamp+1000000000, 0);
     loanInfo = await poolWethDai.loanIdxToLoanInfo(1);
 
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    totalLpShares = await poolWethDai.totalLpShares();
+    poolInfo = await poolWethDai.getPoolInfo();
     console.log(loanInfo)
-    console.log(totalLiquidity)
-    console.log(totalLpShares)
+    console.log(poolInfo._totalLiquidity)
+    console.log(poolInfo._totalLpShares)
 
     await poolWethDai.connect(lp2).addLiquidity(lp2.address, bal, timestamp+1000000000, 0);
     loanTerms = await poolWethDai.loanTerms(pledgeAmount);
@@ -677,11 +678,10 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MAX_UINT128, timestamp+1000000000, 0);
     loanInfo = await poolWethDai.loanIdxToLoanInfo(2);
 
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    totalLpShares = await poolWethDai.totalLpShares();
+    poolInfo = await poolWethDai.getPoolInfo();
     console.log(loanInfo)
-    console.log(totalLiquidity)
-    console.log(totalLpShares)
+    console.log(poolInfo._totalLiquidity)
+    console.log(poolInfo._totalLpShares)
 
     await poolWethDai.connect(lp3).addLiquidity(lp3.address, bal, timestamp+1000000000, 0);
     loanTerms = await poolWethDai.loanTerms(pledgeAmount);
@@ -689,11 +689,10 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MAX_UINT128, timestamp+1000000000, 0);
     loanInfo = await poolWethDai.loanIdxToLoanInfo(3);
 
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    totalLpShares = await poolWethDai.totalLpShares();
+    poolInfo = await poolWethDai.getPoolInfo();
     console.log(loanInfo)
-    console.log(totalLiquidity)
-    console.log(totalLpShares)
+    console.log(poolInfo._totalLiquidity)
+    console.log(poolInfo._totalLpShares)
 
     await poolWethDai.connect(lp4).addLiquidity(lp4.address, bal, timestamp+1000000000, 0);
     loanTerms = await poolWethDai.loanTerms(pledgeAmount);
@@ -701,10 +700,9 @@ describe("WETH-DAI Pool Testing", function () {
     await poolWethDai.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MAX_UINT128, timestamp+1000000000, 0);
     loanInfo = await poolWethDai.loanIdxToLoanInfo(4);
 
-    totalLiquidity = await poolWethDai.getTotalLiquidity();
-    totalLpShares = await poolWethDai.totalLpShares();
+    poolInfo = await poolWethDai.getPoolInfo();
     console.log(loanInfo)
-    console.log(totalLiquidity)
-    console.log(totalLpShares)
+    console.log(poolInfo._totalLiquidity)
+    console.log(poolInfo._totalLpShares)
   })
 });
