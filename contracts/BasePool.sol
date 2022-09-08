@@ -51,7 +51,7 @@ abstract contract BasePool is IBasePool {
     uint256 constant MIN_LPING_PERIOD = 30;
     uint256 constant BASE = 10**18;
     uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15;
-    uint256 immutable minLiquidity;
+    uint256 immutable minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
     address collCcyToken;
@@ -60,15 +60,15 @@ abstract contract BasePool is IBasePool {
     uint128 totalLpShares;
     uint256 loanTenor;
     uint256 collTokenDecimals;
-    uint256 maxLoanPerColl;
-    uint256 creatorFee;
-    uint256 totalLiquidity;
+    uint256 maxLoanPerColl; // denominated in loanCcy decimals
+    uint256 creatorFee; // denominated in BASE
+    uint256 totalLiquidity; // denominated in loanCcy decimals
     uint256 loanIdx;
-    uint256 r1;
-    uint256 r2;
-    uint256 liquidityBnd1;
-    uint256 liquidityBnd2;
-    uint256 minLoan;
+    uint256 r1; // denominated in BASE
+    uint256 r2; // denominated in BASE
+    uint256 liquidityBnd1; // denominated in loanCcy decimals
+    uint256 liquidityBnd2; // denominated in loanCcy decimals
+    uint256 minLoan; // denominated in loanCcy decimals
     uint256 baseAggrBucketSize; // must be a multiple of 100
     mapping(address => LpInfo) addrToLpInfo;
     mapping(address => uint256) lastAddOfTxOrigin;
