@@ -605,12 +605,11 @@ abstract contract BasePool is IBasePool {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
         for (uint256 index = 0; index < 5; ) {
+            bool approval = _approvals[index];
             isApproved[msg.sender][_approvee][
                 IBasePool.ApprovalTypes(index)
-            ] = _approvals[index];
-            if (_approvals[index]) {
-                emit ApprovalUpdate(msg.sender, _approvee, index);
-            }
+            ] = approval;
+            emit ApprovalUpdate(msg.sender, _approvee, index, approval);
             unchecked {
                 index++;
             }

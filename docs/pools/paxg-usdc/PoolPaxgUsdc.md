@@ -377,7 +377,7 @@ Function which sets approval for another to perform a certain function on sender
 ### AddLiquidity
 
 ```solidity
-event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 referralCode)
+event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 indexed referralCode)
 ```
 
 
@@ -393,12 +393,12 @@ event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, 
 | totalLiquidity  | uint256 | undefined |
 | totalLpShares  | uint256 | undefined |
 | earliestRemove  | uint256 | undefined |
-| referralCode  | uint16 | undefined |
+| referralCode `indexed` | uint16 | undefined |
 
 ### ApprovalUpdate
 
 ```solidity
-event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index)
+event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index, bool isApproved)
 ```
 
 
@@ -412,11 +412,12 @@ event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index)
 | ownerOrBeneficiary  | address | undefined |
 | sender  | address | undefined |
 | index  | uint256 | undefined |
+| isApproved  | bool | undefined |
 
 ### Borrow
 
 ```solidity
-event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 expiry, uint256 protocolFee, uint16 referralCode)
+event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint16 indexed referralCode)
 ```
 
 
@@ -431,9 +432,9 @@ event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 re
 | collateral  | uint256 | undefined |
 | loanAmount  | uint256 | undefined |
 | repaymentAmount  | uint256 | undefined |
-| expiry  | uint256 | undefined |
-| protocolFee  | uint256 | undefined |
-| referralCode  | uint16 | undefined |
+| expiry `indexed` | uint256 | undefined |
+| fee  | uint256 | undefined |
+| referralCode `indexed` | uint16 | undefined |
 
 ### Claim
 
@@ -472,27 +473,10 @@ event ClaimFromAggregated(uint256 fromLoanIdx, uint256 toLoanIdx, uint256 repaym
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
 
-### FeeUpdate
-
-```solidity
-event FeeUpdate(uint128 oldFee, uint128 newFee)
-```
-
-
-
-
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| oldFee  | uint128 | undefined |
-| newFee  | uint128 | undefined |
-
 ### NewSubPool
 
 ```solidity
-event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan, uint256 protocolFee)
+event NewSubPool(address loanCcyToken, address collCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan, uint256 creatorFee)
 ```
 
 
@@ -503,8 +487,8 @@ event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, 
 
 | Name | Type | Description |
 |---|---|---|
-| collCcyToken  | address | undefined |
 | loanCcyToken  | address | undefined |
+| collCcyToken  | address | undefined |
 | loanTenor  | uint256 | undefined |
 | maxLoanPerColl  | uint256 | undefined |
 | r1  | uint256 | undefined |
@@ -512,7 +496,7 @@ event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, 
 | liquidityBnd1  | uint256 | undefined |
 | liquidityBnd2  | uint256 | undefined |
 | minLoan  | uint256 | undefined |
-| protocolFee  | uint256 | undefined |
+| creatorFee  | uint256 | undefined |
 
 ### Reinvest
 

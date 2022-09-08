@@ -56,7 +56,8 @@ interface IBasePool {
     event ApprovalUpdate(
         address ownerOrBeneficiary,
         address sender,
-        uint256 index
+        uint256 index,
+        bool isApproved
     );
 
     enum ApprovalTypes {
