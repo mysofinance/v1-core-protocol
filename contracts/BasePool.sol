@@ -50,8 +50,8 @@ abstract contract BasePool is IBasePool {
 
     uint256 constant MIN_LPING_PERIOD = 30;
     uint256 constant BASE = 10**18;
-    uint256 constant MIN_LIQUIDITY = 10 * 10**6;
-    uint256 constant MAX_PROTOCOL_FEE = 5 * 10**15;
+    uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15;
+    uint256 immutable minLiquidity;
 
     address poolCreator;
     address collCcyToken;
@@ -61,7 +61,7 @@ abstract contract BasePool is IBasePool {
     uint256 loanTenor;
     uint256 collTokenDecimals;
     uint256 maxLoanPerColl;
-    uint256 protocolFee;
+    uint256 creatorFee;
     uint256 totalLiquidity;
     uint256 loanIdx;
     uint256 r1;
@@ -93,7 +93,8 @@ abstract contract BasePool is IBasePool {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint256 _protocolFee
+        uint256 _creatorFee,
+        uint256 _minLiquidity
     ) {
         if (_collCcyToken == _loanCcyToken) revert IdenticalLoanAndCollCcy();
         if (_loanCcyToken == address(0) || _collCcyToken == address(0))
@@ -103,10 +104,10 @@ abstract contract BasePool is IBasePool {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
             revert InvalidLiquidityBnds();
-        if (_minLoan <= MIN_LIQUIDITY) revert InvalidMinLoan();
+        if (_minLoan <= _minLiquidity) revert InvalidMinLoan();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
             revert InvalidBaseAggrSize();
-        if (_protocolFee > MAX_PROTOCOL_FEE) revert InvalidFee();
+        if (_creatorFee > MAX_PROTOCOL_FEE) revert InvalidFee();
         poolCreator = msg.sender;
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
@@ -120,7 +121,8 @@ abstract contract BasePool is IBasePool {
         loanIdx = 1;
         collTokenDecimals = IERC20Metadata(_collCcyToken).decimals();
         baseAggrBucketSize = _baseAggrBucketSize;
-        protocolFee = _protocolFee;
+        creatorFee = _creatorFee;
+        minLiquidity = _minLiquidity;
         emit NewSubPool(
             _loanCcyToken,
             _collCcyToken,
@@ -131,7 +133,7 @@ abstract contract BasePool is IBasePool {
             _liquidityBnd1,
             _liquidityBnd2,
             _minLoan,
-            _protocolFee
+            _creatorFee
         );
     }
 
@@ -199,7 +201,7 @@ abstract contract BasePool is IBasePool {
         uint128 _totalLpShares = totalLpShares;
         // update state of pool
         uint256 liquidityRemoved = (numShares *
-            (_totalLiquidity - MIN_LIQUIDITY)) / _totalLpShares;
+            (_totalLiquidity - minLiquidity)) / _totalLpShares;
         totalLpShares -= uint128(numShares);
         totalLiquidity = _totalLiquidity - liquidityRemoved;
 
@@ -239,7 +241,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint256 _protocolFee,
+            uint256 _creatorFee,
             uint256 _totalLiquidity
         ) = _borrow(
                 _inAmountAfterFees,
@@ -276,10 +278,7 @@ abstract contract BasePool is IBasePool {
             );
 
             // transfer protocol fee to treasury in collateral ccy
-            IERC20Metadata(collCcyToken).safeTransfer(
-                poolCreator,
-                _protocolFee
-            );
+            IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
 
             // transfer loanAmount in loan ccy
             IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
@@ -291,7 +290,7 @@ abstract contract BasePool is IBasePool {
             loanAmount,
             repaymentAmount,
             expiry,
-            _protocolFee,
+            _creatorFee,
             _referralCode
         );
     }
@@ -383,7 +382,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint256 _protocolFee,
+            uint256 _creatorFee,
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
 
@@ -441,10 +440,7 @@ abstract contract BasePool is IBasePool {
                 _sendAmount
             );
             // transfer protocol fee to treasury in collateral ccy
-            IERC20Metadata(collCcyToken).safeTransfer(
-                poolCreator,
-                _protocolFee
-            );
+            IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
         }
         // spawn event
         emit Roll(_loanIdx, loanIdx - 1);
@@ -689,25 +685,25 @@ abstract contract BasePool is IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint256 _protocolFee,
+            uint256 _creatorFee,
             uint256 _totalLiquidity
         )
     {
         // compute terms (as uint256)
-        _protocolFee = (_inAmountAfterFees * protocolFee) / BASE;
-        uint256 pledge = _inAmountAfterFees - _protocolFee;
+        _creatorFee = (_inAmountAfterFees * creatorFee) / BASE;
+        uint256 pledge = _inAmountAfterFees - _creatorFee;
         _totalLiquidity = getTotalLiquidity();
-        if (_totalLiquidity <= MIN_LIQUIDITY) revert InsufficientLiquidity();
+        if (_totalLiquidity <= minLiquidity) revert InsufficientLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
-            (_totalLiquidity - MIN_LIQUIDITY)) /
+            (_totalLiquidity - minLiquidity)) /
             (pledge *
                 maxLoanPerColl +
-                (_totalLiquidity - MIN_LIQUIDITY) *
+                (_totalLiquidity - minLiquidity) *
                 10**collTokenDecimals);
         if (loan < minLoan) revert LoanTooSmall();
         uint256 postLiquidity = _totalLiquidity - loan;
-        assert(postLiquidity >= MIN_LIQUIDITY);
+        assert(postLiquidity >= minLiquidity);
         // we use the average rate to calculate the repayment amount
         uint256 avgRate = (getRate(_totalLiquidity) + getRate(postLiquidity)) /
             2;
@@ -971,7 +967,7 @@ abstract contract BasePool is IBasePool {
      * portion of the claim
      * @param _onBehalfOf Recipient of the LP shares
      * @param _inAmountAfterFees Net amount of what was sent by LP minus fees
-     * @return dust If no LP shares, dust is any remaining excess liquidity (i.e. MIN_LIQUIDITY and rounding)
+     * @return dust If no LP shares, dust is any remaining excess liquidity (i.e. minLiquidity and rounding)
      * @return newLpShares Amount of new LP shares to be credited to LP.
      * @return earliestRemove Earliest timestamp from which LP is allowed to remove liquidity
      */
@@ -985,7 +981,7 @@ abstract contract BasePool is IBasePool {
     {
         uint256 _totalLiquidity = getTotalLiquidity();
         if (
-            _inAmountAfterFees < MIN_LIQUIDITY ||
+            _inAmountAfterFees < minLiquidity ||
             _inAmountAfterFees + _totalLiquidity < minLoan
         ) revert InvalidAddAmount();
         // retrieve lpInfo of sender
@@ -1140,7 +1136,7 @@ abstract contract BasePool is IBasePool {
      * @return repaymentAmount Amount of loan Ccy borrower needs to repay to claim collateral
      * @return pledgeAmount Amount of collCcy reclaimable upon repayment
      * @return expiry Timestamp after which loan expires
-     * @return _protocolFee Per transaction fee which levied for using the protocol
+     * @return _creatorFee Per transaction fee which levied for using the protocol
      * @return _totalLiquidity Updated total liquidity (pre-borrow)
      */
     function _borrow(
@@ -1156,7 +1152,7 @@ abstract contract BasePool is IBasePool {
             uint128 repaymentAmount,
             uint128 pledgeAmount,
             uint32 expiry,
-            uint256 _protocolFee,
+            uint256 _creatorFee,
             uint256 _totalLiquidity
         )
     {
@@ -1165,7 +1161,7 @@ abstract contract BasePool is IBasePool {
             loanAmount,
             repaymentAmount,
             pledgeAmount,
-            _protocolFee,
+            _creatorFee,
             _totalLiquidity
         ) = loanTerms(_inAmountAfterFees);
         assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
