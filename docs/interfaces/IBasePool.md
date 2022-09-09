@@ -275,7 +275,7 @@ Function will update the share pointer for the LP
 ### removeLiquidity
 
 ```solidity
-function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove) external nonpayable
+function removeLiquidity(address _onBehalfOf, uint128 numSharesRemove) external nonpayable
 ```
 
 Function which removes shares from an LPs
@@ -287,7 +287,7 @@ Function which removes shares from an LPs
 | Name | Type | Description |
 |---|---|---|
 | _onBehalfOf | address | Owner of the LP shares |
-| numSharesRemove | uint256 | Amount of LP shares to remove |
+| numSharesRemove | uint128 | Amount of LP shares to remove |
 
 ### repay
 

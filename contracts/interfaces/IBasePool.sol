@@ -127,7 +127,7 @@ interface IBasePool {
      * @param _onBehalfOf Owner of the LP shares
      * @param numSharesRemove Amount of LP shares to remove
      */
-    function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove)
+    function removeLiquidity(address _onBehalfOf, uint128 numSharesRemove)
         external;
 
     /**

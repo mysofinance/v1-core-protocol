@@ -73,7 +73,7 @@ describe("Peripheral testing", function () {
     // have borrower use peripheral contract to atomically borrow and repay
     pledgeAmount = ONE_ETH;
     loanTerms = await poolWethUsdc.loanTerms(ONE_ETH);
-    await expect(peripheral.connect(borrower).borrowAndRepay(pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600, 1)).to.be.revertedWith("CannotRepayInSameBlock");
+    await expect(peripheral.connect(borrower).borrowAndRepay(pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600, 1)).to.be.revertedWithCustomError(poolWethUsdc, "CannotRepayInSameBlock");
   });
 
   it("Should revert when trying to borrow and rollover within same block", async function () {
@@ -85,7 +85,7 @@ describe("Peripheral testing", function () {
     // have borrower use peripheral contract to atomically borrow and repay
     pledgeAmount = ONE_ETH;
     loanTerms = await poolWethUsdc.loanTerms(ONE_ETH);
-    await expect(peripheral.connect(borrower).borrowAndRollOver(pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600, 1)).to.be.revertedWith("CannotRepayInSameBlock");
+    await expect(peripheral.connect(borrower).borrowAndRollOver(pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600, 1)).to.be.revertedWithCustomError(poolWethUsdc, "CannotRepayInSameBlock");
   });
 
   it("Should revert when trying to atomically add liquidity and borrow", async function () {
@@ -123,6 +123,6 @@ describe("Peripheral testing", function () {
     // do atomic add liquidity and borrow
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await expect(addLiquidityAndBorrow.connect(borrower).addLiquidityAndBorrow(addAmount, pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600)).to.be.revertedWith("Invalid");
+    await expect(addLiquidityAndBorrow.connect(borrower).addLiquidityAndBorrow(addAmount, pledgeAmount, loanTerms.loanAmount, loanTerms.repaymentAmount, timestamp+3600)).to.be.revertedWithCustomError(poolWethUsdc, "Invalid");
   });
 });

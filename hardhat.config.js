@@ -1,8 +1,9 @@
-require("@nomiclabs/hardhat-waffle");
 require("hardhat-contract-sizer");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 require('@primitivefi/hardhat-dodoc');
+require("@nomiclabs/hardhat-ethers");
+require("@nomicfoundation/hardhat-chai-matchers")
 require("dotenv").config();
 
 const { ALCHEMY_API_KEY } = process.env

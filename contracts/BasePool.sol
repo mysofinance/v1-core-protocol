@@ -20,7 +20,6 @@ abstract contract BasePool is IBasePool {
     error InvalidFee();
     error PastDeadline();
     error InvalidAddAmount();
-    error PotentiallyZeroRoundedFutureClaims();
     error BeforeEarliestRemove();
     error InsufficientLiquidity();
     error InvalidRemove();
@@ -179,7 +178,7 @@ abstract contract BasePool is IBasePool {
     }
 
     // put in number of shares to remove, up to all of them
-    function removeLiquidity(address _onBehalfOf, uint256 numShares)
+    function removeLiquidity(address _onBehalfOf, uint128 numShares)
         external
         override
     {
@@ -202,7 +201,7 @@ abstract contract BasePool is IBasePool {
         // update state of pool
         uint256 liquidityRemoved = (numShares *
             (_totalLiquidity - minLiquidity)) / _totalLpShares;
-        totalLpShares -= uint128(numShares);
+        totalLpShares -= numShares;
         totalLiquidity = _totalLiquidity - liquidityRemoved;
 
         // update LP arrays and check for auto increment
@@ -215,7 +214,7 @@ abstract contract BasePool is IBasePool {
             liquidityRemoved,
             numShares,
             totalLiquidity,
-            _totalLpShares - uint128(numShares)
+            _totalLpShares - numShares
         );
     }
 
@@ -712,13 +711,13 @@ abstract contract BasePool is IBasePool {
         // larger than the amount of integrating loan size over rate;
         uint256 repayment = (loan * (BASE + avgRate)) / BASE;
         // return terms (as uint128)
+        assert(uint128(loan) == loan);
         loanAmount = uint128(loan);
+        assert(uint128(repayment) == repayment);
         repaymentAmount = uint128(repayment);
+        assert(uint128(pledge) == pledge);
         pledgeAmount = uint128(pledge);
-        if (
-            repaymentAmount <= loanAmount ||
-            ((repaymentAmount * BASE) / totalLpShares) == 0
-        ) revert ErroneousLoanTerms();
+        if (repaymentAmount <= loanAmount) revert ErroneousLoanTerms();
     }
 
     function getClaimsFromAggregated(
@@ -995,19 +994,13 @@ abstract contract BasePool is IBasePool {
             newLpShares = _inAmountAfterFees;
         } else {
             assert(_totalLiquidity > 0 && totalLpShares > 0);
-            newLpShares = uint128(
-                (_inAmountAfterFees * uint256(totalLpShares)) / _totalLiquidity
-            );
+            newLpShares =
+                (_inAmountAfterFees * totalLpShares) /
+                _totalLiquidity;
         }
+        if (newLpShares == 0) revert InvalidAddAmount();
+        assert(uint128(newLpShares) == newLpShares);
         totalLpShares += uint128(newLpShares);
-        // purposefully multiply after division
-        // newLpShares only needs to be multiplied once to test if newLpShares = 0
-        if (
-            ((minLoan * BASE) / totalLpShares) * newLpShares == 0 ||
-            (((10**collTokenDecimals * minLoan) / maxLoanPerColl) * BASE) /
-                totalLpShares ==
-            0
-        ) revert PotentiallyZeroRoundedFutureClaims();
         totalLiquidity = _totalLiquidity + _inAmountAfterFees;
         // update LP info
         bool isFirstAddLiquidity = lpInfo.fromLoanIdx == 0;

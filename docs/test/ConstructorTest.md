@@ -301,7 +301,7 @@ Function will update the share pointer for the LP
 ### removeLiquidity
 
 ```solidity
-function removeLiquidity(address _onBehalfOf, uint256 numShares) external nonpayable
+function removeLiquidity(address _onBehalfOf, uint128 numShares) external nonpayable
 ```
 
 
@@ -313,7 +313,7 @@ function removeLiquidity(address _onBehalfOf, uint256 numShares) external nonpay
 | Name | Type | Description |
 |---|---|---|
 | _onBehalfOf | address | undefined |
-| numShares | uint256 | undefined |
+| numShares | uint128 | undefined |
 
 ### repay
 
@@ -928,17 +928,6 @@ error NothingToClaim()
 
 ```solidity
 error PastDeadline()
-```
-
-
-
-
-
-
-### PotentiallyZeroRoundedFutureClaims
-
-```solidity
-error PotentiallyZeroRoundedFutureClaims()
 ```
 
 

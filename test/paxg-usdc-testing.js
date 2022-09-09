@@ -96,7 +96,7 @@ describe("PAXG-USDC Pool Testing", function () {
   });
 
   it("Should fail on loan terms without LPs", async function () {
-    await expect(paxgPool.loanTerms(ONE_PAXG)).to.be.revertedWith("InsufficientLiquidity");
+    await expect(paxgPool.loanTerms(ONE_PAXG)).to.be.revertedWithCustomError(paxgPool, "InsufficientLiquidity");
   });
 
   it("Should allow LPs to add liquidity", async function () {
@@ -175,7 +175,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1InfoPre.sharesOverTime[0]);
     
     // cannot remove without shares
-    await expect(paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1InfoPre.sharesOverTime[0])).to.be.revertedWith("InvalidRemove");
+    await expect(paxgPool.connect(lp1).removeLiquidity(lp1.address, lp1InfoPre.sharesOverTime[0])).to.be.revertedWithCustomError(paxgPool, "InvalidRemove");
 
     lp2InfoPost = await paxgPool.getLpInfo(lp1.address);
     await expect(lp2InfoPost.sharesOverTime.length).to.be.equal(1);
@@ -186,13 +186,13 @@ describe("PAXG-USDC Pool Testing", function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await paxgPool.connect(lp4).addLiquidity(lp4.address, ONE_USDC.mul(1000), timestamp+60, 0);
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [1], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [2], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [1,2], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [2,3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [1,3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
-    await expect(paxgPool.connect(lp4).claim(lp4.address, [1,2,3], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [1], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [2], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [3], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [1,2], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [2,3], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [1,3], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp4).claim(lp4.address, [1,2,3], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
   });
   
   it("Should be possible to borrow when there's sufficient liquidity, and allow new LPs to add liquidity to make borrowing possible again", async function () {
@@ -211,7 +211,7 @@ describe("PAXG-USDC Pool Testing", function () {
         console.log("loanTerms: ", loanTerms);
       } catch(error) {
         console.log("loanTerms error: ", error);
-        await expect(paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWith('LoanTooSmall');
+        await expect(paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWithCustomError(paxgPool, 'LoanTooSmall');
         tooSmallLoans = true;
         break;
       }
@@ -245,7 +245,7 @@ describe("PAXG-USDC Pool Testing", function () {
 
     await paxgPool.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999);
     // cannot claim twice
-    await expect(paxgPool.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp1).claim(lp1.address, loanIds, false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
 
     await paxgPool.connect(lp2).claim(lp2.address, loanIds, false, timestamp+9999999);
     await paxgPool.connect(lp3).claim(lp3.address, loanIds, false, timestamp+9999999);
@@ -297,7 +297,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect((9900 <= pct) && (pct <= 10010)).to.be.true;
 
     // cannot claim twice
-    await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [0, 99], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [0, 99], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
 
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
@@ -305,14 +305,14 @@ describe("PAXG-USDC Pool Testing", function () {
     // lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await USDC.balanceOf(lp2.address);
-    await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [1, 99], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
+    await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [1, 99], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "InvalidSubAggregation");
     await paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999);
     postClaimBal = await USDC.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
 
     //cannot claim twice
-    await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999)).to.be.revertedWith("UnentitledFromLoanIdx");
+    await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnentitledFromLoanIdx");
 
     //lp3 claims
     preClaimBal = await USDC.balanceOf(lp3.address);
@@ -366,7 +366,7 @@ describe("PAXG-USDC Pool Testing", function () {
     // lp1 claims
     preClaimEthBal = await PAXG.balanceOf(lp1.address); //await ethers.provider.getBalance(lp1.address);
     preClaimTokenBal = await USDC.balanceOf(lp1.address);
-    await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [1, 3], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
+    await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [1, 3], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "InvalidSubAggregation");
     await paxgPool.connect(lp1).claim(lp1.address, [1,2,3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp1.address); //ethers.provider.getBalance(lp1.address);
     postClaimTokenBal = await USDC.balanceOf(lp1.address);
@@ -412,7 +412,7 @@ describe("PAXG-USDC Pool Testing", function () {
     console.log("totalRepayments", totalRepayments)
     preClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     preClaimTokenBal = await USDC.balanceOf(lp3.address);
-    await expect(paxgPool.connect(lp3).claimFromAggregated(lp3.address, [1, 3], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
+    await expect(paxgPool.connect(lp3).claimFromAggregated(lp3.address, [1, 3], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "InvalidSubAggregation");
     await paxgPool.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
     postClaimEthBal = await PAXG.balanceOf(lp3.address); //await ethers.provider.getBalance(lp3.address);
     postClaimTokenBal = await USDC.balanceOf(lp3.address);
@@ -458,8 +458,8 @@ describe("PAXG-USDC Pool Testing", function () {
     await ethers.provider.send("evm_mine");
     
     // aggregate only allowed per 100 loans or multiples of 1000 not per 200
-    await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [0, 199], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
-    await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [1, 99, 199], false, timestamp+9999999)).to.be.revertedWith("InvalidSubAggregation");
+    await expect(paxgPool.connect(lp1).claimFromAggregated(lp1.address, [0, 199], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "InvalidSubAggregation");
+    await expect(paxgPool.connect(lp2).claimFromAggregated(lp2.address, [1, 99, 199], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "InvalidSubAggregation");
 
     // claim
     await paxgPool.connect(lp1).claimFromAggregated(lp1.address, [0, 100, 200], false, timestamp+9999999);
@@ -697,7 +697,7 @@ describe("PAXG-USDC Pool Testing", function () {
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
 
     // check that pledger is not entitled to repay
-    await expect(paxgPool.connect(pledger).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(pledger).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // check that borrower can repay
     await paxgPool.connect(borrower).repay(1, borrower.address, loanInfo.repayment)
@@ -708,11 +708,11 @@ describe("PAXG-USDC Pool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
 
     // lp2 shouldn't be able to add liquidity on lp1's behalf without approval
-    await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, false, true, true]);
-    await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // lp1 approves lp2 correctly
     await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, true, false, false]);
@@ -735,11 +735,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
 
     // lp2 shouldn't be able to remove liquidity on lp1's behalf without approval
-    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, false, true]);
-    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
     
     //move forward past earliest remove
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 100])
@@ -769,11 +769,11 @@ describe("PAXG-USDC Pool Testing", function () {
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
 
     // check that lp is not entitled to repay
-    await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(borrower).setApprovals(lp1.address, [false, true, true, true, true]);
-    await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // check that lp can repay
     await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, false, false, false]);
@@ -798,11 +798,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, minLoanLimit, maxRepayLimit, timestamp+60, 0);
 
     // check that lp is not entitled to repay
-    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, true, true, true]);
-    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // check new loan terms
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
@@ -854,11 +854,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     // check that lp2 is not entitled to claim on lp1's behalf
-    await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, true, false]);
-    await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWith("UnapprovedSender");
+    await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // set correct approval
     await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, false, false, true]);
