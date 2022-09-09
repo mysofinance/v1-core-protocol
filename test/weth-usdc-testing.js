@@ -15,7 +15,7 @@ describe("WETH-USDC Pool Testing", function () {
   const _liquidityBnd1 = ONE_USDC.mul(100000);
   const _liquidityBnd2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(100);
-  const MIN_LIQUIDITY = ONE_USDC.mul(10);
+  const minLiquidity = ONE_USDC.mul(10);
   const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
@@ -466,7 +466,7 @@ describe("WETH-USDC Pool Testing", function () {
     balTestToken = await USDC.balanceOf(poolWethUsdc.address);
     poolInfo = await poolWethUsdc.getPoolInfo();
 
-    await expect(poolInfo._totalLiquidity).to.be.equal(MIN_LIQUIDITY);
+    await expect(poolInfo._totalLiquidity).to.be.equal(minLiquidity);
     await expect(poolInfo._totalLpShares).to.be.equal(0);
     console.log("(2/2) balEth:", balEth);
     console.log("(2/2) balTestToken:", balTestToken);
@@ -538,19 +538,19 @@ describe("WETH-USDC Pool Testing", function () {
     // add liquidity with dust should automatically transfer
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    preBalTreasury = await USDC.balanceOf(deployer.address);
+    preBalCreator = await USDC.balanceOf(deployer.address);
     await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+1000, 0);
 
-    // check dust was transferred to treasury
-    postBalTreasury = await USDC.balanceOf(deployer.address);
-    await expect(postBalTreasury.sub(preBalTreasury)).to.be.equal(dust);
+    // check dust was transferred to creator
+    postBalCreator = await USDC.balanceOf(deployer.address);
+    await expect(postBalCreator.sub(preBalCreator)).to.be.equal(dust);
 
     // check lp shares
     poolInfo = await poolWethUsdc.getPoolInfo();
     await expect(poolInfo._totalLpShares).to.be.equal(ONE_USDC.mul(500000));
   })
   
-  it("Should never fall below MIN_LIQUIDITY", async function () {
+  it("Should never fall below minLiquidity", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(1001), timestamp+60, 0);
@@ -568,7 +568,7 @@ describe("WETH-USDC Pool Testing", function () {
     console.log("totalLiquidity:", poolInfo._totalLiquidity);
     console.log("balance:", balance)
     expect(poolInfo._totalLiquidity).to.be.equal(balance);
-    expect(poolInfo._totalLiquidity).to.be.gte(MIN_LIQUIDITY);
+    expect(poolInfo._totalLiquidity).to.be.gte(minLiquidity);
   })
 
   it("Should allow rolling over loan", async function () {

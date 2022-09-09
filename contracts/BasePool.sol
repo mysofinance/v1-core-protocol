@@ -48,9 +48,9 @@ abstract contract BasePool is IBasePool {
     error ZeroShareClaim();
     error Invalid();
 
-    uint256 constant MIN_LPING_PERIOD = 30;
+    uint256 constant MIN_LPING_PERIOD = 30; // in seconds
     uint256 constant BASE = 10**18;
-    uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15;
+    uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15; // 30bps, denominated in BASE
     uint256 immutable minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
@@ -163,7 +163,7 @@ abstract contract BasePool is IBasePool {
             _sendAmount
         );
 
-        // transfer dust to treasury if any
+        // transfer dust to creator if any
         if (dust > 0) {
             IERC20Metadata(loanCcyToken).safeTransfer(poolCreator, dust);
         }
@@ -277,7 +277,7 @@ abstract contract BasePool is IBasePool {
                 _sendAmount
             );
 
-            // transfer protocol fee to treasury in collateral ccy
+            // transfer creator fee to creator in collateral ccy
             IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
 
             // transfer loanAmount in loan ccy
@@ -439,7 +439,7 @@ abstract contract BasePool is IBasePool {
                 address(this),
                 _sendAmount
             );
-            // transfer protocol fee to treasury in collateral ccy
+            // transfer creator fee to pool creator in collateral ccy
             IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
         }
         // spawn event
@@ -605,11 +605,11 @@ abstract contract BasePool is IBasePool {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
         for (uint256 index = 0; index < 5; ) {
-            bool approval = _approvals[index];
+            bool approvalFlag = _approvals[index];
             isApproved[msg.sender][_approvee][
                 IBasePool.ApprovalTypes(index)
-            ] = approval;
-            emit ApprovalUpdate(msg.sender, _approvee, index, approval);
+            ] = approvalFlag;
+            emit Approval(msg.sender, _approvee, index, approvalFlag);
             unchecked {
                 index++;
             }

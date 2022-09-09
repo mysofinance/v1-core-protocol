@@ -15,7 +15,7 @@ describe("PAXG-USDC Pool Testing", function () {
   const _liquidityBnd1 = ONE_USDC.mul(100000);
   const _liquidityBnd2 = ONE_USDC.mul(1000000);
   const _minLoan = ONE_USDC.mul(300);
-  const MIN_LIQUIDITY = ONE_USDC.mul(10);
+  const minLiquidity = ONE_USDC.mul(10);
   const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
   const SUPPLY_CONTROLLER = "0xE25a329d385f77df5D4eD56265babe2b99A5436e";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
@@ -478,7 +478,7 @@ describe("PAXG-USDC Pool Testing", function () {
     balTestToken = await USDC.balanceOf(paxgPool.address);
     poolInfo = await paxgPool.getPoolInfo();
 
-    await expect(poolInfo._totalLiquidity).to.be.equal(MIN_LIQUIDITY);
+    await expect(poolInfo._totalLiquidity).to.be.equal(minLiquidity);
     await expect(poolInfo._totalLpShares).to.be.equal(0);
     console.log("(2/2) balEth:", balEth);
     console.log("(2/2) balTestToken:", balTestToken);
@@ -540,9 +540,9 @@ describe("PAXG-USDC Pool Testing", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(500000), timestamp+1000, 0);
 
-    // check dust was transferred to treasury
-    balTreasury = await USDC.balanceOf(deployer.address);
-    await expect(balTreasury).to.be.equal(MIN_LIQUIDITY);
+    // check dust was transferred to creator
+    balCreator = await USDC.balanceOf(deployer.address);
+    await expect(balCreator).to.be.equal(minLiquidity);
 
     // check lp shares
     poolInfo = await paxgPool.getPoolInfo();
@@ -570,18 +570,18 @@ describe("PAXG-USDC Pool Testing", function () {
     loanInfo = await paxgPool.loanIdxToLoanInfo(1);
     await paxgPool.connect(borrower).repay(1, borrower.address, loanInfo.repayment);
 
-    // get pre-claim treasury balance
-    preBalTreasury = await USDC.balanceOf(deployer.address);
+    // get pre-claim creator balance
+    preBalCreator = await USDC.balanceOf(deployer.address);
 
     // claim and reinvest
     await paxgPool.connect(lp1).claim(lp1.address, [1], true, timestamp+9999999);
 
-    // check post-claim treasury balance
-    postBalTreasury = await USDC.balanceOf(deployer.address);
-    expect(postBalTreasury.sub(preBalTreasury)).to.be.equal(MIN_LIQUIDITY);
+    // check post-claim creator balance
+    postBalCreator = await USDC.balanceOf(deployer.address);
+    expect(postBalCreator.sub(preBalCreator)).to.be.equal(minLiquidity);
   })
   
-  it("Should never fall below MIN_LIQUIDITY", async function () {
+  it("Should never fall below minLiquidity", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(1001), timestamp+60, 0);
@@ -594,7 +594,7 @@ describe("PAXG-USDC Pool Testing", function () {
     console.log("totalLiquidity:", poolInfo._totalLiquidity);
     console.log("balance:", balance)
     expect(poolInfo._totalLiquidity).to.be.equal(balance);
-    expect(poolInfo._totalLiquidity).to.be.gte(MIN_LIQUIDITY);
+    expect(poolInfo._totalLiquidity).to.be.gte(minLiquidity);
   })
 
   it("Should allow rolling over loan", async function () {
@@ -750,7 +750,7 @@ describe("PAXG-USDC Pool Testing", function () {
     preBal = await USDC.balanceOf(lp2.address); 
     await paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000));
     postBal = await USDC.balanceOf(lp2.address);
-    await expect(postBal.sub(preBal)).to.be.equal(ONE_USDC.mul(10000).sub(MIN_LIQUIDITY));
+    await expect(postBal.sub(preBal)).to.be.equal(ONE_USDC.mul(10000).sub(minLiquidity));
   })
   
   it("Should allow repaying on behalf", async function () {

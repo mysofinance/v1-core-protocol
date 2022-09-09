@@ -18,7 +18,7 @@ contract ConstructorTest is BasePool {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _protocolFee
+        uint128 _creatorFee
     )
         BasePool(
             _loanCcyAddr,
@@ -31,7 +31,7 @@ contract ConstructorTest is BasePool {
             _liquidityBnd2,
             _minLoan,
             _baseAggrBucketSize,
-            _protocolFee,
+            _creatorFee,
             10 * 10**6
         )
     {}

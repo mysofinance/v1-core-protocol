@@ -233,7 +233,7 @@ Getter which returns the borrower for a given loan idx
 ### loanTerms
 
 ```solidity
-function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint256 _protocolFee, uint256 _totalLiquidity)
+function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint256 _creatorFee, uint256 _totalLiquidity)
 ```
 
 Function which calculates loan terms
@@ -253,7 +253,7 @@ Function which calculates loan terms
 | loanAmount | uint128 | Amount of loan currency to be trasnferred to the borrower |
 | repaymentAmount | uint128 | Amount of loan currency borrower must repay to reclaim collateral |
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
-| _protocolFee | uint256 | Amount of collateral currency to be transferred to treasury |
+| _creatorFee | uint256 | Amount of collateral currency to be transferred to treasury |
 | _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
 ### overrideSharePointer
@@ -369,10 +369,10 @@ event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, 
 | earliestRemove  | uint256 | undefined |
 | referralCode `indexed` | uint16 | undefined |
 
-### ApprovalUpdate
+### Approval
 
 ```solidity
-event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index, bool isApproved)
+event Approval(address ownerOrBeneficiary, address sender, uint256 approvalTypeIdx, bool isApproved)
 ```
 
 
@@ -385,7 +385,7 @@ event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index, 
 |---|---|---|
 | ownerOrBeneficiary  | address | undefined |
 | sender  | address | undefined |
-| index  | uint256 | undefined |
+| approvalTypeIdx  | uint256 | undefined |
 | isApproved  | bool | undefined |
 
 ### Borrow

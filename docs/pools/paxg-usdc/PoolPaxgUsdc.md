@@ -395,10 +395,10 @@ event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, 
 | earliestRemove  | uint256 | undefined |
 | referralCode `indexed` | uint16 | undefined |
 
-### ApprovalUpdate
+### Approval
 
 ```solidity
-event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index, bool isApproved)
+event Approval(address ownerOrBeneficiary, address sender, uint256 approvalTypeIdx, bool isApproved)
 ```
 
 
@@ -411,7 +411,7 @@ event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index, 
 |---|---|---|
 | ownerOrBeneficiary  | address | undefined |
 | sender  | address | undefined |
-| index  | uint256 | undefined |
+| approvalTypeIdx  | uint256 | undefined |
 | isApproved  | bool | undefined |
 
 ### Borrow

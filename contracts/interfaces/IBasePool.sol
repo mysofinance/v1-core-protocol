@@ -53,10 +53,10 @@ interface IBasePool {
         uint256 newLpShares,
         uint256 earliestRemove
     );
-    event ApprovalUpdate(
+    event Approval(
         address ownerOrBeneficiary,
         address sender,
-        uint256 index,
+        uint256 approvalTypeIdx,
         bool isApproved
     );
 
@@ -311,7 +311,7 @@ interface IBasePool {
      * @return loanAmount Amount of loan currency to be trasnferred to the borrower
      * @return repaymentAmount Amount of loan currency borrower must repay to reclaim collateral
      * @return pledgeAmount Amount of collateral currency borrower retrieves upon repayment
-     * @return _protocolFee Amount of collateral currency to be transferred to treasury
+     * @return _creatorFee Amount of collateral currency to be transferred to treasury
      * @return _totalLiquidity The total liquidity of the pool (pre-borrow) that is available for new loans
      */
     function loanTerms(uint128 _inAmountAfterFees)
@@ -321,7 +321,7 @@ interface IBasePool {
             uint128 loanAmount,
             uint128 repaymentAmount,
             uint128 pledgeAmount,
-            uint256 _protocolFee,
+            uint256 _creatorFee,
             uint256 _totalLiquidity
         );
 
