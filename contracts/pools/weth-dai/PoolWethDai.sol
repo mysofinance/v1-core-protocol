@@ -17,7 +17,7 @@ contract PoolWethDai is BasePool {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _protocolFee
+        uint128 _creatorFee
     )
         BasePool(
             0x6B175474E89094C44Da98b954EedeAC495271d0F,
@@ -30,11 +30,12 @@ contract PoolWethDai is BasePool {
             _liquidityBnd2,
             _minLoan,
             _baseAggrBucketSize,
-            _protocolFee
+            _creatorFee,
+            10 * 10**18
         )
     {}
 
-    function getTotalLiquidity() public view override returns (uint256) {
+    function getTotalLiquidity() internal view override returns (uint256) {
         return totalLiquidity;
     }
 

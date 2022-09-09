@@ -17,7 +17,7 @@ contract PoolWethUsdc is BasePool {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _protocolFee
+        uint128 _creatorFee
     )
         BasePool(
             0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
@@ -30,11 +30,12 @@ contract PoolWethUsdc is BasePool {
             _liquidityBnd2,
             _minLoan,
             _baseAggrBucketSize,
-            _protocolFee
+            _creatorFee,
+            10 * 10**6
         )
     {}
 
-    function getTotalLiquidity() public view override returns (uint256) {
+    function getTotalLiquidity() internal view override returns (uint256) {
         return totalLiquidity;
     }
 

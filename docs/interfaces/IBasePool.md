@@ -29,23 +29,6 @@ Function which adds to an LPs current position
 | _deadline | uint256 | Last timestamp after which function will revert |
 | _referralCode | uint16 | Will possibly be used later to reward referrals |
 
-### baseAggrBucketSize
-
-```solidity
-function baseAggrBucketSize() external view returns (uint256)
-```
-
-Getter which returns the base aggregation size
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The base aggregation size |
-
 ### borrow
 
 ```solidity
@@ -105,23 +88,6 @@ Function which handles aggregate claiming by LPs
 | _isReinvested | bool | Flag for if LP wants claimed loanCcy to be re-invested |
 | _deadline | uint256 | Deadline if reinvestment occurs. (If no reinvestment, this is ignored) |
 
-### collCcyToken
-
-```solidity
-function collCcyToken() external view returns (address)
-```
-
-Getter which returns the pool&#39;s collateral currency
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | The collateral currency token address |
-
 ### getClaimsFromAggregated
 
 ```solidity
@@ -173,6 +139,31 @@ Function which gets all LP info
 | sharesOverTime | uint256[] | Array with elements representing number of LP shares for their past and current positions |
 | loanIdxsWhereSharesChanged | uint256[] | Array with elements representing upper loan idx bounds (excl.), where LP can claim |
 
+### getPoolInfo
+
+```solidity
+function getPoolInfo() external view returns (address _loanCcyToken, address _collCcyToken, uint256 _maxLoanPerColl, uint256 _minLoan, uint256 _loanTenor, uint256 _totalLiquidity, uint256 _totalLpShares, uint256 _baseAggrBucketSize, uint256 _loanIdx)
+```
+
+Function which returns pool information
+
+*This function can be used to get pool information*
+
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _loanCcyToken | address | Loan currency |
+| _collCcyToken | address | Collateral currency |
+| _maxLoanPerColl | uint256 | Maximum loan amount per pledged collateral unit |
+| _minLoan | uint256 | Minimum loan size |
+| _loanTenor | uint256 | Loan tenor |
+| _totalLiquidity | uint256 | Total liquidity available for loans |
+| _totalLpShares | uint256 | Total LP shares |
+| _baseAggrBucketSize | uint256 | Base aggregation level |
+| _loanIdx | uint256 | Loan index for the next incoming loan |
+
 ### getRateParams
 
 ```solidity
@@ -188,27 +179,10 @@ Function which returns rate parameters need for interest rate calculation
 
 | Name | Type | Description |
 |---|---|---|
-| _liquidityBnd1 | uint256 | undefined |
-| _liquidityBnd2 | uint256 | undefined |
-| _r1 | uint256 | undefined |
-| _r2 | uint256 | undefined |
-
-### getTotalLiquidity
-
-```solidity
-function getTotalLiquidity() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s total liquidity available for new loans
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The total liquidity of the pool that is available for new loans |
+| _liquidityBnd1 | uint256 | Amount of liquidity the pool needs to end the reciprocal (hyperbola) range and start &quot;target&quot; range |
+| _liquidityBnd2 | uint256 | Amount of liquidity the pool needs to end the &quot;target&quot; range and start flat rate |
+| _r1 | uint256 | Rate that is used at start of target range |
+| _r2 | uint256 | Minimum rate at end of target range. This is minimum allowable rate |
 
 ### isApproved
 
@@ -233,40 +207,6 @@ Function returns if owner or beneficiary has approved a sender address for a giv
 | Name | Type | Description |
 |---|---|---|
 | _approved | bool | True if approved, false otherwise |
-
-### loanCcyToken
-
-```solidity
-function loanCcyToken() external view returns (address)
-```
-
-Getter which returns the pool&#39;s loan currency
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | The loan currency token address |
-
-### loanIdx
-
-```solidity
-function loanIdx() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s current loan idx counter; the next incoming loan will receive this loan idx;
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The current loan idx counter |
 
 ### loanIdxToBorrower
 
@@ -293,7 +233,7 @@ Getter which returns the borrower for a given loan idx
 ### loanTerms
 
 ```solidity
-function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint128 _protocolFee, uint256 _totalLiquidity)
+function loanTerms(uint128 _inAmountAfterFees) external view returns (uint128 loanAmount, uint128 repaymentAmount, uint128 pledgeAmount, uint256 _creatorFee, uint256 _totalLiquidity)
 ```
 
 Function which calculates loan terms
@@ -313,42 +253,8 @@ Function which calculates loan terms
 | loanAmount | uint128 | Amount of loan currency to be trasnferred to the borrower |
 | repaymentAmount | uint128 | Amount of loan currency borrower must repay to reclaim collateral |
 | pledgeAmount | uint128 | Amount of collateral currency borrower retrieves upon repayment |
-| _protocolFee | uint128 | Amount of collateral currency to be transferred to treasury |
-| _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans  |
-
-### maxLoanPerColl
-
-```solidity
-function maxLoanPerColl() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s maximum loan amount per pledged collateral unit
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The maximum loan amount per pledged collateral unit |
-
-### minLoan
-
-```solidity
-function minLoan() external view returns (uint256)
-```
-
-Getter which returns the pool&#39;s minimum loan size
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | The minimum loan size |
+| _creatorFee | uint256 | Amount of collateral currency to be transferred to treasury |
+| _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
 ### overrideSharePointer
 
@@ -366,27 +272,10 @@ Function will update the share pointer for the LP
 |---|---|---|
 | _newSharePointer | uint256 | New location of the LP&#39;s current share pointer |
 
-### protocolFee
-
-```solidity
-function protocolFee() external view returns (uint128)
-```
-
-Getter which returns the pool&#39;s protocol fee
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint128 | The protocol fee |
-
 ### removeLiquidity
 
 ```solidity
-function removeLiquidity(address _onBehalfOf, uint256 numSharesRemove) external nonpayable
+function removeLiquidity(address _onBehalfOf, uint128 numSharesRemove) external nonpayable
 ```
 
 Function which removes shares from an LPs
@@ -398,7 +287,7 @@ Function which removes shares from an LPs
 | Name | Type | Description |
 |---|---|---|
 | _onBehalfOf | address | Owner of the LP shares |
-| numSharesRemove | uint256 | Amount of LP shares to remove |
+| numSharesRemove | uint128 | Amount of LP shares to remove |
 
 ### repay
 
@@ -455,23 +344,6 @@ Function which sets approval for another to perform a certain function on sender
 | _approvee | address | This address is being given approval for the action(s) by the current sender |
 | _approvals | bool[5] | Array of flags to set which actions are approved or not approved |
 
-### totalLpShares
-
-```solidity
-function totalLpShares() external view returns (uint128)
-```
-
-Getter which returns the pool&#39;s total outstanding LP shares
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint128 | The total outstanding LP shares |
-
 
 
 ## Events
@@ -479,7 +351,7 @@ Getter which returns the pool&#39;s total outstanding LP shares
 ### AddLiquidity
 
 ```solidity
-event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 referralCode)
+event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 indexed referralCode)
 ```
 
 
@@ -495,12 +367,12 @@ event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, 
 | totalLiquidity  | uint256 | undefined |
 | totalLpShares  | uint256 | undefined |
 | earliestRemove  | uint256 | undefined |
-| referralCode  | uint16 | undefined |
+| referralCode `indexed` | uint16 | undefined |
 
-### ApprovalUpdate
+### Approval
 
 ```solidity
-event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index)
+event Approval(address ownerOrBeneficiary, address sender, uint256 approvalTypeIdx, bool isApproved)
 ```
 
 
@@ -513,12 +385,13 @@ event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 index)
 |---|---|---|
 | ownerOrBeneficiary  | address | undefined |
 | sender  | address | undefined |
-| index  | uint256 | undefined |
+| approvalTypeIdx  | uint256 | undefined |
+| isApproved  | bool | undefined |
 
 ### Borrow
 
 ```solidity
-event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 expiry, uint256 protocolFee, uint16 referralCode)
+event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint16 indexed referralCode)
 ```
 
 
@@ -533,9 +406,9 @@ event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 re
 | collateral  | uint256 | undefined |
 | loanAmount  | uint256 | undefined |
 | repaymentAmount  | uint256 | undefined |
-| expiry  | uint256 | undefined |
-| protocolFee  | uint256 | undefined |
-| referralCode  | uint16 | undefined |
+| expiry `indexed` | uint256 | undefined |
+| fee  | uint256 | undefined |
+| referralCode `indexed` | uint16 | undefined |
 
 ### Claim
 
@@ -574,27 +447,10 @@ event ClaimFromAggregated(uint256 fromLoanIdx, uint256 toLoanIdx, uint256 repaym
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
 
-### FeeUpdate
-
-```solidity
-event FeeUpdate(uint128 oldFee, uint128 newFee)
-```
-
-
-
-
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| oldFee  | uint128 | undefined |
-| newFee  | uint128 | undefined |
-
 ### NewSubPool
 
 ```solidity
-event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan)
+event NewSubPool(address loanCcyToken, address collCcyToken, uint256 loanTenor, uint256 maxLoanPerColl, uint256 r1, uint256 r2, uint256 liquidityBnd1, uint256 liquidityBnd2, uint256 minLoan, uint256 creatorFee)
 ```
 
 
@@ -605,8 +461,8 @@ event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, 
 
 | Name | Type | Description |
 |---|---|---|
-| collCcyToken  | address | undefined |
 | loanCcyToken  | address | undefined |
+| collCcyToken  | address | undefined |
 | loanTenor  | uint256 | undefined |
 | maxLoanPerColl  | uint256 | undefined |
 | r1  | uint256 | undefined |
@@ -614,6 +470,7 @@ event NewSubPool(address collCcyToken, address loanCcyToken, uint256 loanTenor, 
 | liquidityBnd1  | uint256 | undefined |
 | liquidityBnd2  | uint256 | undefined |
 | minLoan  | uint256 | undefined |
+| creatorFee  | uint256 | undefined |
 
 ### Reinvest
 

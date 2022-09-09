@@ -1,8 +1,9 @@
-require("@nomiclabs/hardhat-waffle");
 require("hardhat-contract-sizer");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 require('@primitivefi/hardhat-dodoc');
+require("@nomiclabs/hardhat-ethers");
+require("@nomicfoundation/hardhat-chai-matchers")
 require("dotenv").config();
 
 const { ALCHEMY_API_KEY } = process.env
@@ -25,6 +26,12 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 module.exports = {
   solidity: "0.8.15",
+  settings: {
+    optimizer: {
+      enabled: true,
+      runs: 1000,
+    },
+  },
   networks: {
     hardhat: {
       chainId: 31337,
