@@ -377,7 +377,7 @@ Function which sets approval for another to perform a certain function on sender
 ### AddLiquidity
 
 ```solidity
-event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 indexed referralCode)
+event AddLiquidity(address indexed lp, uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 indexed referralCode)
 ```
 
 
@@ -388,6 +388,7 @@ event AddLiquidity(uint256 amount, uint256 newLpShares, uint256 totalLiquidity, 
 
 | Name | Type | Description |
 |---|---|---|
+| lp `indexed` | address | undefined |
 | amount  | uint256 | undefined |
 | newLpShares  | uint256 | undefined |
 | totalLiquidity  | uint256 | undefined |
@@ -417,7 +418,7 @@ event Approval(address ownerOrBeneficiary, address sender, uint256 approvalTypeI
 ### Borrow
 
 ```solidity
-event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint16 indexed referralCode)
+event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint16 indexed referralCode)
 ```
 
 
@@ -428,6 +429,7 @@ event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 re
 
 | Name | Type | Description |
 |---|---|---|
+| borrower `indexed` | address | undefined |
 | loanIdx  | uint256 | undefined |
 | collateral  | uint256 | undefined |
 | loanAmount  | uint256 | undefined |
@@ -439,7 +441,7 @@ event Borrow(uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 re
 ### Claim
 
 ```solidity
-event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral)
+event Claim(address indexed lp, uint256[] loanIdxs, uint256 repayments, uint256 collateral)
 ```
 
 
@@ -450,6 +452,7 @@ event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral)
 
 | Name | Type | Description |
 |---|---|---|
+| lp `indexed` | address | undefined |
 | loanIdxs  | uint256[] | undefined |
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
@@ -457,7 +460,7 @@ event Claim(uint256[] loanIdxs, uint256 repayments, uint256 collateral)
 ### ClaimFromAggregated
 
 ```solidity
-event ClaimFromAggregated(uint256 fromLoanIdx, uint256 toLoanIdx, uint256 repayments, uint256 collateral)
+event ClaimFromAggregated(address indexed lp, uint256 fromLoanIdx, uint256 toLoanIdx, uint256 repayments, uint256 collateral)
 ```
 
 
@@ -468,6 +471,7 @@ event ClaimFromAggregated(uint256 fromLoanIdx, uint256 toLoanIdx, uint256 repaym
 
 | Name | Type | Description |
 |---|---|---|
+| lp `indexed` | address | undefined |
 | fromLoanIdx  | uint256 | undefined |
 | toLoanIdx  | uint256 | undefined |
 | repayments  | uint256 | undefined |
@@ -519,7 +523,7 @@ event Reinvest(uint256 repayments, uint256 newLpShares, uint256 earliestRemove)
 ### RemoveLiquidity
 
 ```solidity
-event RemoveLiquidity(uint256 amount, uint256 removedLpShares, uint256 totalLiquidity, uint256 totalLpShares)
+event RemoveLiquidity(address indexed lp, uint256 amount, uint256 removedLpShares, uint256 totalLiquidity, uint256 totalLpShares)
 ```
 
 
@@ -530,6 +534,7 @@ event RemoveLiquidity(uint256 amount, uint256 removedLpShares, uint256 totalLiqu
 
 | Name | Type | Description |
 |---|---|---|
+| lp `indexed` | address | undefined |
 | amount  | uint256 | undefined |
 | removedLpShares  | uint256 | undefined |
 | totalLiquidity  | uint256 | undefined |
@@ -538,7 +543,7 @@ event RemoveLiquidity(uint256 amount, uint256 removedLpShares, uint256 totalLiqu
 ### Repay
 
 ```solidity
-event Repay(uint256 loanIdx)
+event Repay(address indexed borrower, uint256 loanIdx)
 ```
 
 
@@ -549,6 +554,7 @@ event Repay(uint256 loanIdx)
 
 | Name | Type | Description |
 |---|---|---|
+| borrower `indexed` | address | undefined |
 | loanIdx  | uint256 | undefined |
 
 ### Roll

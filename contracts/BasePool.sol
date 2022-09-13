@@ -168,6 +168,7 @@ abstract contract BasePool is IBasePool {
         }
         // spawn event
         emit AddLiquidity(
+            _onBehalfOf,
             _sendAmount,
             newLpShares,
             totalLiquidity,
@@ -211,6 +212,7 @@ abstract contract BasePool is IBasePool {
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
         // spawn event
         emit RemoveLiquidity(
+            _onBehalfOf,
             liquidityRemoved,
             numShares,
             totalLiquidity,
@@ -284,6 +286,7 @@ abstract contract BasePool is IBasePool {
         }
         // spawn event
         emit Borrow(
+            _onBehalf,
             loanIdx - 1,
             pledgeAmount,
             loanAmount,
@@ -349,7 +352,7 @@ abstract contract BasePool is IBasePool {
         // transfer directly to someone other than payer/sender)
         IERC20Metadata(collCcyToken).safeTransfer(_recipient, _collateral);
         // spawn event
-        emit Repay(_loanIdx);
+        emit Repay(_loanOwner, _loanIdx);
     }
 
     function rollOver(
@@ -497,7 +500,7 @@ abstract contract BasePool is IBasePool {
         );
 
         // spawn event
-        emit Claim(_loanIdxs, repayments, collateral);
+        emit Claim(_onBehalfOf, _loanIdxs, repayments, collateral);
     }
 
     function overrideSharePointer(uint256 _newSharePointer) external {
@@ -591,6 +594,7 @@ abstract contract BasePool is IBasePool {
         );
         //spawn event
         emit ClaimFromAggregated(
+            _onBehalfOf,
             _aggIdxs[0],
             _aggIdxs[lengthArr - 1],
             totalRepayments,
