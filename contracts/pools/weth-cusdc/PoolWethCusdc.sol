@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {BasePool} from "../../BasePool.sol";
 
-contract PoolWethDai is BasePool {
+contract PoolWethCusdc is BasePool {
     constructor(
         uint24 _loanTenor,
         uint128 _maxLoanPerColl,
@@ -19,7 +19,7 @@ contract PoolWethDai is BasePool {
         uint128 _creatorFee
     )
         BasePool(
-            0x6B175474E89094C44Da98b954EedeAC495271d0F,
+            0x39AA39c021dfbaE8faC545936693aC917d5E7563,
             0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
             _loanTenor,
             _maxLoanPerColl,
@@ -30,7 +30,7 @@ contract PoolWethDai is BasePool {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10 * 10**18
+            44199813427 // corresponds to around 10 USDC
         )
     {}
 

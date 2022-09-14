@@ -63,8 +63,8 @@ abstract contract BasePool is IBasePool {
     uint256 creatorFee; // denominated in BASE
     uint256 totalLiquidity; // denominated in loanCcy decimals
     uint256 loanIdx;
-    uint256 r1; // denominated in BASE
-    uint256 r2; // denominated in BASE
+    uint256 r1; // denominated in BASE and w.r.t. tenor (i.e., not annualized)
+    uint256 r2; // denominated in BASE and w.r.t. tenor (i.e., not annualized)
     uint256 liquidityBnd1; // denominated in loanCcy decimals
     uint256 liquidityBnd2; // denominated in loanCcy decimals
     uint256 minLoan; // denominated in loanCcy decimals
