@@ -20,7 +20,7 @@ describe("WETH-DAI Pool Testing", function () {
   const DAI_HOLDER = "0x6c6bc977e13df9b0de53b251522280bb72383700";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
-  beforeEach( async () => {
+  before( async () => {
     [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
 
     // prepare DAI balances
@@ -35,12 +35,19 @@ describe("WETH-DAI Pool Testing", function () {
     });
     daiHolder = await ethers.getSigner(DAI_HOLDER);
     bal = await DAI.balanceOf(DAI_HOLDER);
+    expect(bal).to.be.equal("531662329855678383637691110"); // account should hold around 530mn DAI
+
+    // transfer DAI to test accounts
     await DAI.connect(daiHolder).transfer(lp1.address, bal.div(6));
     await DAI.connect(daiHolder).transfer(lp2.address, bal.div(6));
     await DAI.connect(daiHolder).transfer(lp3.address, bal.div(6));
     await DAI.connect(daiHolder).transfer(lp4.address, bal.div(6));
     await DAI.connect(daiHolder).transfer(lp5.address, bal.div(6));
     await DAI.connect(daiHolder).transfer(borrower.address, bal.div(6));
+  });
+
+  beforeEach( async () => {
+    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
 
     // prepare WETH balance
     WETH = await ethers.getContractAt("IWETH", _collCcyToken);
@@ -606,7 +613,7 @@ describe("WETH-DAI Pool Testing", function () {
 
     //check lp shares
     poolInfo = await poolWethDai.getPoolInfo();
-    await expect(poolInfo._totalLpShares).to.be.equal(ONE_DAI.mul(500000));
+    await expect(poolInfo._totalLpShares).to.be.equal(ONE_DAI.mul(500000).mul(1000).div(minLiquidity));
   })
 
   it("Should never fall below minLiquidity", async function () {
@@ -700,22 +707,28 @@ describe("WETH-DAI Pool Testing", function () {
     console.log(poolInfo._totalLiquidity)
     console.log(poolInfo._totalLpShares)
   })
+  
+  it("(1/2) Should handle consecutively large add and borrows correctly (7x iterations before overflow)", async function () {
+    // transfer all DAI to lp1
+    users = [borrower, lp2, lp3, lp4, lp5]
+    for (const user of users) {
+      bal = await DAI.balanceOf(user.address);
+      await DAI.connect(user).transfer(lp1.address, bal);
+    }
 
-  it("Should revert after multiple rounds of large liquidity injections and pool depletions (2x rounds of adding and borrowing DAI ≈400mn)", async function () {
-    // transfer borrower's DAI balance from previous tests to LP  
-    borrowerDaiBal = await DAI.balanceOf(borrower.address);
-    expect(borrowerDaiBal).to.be.equal("428273133789058374074522071"); // approx. 400mn DAI
-    await DAI.connect(borrower).transfer(lp1.address, borrowerDaiBal);
-    lpDaiBal = await DAI.balanceOf(lp1.address);
-    expect(borrowerDaiBal).to.be.equal(lpDaiBal); // check balance was transferred
+    // check balance of lp1
+    bal = await DAI.balanceOf(lp1.address);
+    expect(bal).to.be.equal("525998336154986862124593707"); // approx. 526mn DAI
 
     // get timestamp
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
 
-    // helper var for reconstructing add liquidity checks
-    BASE = MONE;
-
+    // consecutively do large add and deplete pool
+    counter = 0;
+    totalLoaned = ethers.BigNumber.from("0");
+    totalRepayment = ethers.BigNumber.from("0");
+    totalPledged = ethers.BigNumber.from("0");
     for (let i = 0; i < 100; i++) {
       lpDaiBal = await DAI.balanceOf(lp1.address);
       poolInfo = await poolWethDai.getPoolInfo();
@@ -723,17 +736,19 @@ describe("WETH-DAI Pool Testing", function () {
       console.log("pool has totalLiquidity of:", poolInfo._totalLiquidity)
       console.log("pool has totalLpShares of:", poolInfo._totalLpShares)
       if (i==0) {
-        newLpShares = lpDaiBal;
+        newLpShares = lpDaiBal.mul(1000).div(minLiquidity);
         totalLpSharesAfterAdd = newLpShares; 
       } else {
         newLpShares = lpDaiBal.mul(poolInfo._totalLpShares).div(poolInfo._totalLiquidity);
         totalLpSharesAfterAdd = poolInfo._totalLpShares.add(newLpShares); 
       }
 
+      // try adding large liquidity amount
       try {
         await poolWethDai.connect(lp1).addLiquidity(lp1.address, lpDaiBal, timestamp+1000000000, 0);
+        counter += 1;
       } catch(error) {
-        await expect(poolWethDai.connect(lp1).addLiquidity(lp1.address, lpDaiBal, timestamp+1000000000, 0)).to.be.revertedWithPanic(0x01);
+        await expect(poolWethDai.connect(lp1).addLiquidity(lp1.address, lpDaiBal, timestamp+1000000000, 0)).to.be.revertedWithCustomError(poolWethDai, "InvalidAddAmount");
         break;
       }
       poolInfo = await poolWethDai.getPoolInfo();
@@ -750,9 +765,16 @@ describe("WETH-DAI Pool Testing", function () {
       await WETH.connect(borrower).deposit({value: borrowerEthBal.sub(ONE_ETH)});
       borrowerWEthBal = await WETH.balanceOf(borrower.address);
       console.log("WETH bal", borrowerWEthBal);
+      
+      // get loan terms for large borrow
+      pledgeAmount = ethers.BigNumber.from("10000000000000000000000000000");
+      loanTerms = await poolWethDai.loanTerms(borrowerWEthBal);
+      totalLoaned = totalLoaned.add(loanTerms.loanAmount);
+      totalRepayment = totalRepayment.add(loanTerms.repaymentAmount);
+      totalPledged = totalPledged.add(loanTerms.pledgeAmount);
 
       // deplete pool by large borrow
-      await poolWethDai.connect(borrower).borrow(borrower.address, borrowerWEthBal, 0, MAX_UINT128, timestamp+1000000000, 0);
+      await poolWethDai.connect(borrower).borrow(borrower.address, pledgeAmount, 0, MAX_UINT128, timestamp+1000000000, 0);
       poolInfo = await poolWethDai.getPoolInfo();
       console.log("poolInfo 2:", poolInfo)
 
@@ -761,5 +783,81 @@ describe("WETH-DAI Pool Testing", function () {
       await DAI.connect(borrower).transfer(lp1.address, borrowerDaiBal);
       lpDaiBal = await DAI.balanceOf(lp1.address);
     }
+    expect(counter).to.be.equal(7);
+    console.log("totalLoaned", totalLoaned)
+    console.log("totalRepayment", totalRepayment)
+    console.log("totalPledged", totalPledged)
+    expect(totalLoaned).to.be.equal("3681973911519252027816550885"); // aprox. $3.7bn
+    expect(totalRepayment).to.be.equal("21565762597463274500560697038"); // aprox. $21bn @ +324% of loaned
+    expect(totalPledged).to.be.equal("1886639928499595085662775146154"); // aprox. 1800bn ETH vs 122,375,913 total supply
   })
+  
+  it("(2/2) Should handle consecutively small add and borrows correctly (25x iterations before overflow)", async function () {  
+    // get timestamp
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+
+    // fill up large collateral amount
+    WETH = await ethers.getContractAt("IWETH", _collCcyToken);
+    await ethers.provider.send("hardhat_setBalance", [
+      borrower.address,
+      "0x204FCE5E3E25026110000000",
+    ]);
+    borrowerEthBal = await ethers.provider.getBalance(borrower.address);
+    await WETH.connect(borrower).deposit({value: borrowerEthBal.sub(ONE_ETH)});
+    borrowerWEthBal = await WETH.balanceOf(borrower.address);
+    
+    // consecutively add and deplete pool
+    numAdds = 0;
+    numBorrows = 0;
+    for (let i = 0; i < 100; i++) {
+      // define small add amount
+      if (i == 0) {
+        addAmount = minLiquidity.add(_minLoan);
+      } else {
+        addAmount = _minLoan;
+      }
+
+      // add small amount of liquidity
+      try {
+        await poolWethDai.connect(lp1).addLiquidity(lp1.address, addAmount, timestamp+1000000000, 0);
+        numAdds += 1;
+      } catch(error) {
+        await expect(poolWethDai.connect(lp1).addLiquidity(lp1.address, addAmount, timestamp+1000000000, 0)).to.be.revertedWithCustomError(poolWethDai, "InvalidAddAmount");
+        break;
+      }
+
+      // try depleting pool by pledging large collateral amount
+      console.log("try borrowing against", ONE_ETH.mul(100))
+      poolInfo = await poolWethDai.getPoolInfo();
+      console.log("pool has totalLiquidity of:", poolInfo._totalLiquidity)
+      console.log("pool has totalLpShares of:", poolInfo._totalLpShares)
+      try {
+        await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH.mul(100), 0, MAX_UINT128, timestamp+1000000000, 0);
+        numBorrows += 1;
+      } catch(error) {
+        try {
+          await expect(poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH.mul(100), 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWithCustomError(poolWethDai, "LoanTooSmall");
+        } catch(error) {
+          await poolWethDai.connect(borrower).borrow(borrower.address, ONE_ETH.mul(100), 0, MAX_UINT128, timestamp+1000000000, 0);
+        }
+      }
+    }
+    // check number of adds before lp shares overflow
+    expect(numAdds).to.be.equal(25);
+
+    //move forward to loan expiry
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_mine");
+
+    // check that lp can still remove all his funds despite lp share overflow
+    loanIds = Array.from({length: numBorrows}, (_, i) => i + 1);
+    lpInfo = await poolWethDai.getLpInfo(lp1.address);
+    console.log("lpInfo", lpInfo)
+    for (const loanId of loanIds) {
+      await poolWethDai.connect(lp1).claim(lp1.address, [loanId], false, timestamp+9999999);
+    }
+    lpInfo = await poolWethDai.getLpInfo(lp1.address);
+    await poolWethDai.connect(lp1).removeLiquidity(lp1.address, lpInfo.sharesOverTime[lpInfo.sharesOverTime.length-1]);
+  });
 });

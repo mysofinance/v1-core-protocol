@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.15;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -982,28 +982,24 @@ abstract contract BasePool is IBasePool {
         )
     {
         uint256 _totalLiquidity = getTotalLiquidity();
-        if (
-            _inAmountAfterFees < minLiquidity ||
-            _inAmountAfterFees + _totalLiquidity < minLoan
-        ) revert InvalidAddAmount();
+        if (_inAmountAfterFees < minLiquidity) revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
         // update state of pool
         if (_totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = _inAmountAfterFees;
+            newLpShares = (_inAmountAfterFees * 1000) / minLiquidity;
         } else if (totalLpShares == 0) {
             dust = _totalLiquidity;
             _totalLiquidity = 0;
-            newLpShares = _inAmountAfterFees;
+            newLpShares = (_inAmountAfterFees * 1000) / minLiquidity;
         } else {
-            assert(_totalLiquidity > 0 && totalLpShares > 0);
             newLpShares =
                 (_inAmountAfterFees * totalLpShares) /
                 _totalLiquidity;
         }
-        if (newLpShares == 0) revert InvalidAddAmount();
-        assert(uint128(newLpShares) == newLpShares);
+        if (newLpShares == 0 || uint128(newLpShares) != newLpShares)
+            revert InvalidAddAmount();
         totalLpShares += uint128(newLpShares);
         totalLiquidity = _totalLiquidity + _inAmountAfterFees;
         // update LP info

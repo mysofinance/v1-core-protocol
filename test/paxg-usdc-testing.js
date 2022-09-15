@@ -546,7 +546,7 @@ describe("PAXG-USDC Pool Testing", function () {
 
     // check lp shares
     poolInfo = await paxgPool.getPoolInfo();
-    await expect(poolInfo._totalLpShares).to.be.equal(ONE_USDC.mul(500000));
+    await expect(poolInfo._totalLpShares).to.be.equal(ONE_USDC.mul(500000).mul(1000).div(minLiquidity));
   })
 
   it("Should transfer dust when there are no more active LPs but previous LP claims and reinvests", async function () {
@@ -721,10 +721,10 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
 
     // check lp shares
-    lpArrayInfo1 = await paxgPool.getLpInfo(lp1.address);
-    lpArrayInfo2 = await paxgPool.getLpInfo(lp2.address);
-    await expect(lpArrayInfo1.sharesOverTime[0]).to.be.equal(ONE_USDC.mul(10000));
-    await expect(lpArrayInfo2.sharesOverTime.length).to.be.equal(0);
+    lp1Info = await paxgPool.getLpInfo(lp1.address);
+    lp2Info = await paxgPool.getLpInfo(lp2.address);
+    await expect(lp1Info.sharesOverTime[0]).to.be.equal(ONE_USDC.mul(10000).mul(1000).div(minLiquidity));
+    await expect(lp2Info.sharesOverTime.length).to.be.equal(0);
   })
 
   it("Should allow removing liquidity on behalf", async function () {
@@ -734,12 +734,16 @@ describe("PAXG-USDC Pool Testing", function () {
     // add liquidity
     await paxgPool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
 
+    // get removable amount of lp shares
+    lpInfo = await paxgPool.getLpInfo(lp1.address);
+    lpShares = lpInfo.sharesOverTime[0];
+
     // lp2 shouldn't be able to remove liquidity on lp1's behalf without approval
-    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
+    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
     await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, false, true]);
-    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000))).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
+    await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
     
     //move forward past earliest remove
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 100])
@@ -748,7 +752,7 @@ describe("PAXG-USDC Pool Testing", function () {
     // lp1 approves lp2
     await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, false, true, false]);
     preBal = await USDC.balanceOf(lp2.address); 
-    await paxgPool.connect(lp2).removeLiquidity(lp1.address, ONE_USDC.mul(10000));
+    await paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares);
     postBal = await USDC.balanceOf(lp2.address);
     await expect(postBal.sub(preBal)).to.be.equal(ONE_USDC.mul(10000).sub(minLiquidity));
   })

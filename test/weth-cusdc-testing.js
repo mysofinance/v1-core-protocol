@@ -21,7 +21,7 @@ describe("WETH-cUSDC Pool Testing", function () {
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
 
   beforeEach( async () => {
-    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
+    [deployer, _, _, _, _, _, _, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
 
     // get USDC contract and mock master minter
     USDC = await ethers.getContractAt("IUSDC", USDC_ADDRESS);
@@ -66,7 +66,7 @@ describe("WETH-cUSDC Pool Testing", function () {
     _liquidityBnd1 = ONE_USDC.mul(100000).mul(MONE).div(exchangeRateCurrent);
     _liquidityBnd2 = ONE_USDC.mul(1000000).mul(MONE).div(exchangeRateCurrent);
     _minLoan = ONE_USDC.mul(100).mul(MONE).div(exchangeRateCurrent);
-    _minLiquidity = ONE_USDC.mul(10).mul(MONE).div(exchangeRateCurrent);
+    _minLiquidity = ethers.BigNumber.from("44199813427"); //ONE_USDC.mul(10).mul(MONE).div(exchangeRateCurrent);
   
     // deploy pool
     PoolWethCusdc = await ethers.getContractFactory("PoolWethCusdc");
@@ -159,7 +159,7 @@ describe("WETH-cUSDC Pool Testing", function () {
     expect(poolInfo._totalLiquidity).to.be.equal(expectedTotalLiquidity);
 
     // check total lp shares
-    newLpSharesFromContr1 = lpContribution1;
+    newLpSharesFromContr1 = lpContribution1.mul(1000).div(_minLiquidity);
     newLpSharesFromContr2 = lpContribution2.mul(newLpSharesFromContr1).div(lpContribution1);
     newLpSharesFromContr3 = lpContribution3.mul(newLpSharesFromContr1.add(newLpSharesFromContr2)).div(lpContribution1.add(lpContribution2));
     expectedTotalLpShares = newLpSharesFromContr1.add(newLpSharesFromContr2).add(newLpSharesFromContr3);
