@@ -761,14 +761,13 @@ describe("WETH-DAI Pool Testing", function () {
         borrower.address,
         "0x204FCE5E3E25026110000000",
       ]);
-      borrowerEthBal = await ethers.provider.getBalance(borrower.address);
-      await WETH.connect(borrower).deposit({value: borrowerEthBal.sub(ONE_ETH)});
+      pledgeAmount = ethers.BigNumber.from("0x204FCE5E3E25026110000000").sub(ONE_ETH);
+      await WETH.connect(borrower).deposit({value: pledgeAmount});
       borrowerWEthBal = await WETH.balanceOf(borrower.address);
       console.log("WETH bal", borrowerWEthBal);
       
       // get loan terms for large borrow
-      pledgeAmount = ethers.BigNumber.from("10000000000000000000000000000");
-      loanTerms = await poolWethDai.loanTerms(borrowerWEthBal);
+      loanTerms = await poolWethDai.loanTerms(pledgeAmount);
       totalLoaned = totalLoaned.add(loanTerms.loanAmount);
       totalRepayment = totalRepayment.add(loanTerms.repaymentAmount);
       totalPledged = totalPledged.add(loanTerms.pledgeAmount);
@@ -787,12 +786,19 @@ describe("WETH-DAI Pool Testing", function () {
     console.log("totalLoaned", totalLoaned)
     console.log("totalRepayment", totalRepayment)
     console.log("totalPledged", totalPledged)
-    expect(totalLoaned).to.be.equal("3681973911519252027816550885"); // aprox. $3.7bn
-    expect(totalRepayment).to.be.equal("21565762597463274500560697038"); // aprox. $21bn @ +324% of loaned
-    expect(totalPledged).to.be.equal("1886639928499595085662775146154"); // aprox. 1800bn ETH vs 122,375,913 total supply
+    expect(totalLoaned).to.be.equal("3681600979894270315427817139"); // aprox. $3.7bn
+    expect(totalRepayment).to.be.equal("4383698105736210772780875326"); // aprox. $4.4bn
+    expect(totalPledged).to.be.equal("69999999993000000000000000000"); // aprox. 70bn ETH vs 122,375,913 total supply
   })
   
   it("(2/2) Should handle consecutively small add and borrows correctly (25x iterations before overflow)", async function () {  
+    // transfer all DAI to lp1
+    users = [borrower, lp2, lp3, lp4, lp5]
+    for (const user of users) {
+      bal = await DAI.balanceOf(user.address);
+      await DAI.connect(user).transfer(lp1.address, bal);
+    }
+
     // get timestamp
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
@@ -803,9 +809,8 @@ describe("WETH-DAI Pool Testing", function () {
       borrower.address,
       "0x204FCE5E3E25026110000000",
     ]);
-    borrowerEthBal = await ethers.provider.getBalance(borrower.address);
-    await WETH.connect(borrower).deposit({value: borrowerEthBal.sub(ONE_ETH)});
-    borrowerWEthBal = await WETH.balanceOf(borrower.address);
+    amount = ethers.BigNumber.from("0x204FCE5E3E25026110000000");
+    await WETH.connect(borrower).deposit({value: amount.sub(ONE_ETH)});
     
     // consecutively add and deplete pool
     numAdds = 0;

@@ -559,7 +559,9 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(borrower).borrow(borrower.address, ONE_PAXG, 0, MONE, timestamp+1000000000, 0);
 
     // move forward past LP lockup
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
     
     // LP removes liquidity
@@ -746,7 +748,9 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
     
     //move forward past earliest remove
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 100])
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
 
     // lp1 approves lp2

@@ -449,7 +449,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claimFromAggregated(lp3.address, [0, 1000, 2000, 3000, 4000, 5000], false, timestamp+9999999);
 
     // move forward past min LP lockup period
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
 
     // get LP info 
@@ -514,7 +514,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     // move forward past min LP lockup period
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
     
     // remove liquidity

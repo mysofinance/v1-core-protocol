@@ -116,7 +116,7 @@ describe("Peripheral testing", function () {
     console.log("loanTerms: ", loanTerms);
 
     // move forward and remove dummy liquidity again
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
     lpInfo = await poolWethUsdc.getLpInfo(borrower.address);
     await poolWethUsdc.connect(borrower).removeLiquidity(borrower.address, lpInfo.sharesOverTime[0]);

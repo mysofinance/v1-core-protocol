@@ -15,7 +15,7 @@ abstract contract BasePool is IBasePool {
     error InvalidMaxLoanPerColl();
     error InvalidRateParams();
     error InvalidLiquidityBnds();
-    error InvalidMinLoan();
+    error InvalidMinLiquidity();
     error InvalidBaseAggrSize();
     error InvalidFee();
     error PastDeadline();
@@ -47,7 +47,7 @@ abstract contract BasePool is IBasePool {
     error ZeroShareClaim();
     error Invalid();
 
-    uint256 constant MIN_LPING_PERIOD = 30; // in seconds
+    uint256 constant MIN_LPING_PERIOD = 120; // in seconds
     uint256 constant BASE = 10**18;
     uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15; // 30bps, denominated in BASE
     uint256 immutable minLiquidity; // denominated in loanCcy decimals
@@ -56,8 +56,8 @@ abstract contract BasePool is IBasePool {
     address collCcyToken;
     address loanCcyToken;
 
-    uint128 totalLpShares;
-    uint256 loanTenor;
+    uint128 totalLpShares; // LP shares are denominated and discretized in 1/1000th of minLiquidity
+    uint256 loanTenor; // in seconds
     uint256 collTokenDecimals;
     uint256 maxLoanPerColl; // denominated in loanCcy decimals
     uint256 creatorFee; // denominated in BASE
@@ -103,7 +103,8 @@ abstract contract BasePool is IBasePool {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
             revert InvalidLiquidityBnds();
-        if (_minLoan <= _minLiquidity) revert InvalidMinLoan();
+        // ensure LP shares can be minted based on 1/1000th of minLp discretization
+        if (_minLiquidity < 1000) revert InvalidMinLiquidity();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
             revert InvalidBaseAggrSize();
         if (_creatorFee > MAX_PROTOCOL_FEE) revert InvalidFee();
@@ -986,14 +987,13 @@ abstract contract BasePool is IBasePool {
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
-        // update state of pool
-        if (_totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = (_inAmountAfterFees * 1000) / minLiquidity;
-        } else if (totalLpShares == 0) {
+        // calculate new lp shares
+        if (totalLpShares == 0) {
             dust = _totalLiquidity;
             _totalLiquidity = 0;
             newLpShares = (_inAmountAfterFees * 1000) / minLiquidity;
         } else {
+            assert(_totalLiquidity > 0);
             newLpShares =
                 (_inAmountAfterFees * totalLpShares) /
                 _totalLiquidity;

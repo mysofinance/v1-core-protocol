@@ -765,10 +765,10 @@ error InvalidMaxLoanPerColl()
 
 
 
-### InvalidMinLoan
+### InvalidMinLiquidity
 
 ```solidity
-error InvalidMinLoan()
+error InvalidMinLiquidity()
 ```
 
 
