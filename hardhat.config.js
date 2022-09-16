@@ -4,6 +4,7 @@ require("solidity-coverage");
 require('@primitivefi/hardhat-dodoc');
 require("@nomiclabs/hardhat-ethers");
 require("@nomicfoundation/hardhat-chai-matchers")
+require('hardhat-abi-exporter');
 require("dotenv").config();
 
 const { ALCHEMY_API_KEY } = process.env
@@ -25,7 +26,7 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: "0.8.15",
+  solidity: "0.8.17",
   settings: {
     optimizer: {
       enabled: true,
@@ -50,5 +51,14 @@ module.exports = {
     runOnCompile: true,
     strict: false,
     only: [],
+  },
+  abiExporter: {
+    path: './data/abi',
+    runOnCompile: true,
+    clear: true,
+    flat: false,
+    only: [],
+    spacing: 2,
+    format: "json",
   }
 };

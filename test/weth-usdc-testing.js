@@ -449,7 +449,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claimFromAggregated(lp3.address, [0, 1000, 2000, 3000, 4000, 5000], false, timestamp+9999999);
 
     // move forward past min LP lockup period
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
 
     // get LP info 
@@ -514,7 +514,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp3).claim(lp3.address, [1, 2, 3], false, timestamp+9999999);
 
     // move forward past min LP lockup period
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60])
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 120])
     await ethers.provider.send("evm_mine");
     
     // remove liquidity
@@ -547,7 +547,7 @@ describe("WETH-USDC Pool Testing", function () {
 
     // check lp shares
     poolInfo = await poolWethUsdc.getPoolInfo();
-    await expect(poolInfo._totalLpShares).to.be.equal(ONE_USDC.mul(500000));
+    await expect(poolInfo._totalLpShares).to.be.equal(ONE_USDC.mul(500000).mul(1000).div(minLiquidity));
   })
   
   it("Should never fall below minLiquidity", async function () {
@@ -582,7 +582,7 @@ describe("WETH-USDC Pool Testing", function () {
 
     loanTerms = await poolWethUsdc.loanTerms(loanInfo.collateral);
     balTestTokenPre = await USDC.balanceOf(borrower.address);
-    await expect(poolWethUsdc.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWithCustomError(poolWethUsdc, "InvalidSendAmount")
+    await expect(poolWethUsdc.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, 0)).to.be.revertedWithCustomError(poolWethUsdc, "InvalidSendAmount");
     await poolWethUsdc.connect(borrower).rollOver(1, 0, MONE, timestamp+1000000000, loanInfo.repayment.sub(loanTerms[0]));
     balTestTokenPost = await USDC.balanceOf(borrower.address);
 
@@ -613,7 +613,7 @@ describe("WETH-USDC Pool Testing", function () {
         counter++;
       } catch(error) {
         console.log(i, error)
-        await expect(poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+1000000000, 0)).to.be.revertedWithPanic(0x01);
+        await expect(poolWethUsdc.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+1000000000, 0)).to.be.revertedWithCustomError(poolWethUsdc, "InvalidAddAmount");
         break
       }
     }
@@ -1161,7 +1161,7 @@ describe("WETH-USDC Pool Testing", function () {
     await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 10000], false, timestamp+1000000000);
     postClaimBalLoanCcy = await USDC.balanceOf(lp1.address);
     postClaimBalCollCcy = await WETH.balanceOf(lp1.address);
-    const firstLpShares = ONE_USDC.mul(1000000000000);
+    const firstLpShares = ONE_USDC.mul(1000000000000).mul(1000).div(minLiquidity);
     expect(postClaimBalCollCcy.sub(preClaimBalCollCcy)).to.be.equal(aggregateCollPerShare.mul(firstLpShares).div(MONE));
     expect(postClaimBalLoanCcy.sub(preClaimBalLoanCcy)).to.be.equal(aggregateRepaymentsPerShare.mul(firstLpShares).div(MONE));
   })

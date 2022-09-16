@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.15;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {BasePool} from "../BasePool.sol";
@@ -10,15 +10,15 @@ contract ConstructorTest is BasePool {
     constructor(
         address _loanCcyAddr,
         address _collCcyAddr,
-        uint24 _loanTenor,
-        uint128 _maxLoanPerColl,
+        uint256 _loanTenor,
+        uint256 _maxLoanPerColl,
         uint256 _r1,
         uint256 _r2,
         uint256 _liquidityBnd1,
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _creatorFee
+        uint256 _creatorFee
     )
         BasePool(
             _loanCcyAddr,
@@ -32,7 +32,7 @@ contract ConstructorTest is BasePool {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10 * 10**6
+            1000
         )
     {}
 

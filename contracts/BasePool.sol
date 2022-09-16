@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.15;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -15,7 +15,7 @@ abstract contract BasePool is IBasePool {
     error InvalidMaxLoanPerColl();
     error InvalidRateParams();
     error InvalidLiquidityBnds();
-    error InvalidMinLoan();
+    error InvalidMinLiquidity();
     error InvalidBaseAggrSize();
     error InvalidFee();
     error PastDeadline();
@@ -47,7 +47,7 @@ abstract contract BasePool is IBasePool {
     error ZeroShareClaim();
     error Invalid();
 
-    uint256 constant MIN_LPING_PERIOD = 30; // in seconds
+    uint256 constant MIN_LPING_PERIOD = 120; // in seconds
     uint256 constant BASE = 10**18;
     uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15; // 30bps, denominated in BASE
     uint256 immutable minLiquidity; // denominated in loanCcy decimals
@@ -56,15 +56,15 @@ abstract contract BasePool is IBasePool {
     address collCcyToken;
     address loanCcyToken;
 
-    uint128 totalLpShares;
-    uint256 loanTenor;
+    uint128 totalLpShares; // LP shares are denominated and discretized in 1/1000th of minLiquidity
+    uint256 loanTenor; // in seconds
     uint256 collTokenDecimals;
     uint256 maxLoanPerColl; // denominated in loanCcy decimals
     uint256 creatorFee; // denominated in BASE
     uint256 totalLiquidity; // denominated in loanCcy decimals
     uint256 loanIdx;
-    uint256 r1; // denominated in BASE
-    uint256 r2; // denominated in BASE
+    uint256 r1; // denominated in BASE and w.r.t. tenor (i.e., not annualized)
+    uint256 r2; // denominated in BASE and w.r.t. tenor (i.e., not annualized)
     uint256 liquidityBnd1; // denominated in loanCcy decimals
     uint256 liquidityBnd2; // denominated in loanCcy decimals
     uint256 minLoan; // denominated in loanCcy decimals
@@ -103,7 +103,8 @@ abstract contract BasePool is IBasePool {
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
             revert InvalidLiquidityBnds();
-        if (_minLoan <= _minLiquidity) revert InvalidMinLoan();
+        // ensure LP shares can be minted based on 1/1000th of minLp discretization
+        if (_minLiquidity < 1000) revert InvalidMinLiquidity();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
             revert InvalidBaseAggrSize();
         if (_creatorFee > MAX_PROTOCOL_FEE) revert InvalidFee();
@@ -168,6 +169,7 @@ abstract contract BasePool is IBasePool {
         }
         // spawn event
         emit AddLiquidity(
+            _onBehalfOf,
             _sendAmount,
             newLpShares,
             totalLiquidity,
@@ -211,6 +213,7 @@ abstract contract BasePool is IBasePool {
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, liquidityRemoved);
         // spawn event
         emit RemoveLiquidity(
+            _onBehalfOf,
             liquidityRemoved,
             numShares,
             totalLiquidity,
@@ -284,6 +287,7 @@ abstract contract BasePool is IBasePool {
         }
         // spawn event
         emit Borrow(
+            _onBehalf,
             loanIdx - 1,
             pledgeAmount,
             loanAmount,
@@ -349,7 +353,7 @@ abstract contract BasePool is IBasePool {
         // transfer directly to someone other than payer/sender)
         IERC20Metadata(collCcyToken).safeTransfer(_recipient, _collateral);
         // spawn event
-        emit Repay(_loanIdx);
+        emit Repay(_loanOwner, _loanIdx);
     }
 
     function rollOver(
@@ -497,7 +501,7 @@ abstract contract BasePool is IBasePool {
         );
 
         // spawn event
-        emit Claim(_loanIdxs, repayments, collateral);
+        emit Claim(_onBehalfOf, _loanIdxs, repayments, collateral);
     }
 
     function overrideSharePointer(uint256 _newSharePointer) external {
@@ -591,6 +595,7 @@ abstract contract BasePool is IBasePool {
         );
         //spawn event
         emit ClaimFromAggregated(
+            _onBehalfOf,
             _aggIdxs[0],
             _aggIdxs[lengthArr - 1],
             totalRepayments,
@@ -978,28 +983,23 @@ abstract contract BasePool is IBasePool {
         )
     {
         uint256 _totalLiquidity = getTotalLiquidity();
-        if (
-            _inAmountAfterFees < minLiquidity ||
-            _inAmountAfterFees + _totalLiquidity < minLoan
-        ) revert InvalidAddAmount();
+        if (_inAmountAfterFees < minLiquidity) revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
-        // update state of pool
-        if (_totalLiquidity == 0 && totalLpShares == 0) {
-            newLpShares = _inAmountAfterFees;
-        } else if (totalLpShares == 0) {
+        // calculate new lp shares
+        if (totalLpShares == 0) {
             dust = _totalLiquidity;
             _totalLiquidity = 0;
-            newLpShares = _inAmountAfterFees;
+            newLpShares = (_inAmountAfterFees * 1000) / minLiquidity;
         } else {
-            assert(_totalLiquidity > 0 && totalLpShares > 0);
+            assert(_totalLiquidity > 0);
             newLpShares =
                 (_inAmountAfterFees * totalLpShares) /
                 _totalLiquidity;
         }
-        if (newLpShares == 0) revert InvalidAddAmount();
-        assert(uint128(newLpShares) == newLpShares);
+        if (newLpShares == 0 || uint128(newLpShares) != newLpShares)
+            revert InvalidAddAmount();
         totalLpShares += uint128(newLpShares);
         totalLiquidity = _totalLiquidity + _inAmountAfterFees;
         // update LP info
