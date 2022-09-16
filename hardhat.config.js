@@ -4,6 +4,7 @@ require("solidity-coverage");
 require('@primitivefi/hardhat-dodoc');
 require("@nomiclabs/hardhat-ethers");
 require("@nomicfoundation/hardhat-chai-matchers")
+require('hardhat-abi-exporter');
 require("dotenv").config();
 
 const { ALCHEMY_API_KEY } = process.env
@@ -50,5 +51,14 @@ module.exports = {
     runOnCompile: true,
     strict: false,
     only: [],
+  },
+  abiExporter: {
+    path: './data/abi',
+    runOnCompile: true,
+    clear: true,
+    flat: false,
+    only: [],
+    spacing: 2,
+    format: "json",
   }
 };
