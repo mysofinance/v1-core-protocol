@@ -21,6 +21,10 @@ contracts/
 ┣ pools/
 ┃ ┣ paxg-usdc/
 ┃ ┃ ┗ PoolPaxgUsdc.sol
+┃ ┣ usdc-weth/
+┃ ┃ ┗ PoolUsdcWeth.sol
+┃ ┣ weth-cusdc/
+┃ ┃ ┗ PoolWethCusdc.sol
 ┃ ┣ weth-dai/
 ┃ ┃ ┗ PoolWethDai.sol
 ┃ ┗ weth-usdc/
