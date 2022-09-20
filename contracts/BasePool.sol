@@ -983,7 +983,7 @@ abstract contract BasePool is IBasePool {
         )
     {
         uint256 _totalLiquidity = getTotalLiquidity();
-        if (_inAmountAfterFees < minLiquidity) revert InvalidAddAmount();
+        if (_inAmountAfterFees < minLiquidity / 1000) revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
 
