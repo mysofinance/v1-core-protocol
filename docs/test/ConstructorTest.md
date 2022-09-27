@@ -356,7 +356,7 @@ Function which allows repayment of a loan and roll over into new loan
 ### setApprovals
 
 ```solidity
-function setApprovals(address _approvee, bool[5] _approvals) external nonpayable
+function setApprovals(address _approvee, uint256 _packedApprovals) external nonpayable
 ```
 
 Function which sets approval for another to perform a certain function on sender&#39;s behalf
@@ -368,7 +368,7 @@ Function which sets approval for another to perform a certain function on sender
 | Name | Type | Description |
 |---|---|---|
 | _approvee | address | This address is being given approval for the action(s) by the current sender |
-| _approvals | bool[5] | Array of flags to set which actions are approved or not approved |
+| _packedApprovals | uint256 | Packed boolean flags to set which actions are approved or not approved, where e.g. &quot;00001&quot; refers to ApprovalTypes.Repay (=0) and &quot;10000&quot; to ApprovalTypes.Claim (=4) |
 
 
 
@@ -399,7 +399,7 @@ event AddLiquidity(address indexed lp, uint256 amount, uint256 newLpShares, uint
 ### Approval
 
 ```solidity
-event Approval(address ownerOrBeneficiary, address sender, uint256 approvalTypeIdx, bool isApproved)
+event Approval(address ownerOrBeneficiary, address sender, uint256 _packedApprovals)
 ```
 
 
@@ -412,8 +412,7 @@ event Approval(address ownerOrBeneficiary, address sender, uint256 approvalTypeI
 |---|---|---|
 | ownerOrBeneficiary  | address | undefined |
 | sender  | address | undefined |
-| approvalTypeIdx  | uint256 | undefined |
-| isApproved  | bool | undefined |
+| _packedApprovals  | uint256 | undefined |
 
 ### Borrow
 

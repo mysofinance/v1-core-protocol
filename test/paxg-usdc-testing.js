@@ -713,11 +713,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
-    await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, false, true, true]);
+    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("11011", 2));
     await expect(paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // lp1 approves lp2 correctly
-    await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, true, false, false]);
+    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("00100", 2));
 
     // lp2 adds liquidity on behalf of lp1
     await paxgPool.connect(lp2).addLiquidity(lp1.address, ONE_USDC.mul(10000), timestamp+60, 0);
@@ -744,7 +744,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
-    await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, false, true]);
+    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("10111", 2));
     await expect(paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
     
     //move forward past earliest remove
@@ -754,7 +754,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await ethers.provider.send("evm_mine");
 
     // lp1 approves lp2
-    await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, false, true, false]);
+    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("01000", 2));
     preBal = await USDC.balanceOf(lp2.address); 
     await paxgPool.connect(lp2).removeLiquidity(lp1.address, lpShares);
     postBal = await USDC.balanceOf(lp2.address);
@@ -780,11 +780,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
-    await paxgPool.connect(borrower).setApprovals(lp1.address, [false, true, true, true, true]);
+    await paxgPool.connect(borrower).setApprovals(lp1.address, parseInt("11110", 2));
     await expect(paxgPool.connect(lp1).repay(1, borrower.address, loanInfo.repayment)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // check that lp can repay
-    await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, false, false, false]);
+    await paxgPool.connect(borrower).setApprovals(lp1.address, parseInt("00001", 2));
     preBal = await PAXG.balanceOf(lp1.address); 
     await paxgPool.connect(lp1).repay(1, lp1.address, loanInfo.repayment);
     postBal = await PAXG.balanceOf(lp1.address);
@@ -809,7 +809,7 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
-    await paxgPool.connect(borrower).setApprovals(lp1.address, [true, false, true, true, true]);
+    await paxgPool.connect(borrower).setApprovals(lp1.address, parseInt("11101", 2));
     await expect(paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, 0)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // check new loan terms
@@ -821,7 +821,7 @@ describe("PAXG-USDC Pool Testing", function () {
     console.log("rollOverCost", rollOverCost)
 
     // check that lp can repay with approval
-    await paxgPool.connect(borrower).setApprovals(lp1.address, [false, true, false, false, false]);
+    await paxgPool.connect(borrower).setApprovals(lp1.address, parseInt("00010", 2));
     preBalColl = await PAXG.balanceOf(lp1.address); 
     preBalLoanCcy = await USDC.balanceOf(lp1.address);
     await paxgPool.connect(lp1).rollOver(1, 0, MAX_UINT128, timestamp+1000000000, rollOverCost);
@@ -865,11 +865,11 @@ describe("PAXG-USDC Pool Testing", function () {
     await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // should still fail with wrong approval
-    await paxgPool.connect(lp1).setApprovals(lp2.address, [true, true, true, true, false]);
+    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("01111", 2));
     await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
     // set correct approval
-    await paxgPool.connect(lp1).setApprovals(lp2.address, [false, false, false, false, true]);
+    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("10000", 2));
 
     // check that lp2 can claim on behalf of lp1
     preBalColl = await PAXG.balanceOf(lp2.address); 

@@ -184,6 +184,7 @@ abstract contract BasePool is IBasePool {
         external
         override
     {
+        delete lastAddOfTxOrigin[_onBehalfOf];
         // verify LP info and eligibility
         checkSenderApproval(
             _onBehalfOf,
@@ -593,7 +594,7 @@ abstract contract BasePool is IBasePool {
             totalCollateral,
             _isReinvested
         );
-        //spawn event
+        // spawn event
         emit ClaimFromAggregated(
             _onBehalfOf,
             _aggIdxs[0],
@@ -603,20 +604,29 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function setApprovals(address _approvee, bool[5] calldata _approvals)
+    function setApprovals(address _approvee, uint256 _packedApprovals)
         external
     {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
         for (uint256 index = 0; index < 5; ) {
-            bool approvalFlag = _approvals[index];
-            isApproved[msg.sender][_approvee][
-                IBasePool.ApprovalTypes(index)
-            ] = approvalFlag;
-            emit Approval(msg.sender, _approvee, index, approvalFlag);
+            bool approvalFlag = ((_packedApprovals >> index) & uint256(1)) == 1;
+            if (
+                isApproved[msg.sender][_approvee][
+                    IBasePool.ApprovalTypes(index)
+                ] != approvalFlag
+            ) {
+                isApproved[msg.sender][_approvee][
+                    IBasePool.ApprovalTypes(index)
+                ] = approvalFlag;
+                _packedApprovals |= uint256(1) << 256;
+            }
             unchecked {
                 index++;
             }
+        }
+        if (((_packedApprovals >> 256) & uint256(1)) == 1) {
+            emit Approval(msg.sender, _approvee, _packedApprovals);
         }
     }
 

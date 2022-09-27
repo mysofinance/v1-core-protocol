@@ -909,8 +909,8 @@ describe("WETH-USDC Pool Testing", function () {
     await expect(lp1Info.currSharePtr).to.be.equal(0);
 
     // revert if pass in your own address or address 0
-    await expect(poolWethUsdc.connect(lp2).setApprovals(lp2.address, [true, true, false, false, true])).to.be.revertedWithCustomError(poolWethUsdc, "InvalidApprovalAddress");
-    await expect(poolWethUsdc.connect(lp2).setApprovals("0x0000000000000000000000000000000000000000", [true, true, false, false, true])).to.be.revertedWithCustomError(poolWethUsdc, "InvalidApprovalAddress");
+    await expect(poolWethUsdc.connect(lp2).setApprovals(lp2.address, parseInt("10011", 2))).to.be.revertedWithCustomError(poolWethUsdc, "InvalidApprovalAddress");
+    await expect(poolWethUsdc.connect(lp2).setApprovals("0x0000000000000000000000000000000000000000", parseInt("10011", 2))).to.be.revertedWithCustomError(poolWethUsdc, "InvalidApprovalAddress");
     
     // enum ApprovalTypes {
     //    REPAY = 0,
@@ -919,7 +919,7 @@ describe("WETH-USDC Pool Testing", function () {
     //    REMOVE_LIQUIDITY = 3,
     //    CLAIM = 4
 
-    await poolWethUsdc.connect(lp2).setApprovals(lp1.address, [false, false, true, true, true]);
+    await poolWethUsdc.connect(lp2).setApprovals(lp1.address, parseInt("11100", 2));
 
     for (let i = 0; i < 10; i++) {
       try {

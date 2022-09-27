@@ -65,8 +65,7 @@ interface IBasePool {
     event Approval(
         address ownerOrBeneficiary,
         address sender,
-        uint256 approvalTypeIdx,
-        bool isApproved
+        uint256 _packedApprovals
     );
 
     enum ApprovalTypes {
@@ -241,10 +240,10 @@ interface IBasePool {
     /**
      * @notice Function which sets approval for another to perform a certain function on sender's behalf
      * @param _approvee This address is being given approval for the action(s) by the current sender
-     * @param _approvals Array of flags to set which actions are approved or not approved
+     * @param _packedApprovals Packed boolean flags to set which actions are approved or not approved,
+     * where e.g. "00001" refers to ApprovalTypes.Repay (=0) and "10000" to ApprovalTypes.Claim (=4)
      */
-    function setApprovals(address _approvee, bool[5] calldata _approvals)
-        external;
+    function setApprovals(address _approvee, uint256 _packedApprovals) external;
 
     /**
      * @notice Function which gets all LP info
