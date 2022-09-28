@@ -141,7 +141,7 @@ abstract contract BasePool is IBasePool {
         address _onBehalfOf,
         uint128 _sendAmount,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external override {
         // verify LP info and eligibility
         checkTimestamp(_deadline);
@@ -175,6 +175,7 @@ abstract contract BasePool is IBasePool {
             totalLiquidity,
             totalLpShares,
             earliestRemove,
+            loanIdx,
             _referralCode
         );
     }
@@ -218,7 +219,8 @@ abstract contract BasePool is IBasePool {
             liquidityRemoved,
             numShares,
             totalLiquidity,
-            _totalLpShares - numShares
+            _totalLpShares - numShares,
+            loanIdx
         );
     }
 
@@ -228,7 +230,7 @@ abstract contract BasePool is IBasePool {
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external override {
         uint256 _timestamp = checkTimestamp(_deadline);
         // check if atomic add and borrow as well as sanity check of onBehalf address
@@ -959,7 +961,13 @@ abstract contract BasePool is IBasePool {
                     );
                 }
                 // spawn event
-                emit Reinvest(_repayments, newLpShares, earliestRemove);
+                emit Reinvest(
+                    _onBehalfOf,
+                    _repayments,
+                    newLpShares,
+                    earliestRemove,
+                    loanIdx
+                );
             } else {
                 IERC20Metadata(loanCcyToken).safeTransfer(
                     msg.sender,

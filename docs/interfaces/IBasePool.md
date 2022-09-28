@@ -13,7 +13,7 @@
 ### addLiquidity
 
 ```solidity
-function addLiquidity(address _onBehalfOf, uint128 _sendAmount, uint256 _deadline, uint16 _referralCode) external nonpayable
+function addLiquidity(address _onBehalfOf, uint128 _sendAmount, uint256 _deadline, uint256 _referralCode) external nonpayable
 ```
 
 Function which adds to an LPs current position
@@ -27,12 +27,12 @@ Function which adds to an LPs current position
 | _onBehalfOf | address | Recipient of the LP shares |
 | _sendAmount | uint128 | Amount of loan currency LP wishes to deposit |
 | _deadline | uint256 | Last timestamp after which function will revert |
-| _referralCode | uint16 | Will possibly be used later to reward referrals |
+| _referralCode | uint256 | Will possibly be used later to reward referrals |
 
 ### borrow
 
 ```solidity
-function borrow(address _onBehalf, uint128 _sendAmount, uint128 _minLoan, uint128 _maxRepay, uint256 _deadline, uint16 _referralCode) external nonpayable
+function borrow(address _onBehalf, uint128 _sendAmount, uint128 _minLoan, uint128 _maxRepay, uint256 _deadline, uint256 _referralCode) external nonpayable
 ```
 
 Function which allows borrowing from the pool
@@ -48,7 +48,7 @@ Function which allows borrowing from the pool
 | _minLoan | uint128 | Minimum loan currency amount acceptable to borrower |
 | _maxRepay | uint128 | Maximum allowable loan currency amount borrower is willing to repay |
 | _deadline | uint256 | Timestamp after which transaction will be void |
-| _referralCode | uint16 | Code for later possible rewards in referral program |
+| _referralCode | uint256 | Code for later possible rewards in referral program |
 
 ### claim
 
@@ -351,7 +351,7 @@ Function which sets approval for another to perform a certain function on sender
 ### AddLiquidity
 
 ```solidity
-event AddLiquidity(address indexed lp, uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint16 indexed referralCode)
+event AddLiquidity(address indexed lp, uint256 amount, uint256 newLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 earliestRemove, uint256 indexed loanIdx, uint256 indexed referralCode)
 ```
 
 
@@ -368,7 +368,8 @@ event AddLiquidity(address indexed lp, uint256 amount, uint256 newLpShares, uint
 | totalLiquidity  | uint256 | undefined |
 | totalLpShares  | uint256 | undefined |
 | earliestRemove  | uint256 | undefined |
-| referralCode `indexed` | uint16 | undefined |
+| loanIdx `indexed` | uint256 | undefined |
+| referralCode `indexed` | uint256 | undefined |
 
 ### ApprovalUpdate
 
@@ -391,7 +392,7 @@ event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 _packed
 ### Borrow
 
 ```solidity
-event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint16 indexed referralCode)
+event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint256 indexed referralCode)
 ```
 
 
@@ -409,7 +410,7 @@ event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint
 | repaymentAmount  | uint256 | undefined |
 | expiry `indexed` | uint256 | undefined |
 | fee  | uint256 | undefined |
-| referralCode `indexed` | uint16 | undefined |
+| referralCode `indexed` | uint256 | undefined |
 
 ### Claim
 
@@ -478,7 +479,7 @@ event NewSubPool(address loanCcyToken, address collCcyToken, uint256 loanTenor, 
 ### Reinvest
 
 ```solidity
-event Reinvest(uint256 repayments, uint256 newLpShares, uint256 earliestRemove)
+event Reinvest(address indexed lp, uint256 repayments, uint256 newLpShares, uint256 earliestRemove, uint256 indexed loanIdx)
 ```
 
 
@@ -489,14 +490,16 @@ event Reinvest(uint256 repayments, uint256 newLpShares, uint256 earliestRemove)
 
 | Name | Type | Description |
 |---|---|---|
+| lp `indexed` | address | undefined |
 | repayments  | uint256 | undefined |
 | newLpShares  | uint256 | undefined |
 | earliestRemove  | uint256 | undefined |
+| loanIdx `indexed` | uint256 | undefined |
 
 ### RemoveLiquidity
 
 ```solidity
-event RemoveLiquidity(address indexed lp, uint256 amount, uint256 removedLpShares, uint256 totalLiquidity, uint256 totalLpShares)
+event RemoveLiquidity(address indexed lp, uint256 amount, uint256 removedLpShares, uint256 totalLiquidity, uint256 totalLpShares, uint256 indexed loanIdx)
 ```
 
 
@@ -512,6 +515,7 @@ event RemoveLiquidity(address indexed lp, uint256 amount, uint256 removedLpShare
 | removedLpShares  | uint256 | undefined |
 | totalLiquidity  | uint256 | undefined |
 | totalLpShares  | uint256 | undefined |
+| loanIdx `indexed` | uint256 | undefined |
 
 ### Repay
 

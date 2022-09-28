@@ -22,14 +22,16 @@ interface IBasePool {
         uint256 totalLiquidity,
         uint256 totalLpShares,
         uint256 earliestRemove,
-        uint16 indexed referralCode
+        uint256 indexed loanIdx,
+        uint256 indexed referralCode
     );
     event RemoveLiquidity(
         address indexed lp,
         uint256 amount,
         uint256 removedLpShares,
         uint256 totalLiquidity,
-        uint256 totalLpShares
+        uint256 totalLpShares,
+        uint256 indexed loanIdx
     );
     event Borrow(
         address indexed borrower,
@@ -39,7 +41,7 @@ interface IBasePool {
         uint256 repaymentAmount,
         uint256 indexed expiry,
         uint256 fee,
-        uint16 indexed referralCode
+        uint256 indexed referralCode
     );
     event Roll(uint256 oldLoanIdx, uint256 newLoanIdx);
 
@@ -58,9 +60,11 @@ interface IBasePool {
     );
     event Repay(address indexed borrower, uint256 loanIdx);
     event Reinvest(
+        address indexed lp,
         uint256 repayments,
         uint256 newLpShares,
-        uint256 earliestRemove
+        uint256 earliestRemove,
+        uint256 indexed loanIdx
     );
     event ApprovalUpdate(
         address ownerOrBeneficiary,
@@ -124,7 +128,7 @@ interface IBasePool {
         address _onBehalfOf,
         uint128 _sendAmount,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external;
 
     /**
@@ -153,7 +157,7 @@ interface IBasePool {
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external;
 
     /**
