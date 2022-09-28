@@ -619,14 +619,14 @@ abstract contract BasePool is IBasePool {
                 isApproved[msg.sender][_approvee][
                     IBasePool.ApprovalTypes(index)
                 ] = approvalFlag;
-                _packedApprovals |= uint256(1) << 256;
+                _packedApprovals |= uint256(1) << 5;
             }
             unchecked {
                 index++;
             }
         }
-        if (((_packedApprovals >> 256) & uint256(1)) == 1) {
-            emit Approval(msg.sender, _approvee, _packedApprovals);
+        if (((_packedApprovals >> 5) & uint256(1)) == 1) {
+            emit ApprovalUpdate(msg.sender, _approvee, _packedApprovals);
         }
     }
 

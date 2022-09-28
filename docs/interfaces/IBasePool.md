@@ -370,10 +370,10 @@ event AddLiquidity(address indexed lp, uint256 amount, uint256 newLpShares, uint
 | earliestRemove  | uint256 | undefined |
 | referralCode `indexed` | uint16 | undefined |
 
-### Approval
+### ApprovalUpdate
 
 ```solidity
-event Approval(address ownerOrBeneficiary, address sender, uint256 _packedApprovals)
+event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 _packedApprovals)
 ```
 
 
