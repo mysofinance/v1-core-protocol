@@ -141,7 +141,7 @@ abstract contract BasePool is IBasePool {
         address _onBehalfOf,
         uint128 _sendAmount,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external override {
         // verify LP info and eligibility
         checkTimestamp(_deadline);
@@ -175,6 +175,7 @@ abstract contract BasePool is IBasePool {
             totalLiquidity,
             totalLpShares,
             earliestRemove,
+            loanIdx,
             _referralCode
         );
     }
@@ -184,6 +185,7 @@ abstract contract BasePool is IBasePool {
         external
         override
     {
+        delete lastAddOfTxOrigin[_onBehalfOf];
         // verify LP info and eligibility
         checkSenderApproval(
             _onBehalfOf,
@@ -217,7 +219,8 @@ abstract contract BasePool is IBasePool {
             liquidityRemoved,
             numShares,
             totalLiquidity,
-            _totalLpShares - numShares
+            _totalLpShares - numShares,
+            loanIdx
         );
     }
 
@@ -227,7 +230,7 @@ abstract contract BasePool is IBasePool {
         uint128 _minLoanLimit,
         uint128 _maxRepayLimit,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external override {
         uint256 _timestamp = checkTimestamp(_deadline);
         // check if atomic add and borrow as well as sanity check of onBehalf address
@@ -593,7 +596,7 @@ abstract contract BasePool is IBasePool {
             totalCollateral,
             _isReinvested
         );
-        //spawn event
+        // spawn event
         emit ClaimFromAggregated(
             _onBehalfOf,
             _aggIdxs[0],
@@ -603,20 +606,29 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function setApprovals(address _approvee, bool[5] calldata _approvals)
+    function setApprovals(address _approvee, uint256 _packedApprovals)
         external
     {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
         for (uint256 index = 0; index < 5; ) {
-            bool approvalFlag = _approvals[index];
-            isApproved[msg.sender][_approvee][
-                IBasePool.ApprovalTypes(index)
-            ] = approvalFlag;
-            emit Approval(msg.sender, _approvee, index, approvalFlag);
+            bool approvalFlag = ((_packedApprovals >> index) & uint256(1)) == 1;
+            if (
+                isApproved[msg.sender][_approvee][
+                    IBasePool.ApprovalTypes(index)
+                ] != approvalFlag
+            ) {
+                isApproved[msg.sender][_approvee][
+                    IBasePool.ApprovalTypes(index)
+                ] = approvalFlag;
+                _packedApprovals |= uint256(1) << 5;
+            }
             unchecked {
                 index++;
             }
+        }
+        if (((_packedApprovals >> 5) & uint256(1)) == 1) {
+            emit ApprovalUpdate(msg.sender, _approvee, _packedApprovals);
         }
     }
 
@@ -949,7 +961,13 @@ abstract contract BasePool is IBasePool {
                     );
                 }
                 // spawn event
-                emit Reinvest(_repayments, newLpShares, earliestRemove);
+                emit Reinvest(
+                    _onBehalfOf,
+                    _repayments,
+                    newLpShares,
+                    earliestRemove,
+                    loanIdx
+                );
             } else {
                 IERC20Metadata(loanCcyToken).safeTransfer(
                     msg.sender,

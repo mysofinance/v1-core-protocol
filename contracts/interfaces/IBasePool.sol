@@ -22,14 +22,16 @@ interface IBasePool {
         uint256 totalLiquidity,
         uint256 totalLpShares,
         uint256 earliestRemove,
-        uint16 indexed referralCode
+        uint256 indexed loanIdx,
+        uint256 indexed referralCode
     );
     event RemoveLiquidity(
         address indexed lp,
         uint256 amount,
         uint256 removedLpShares,
         uint256 totalLiquidity,
-        uint256 totalLpShares
+        uint256 totalLpShares,
+        uint256 indexed loanIdx
     );
     event Borrow(
         address indexed borrower,
@@ -39,7 +41,7 @@ interface IBasePool {
         uint256 repaymentAmount,
         uint256 indexed expiry,
         uint256 fee,
-        uint16 indexed referralCode
+        uint256 indexed referralCode
     );
     event Roll(uint256 oldLoanIdx, uint256 newLoanIdx);
 
@@ -58,15 +60,16 @@ interface IBasePool {
     );
     event Repay(address indexed borrower, uint256 loanIdx);
     event Reinvest(
+        address indexed lp,
         uint256 repayments,
         uint256 newLpShares,
-        uint256 earliestRemove
+        uint256 earliestRemove,
+        uint256 indexed loanIdx
     );
-    event Approval(
+    event ApprovalUpdate(
         address ownerOrBeneficiary,
         address sender,
-        uint256 approvalTypeIdx,
-        bool isApproved
+        uint256 _packedApprovals
     );
 
     enum ApprovalTypes {
@@ -125,7 +128,7 @@ interface IBasePool {
         address _onBehalfOf,
         uint128 _sendAmount,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external;
 
     /**
@@ -154,7 +157,7 @@ interface IBasePool {
         uint128 _minLoan,
         uint128 _maxRepay,
         uint256 _deadline,
-        uint16 _referralCode
+        uint256 _referralCode
     ) external;
 
     /**
@@ -241,10 +244,10 @@ interface IBasePool {
     /**
      * @notice Function which sets approval for another to perform a certain function on sender's behalf
      * @param _approvee This address is being given approval for the action(s) by the current sender
-     * @param _approvals Array of flags to set which actions are approved or not approved
+     * @param _packedApprovals Packed boolean flags to set which actions are approved or not approved,
+     * where e.g. "00001" refers to ApprovalTypes.Repay (=0) and "10000" to ApprovalTypes.Claim (=4)
      */
-    function setApprovals(address _approvee, bool[5] calldata _approvals)
-        external;
+    function setApprovals(address _approvee, uint256 _packedApprovals) external;
 
     /**
      * @notice Function which gets all LP info
