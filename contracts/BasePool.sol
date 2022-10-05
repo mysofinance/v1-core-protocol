@@ -200,7 +200,7 @@ abstract contract BasePool is IBasePool {
         ) revert InvalidRemove();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
-        uint256 _totalLiquidity = getTotalLiquidity();
+        uint256 _totalLiquidity = totalLiquidity;
         uint128 _totalLpShares = totalLpShares;
         // update state of pool
         uint256 liquidityRemoved = (numShares *
@@ -707,7 +707,7 @@ abstract contract BasePool is IBasePool {
         // compute terms (as uint256)
         _creatorFee = (_inAmountAfterFees * creatorFee) / BASE;
         uint256 pledge = _inAmountAfterFees - _creatorFee;
-        _totalLiquidity = getTotalLiquidity();
+        _totalLiquidity = totalLiquidity;
         if (_totalLiquidity <= minLiquidity) revert InsufficientLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
@@ -780,8 +780,6 @@ abstract contract BasePool is IBasePool {
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
-
-    function getTotalLiquidity() internal view virtual returns (uint256);
 
     /**
      * @notice Function which updates the 3 aggegration levels when claiming
@@ -1000,7 +998,7 @@ abstract contract BasePool is IBasePool {
             uint32 earliestRemove
         )
     {
-        uint256 _totalLiquidity = getTotalLiquidity();
+        uint256 _totalLiquidity = totalLiquidity;
         if (_inAmountAfterFees < minLiquidity / 1000) revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
