@@ -332,14 +332,10 @@ abstract contract BasePool is IBasePool {
         uint128 _repayment = loanInfo.repayment;
 
         // transfer repayment amount
-        uint128 repaymentAmountAfterFees = _sendAmount -
-            getLoanCcyTransferFee(_sendAmount);
-        // set range in case of rounding exact repayment amount
-        // cannot be hit; set upper bound to prevent fat finger
-        if (
-            repaymentAmountAfterFees < _repayment ||
-            repaymentAmountAfterFees > (101 * _repayment) / 100
-        ) revert InvalidSendAmount();
+        uint128 repaymentAmountAfterFees = checkAndGetSendAmountAfterFees(
+            _sendAmount,
+            _repayment
+        );
         // if repaymentAmountAfterFees was larger then update loan info
         // this ensures the extra repayment goes to the LPs
         if (repaymentAmountAfterFees != _repayment) {
@@ -400,26 +396,24 @@ abstract contract BasePool is IBasePool {
             uint256 _creatorFee,
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
-
+        // overwrite _deadline memory variable in order to prevent stack too deep
+        // error when emitting repay event
+        _deadline = _loanIdx;
         {
             // check roll over cost
             uint128 tmpRepayment = loanInfo.repayment;
             if (loanAmount >= tmpRepayment) revert InvalidRollOver();
-            uint256 rollOverCost = tmpRepayment - loanAmount;
-            // set range in case of rounding exact rollOverCost
-            // cannot be hit; set upper bound to prevent fat finger
-            if (
-                _sendAmount - getLoanCcyTransferFee(_sendAmount) <
-                rollOverCost ||
-                _sendAmount - getLoanCcyTransferFee(_sendAmount) >
-                (101 * rollOverCost) / 100
-            ) revert InvalidSendAmount();
-            else {
-                loanInfo.repayment =
-                    _sendAmount +
-                    loanAmount -
-                    getLoanCcyTransferFee(_sendAmount);
-            }
+            uint128 rollOverCost = tmpRepayment - loanAmount;
+            uint128 repaymentAmountAfterFees = checkAndGetSendAmountAfterFees(
+                _sendAmount,
+                rollOverCost
+            ) + loanAmount;
+            loanInfo.repayment = repaymentAmountAfterFees;
+            // mark previous loan as repaid
+            loanInfo.repaid = true;
+            // overwrite _maxRepayLimit memory variable in order to prevent stack too deep
+            // error when emitting repay event
+            _maxRepayLimit = repaymentAmountAfterFees;
         }
         // update the aggregation mapping for repaid loan
         updateAggregations(
@@ -429,25 +423,24 @@ abstract contract BasePool is IBasePool {
             loanInfo.totalLpShares,
             true
         );
-        // mark previous loan as repaid
-        loanInfo.repaid = true;
         {
+            uint256 currLoanIdx = loanIdx;
             // set new loan info
-            loanIdxToBorrower[loanIdx] = loanOwner;
+            loanIdxToBorrower[currLoanIdx] = loanOwner;
             LoanInfo memory loanInfoNew;
             loanInfoNew.expiry = expiry;
             loanInfoNew.totalLpShares = totalLpShares;
             loanInfoNew.repayment = repaymentAmount;
             loanInfoNew.collateral = pledgeAmount;
-            loanIdxToLoanInfo[loanIdx] = loanInfoNew;
+            loanIdxToLoanInfo[currLoanIdx] = loanInfoNew;
             updateAggregations(
-                loanIdx,
+                currLoanIdx,
                 pledgeAmount,
                 0,
                 loanInfoNew.totalLpShares,
                 false
             );
-            loanIdx += 1;
+            loanIdx = currLoanIdx + 1;
             totalLiquidity = _totalLiquidity - loanAmount;
             // transfer liquidity
             IERC20Metadata(loanCcyToken).safeTransferFrom(
@@ -461,7 +454,7 @@ abstract contract BasePool is IBasePool {
             // spawn event
             emit Rollover(
                 loanOwner,
-                loanIdx - 1,
+                currLoanIdx,
                 pledgeAmount,
                 loanAmount,
                 repaymentAmount,
@@ -469,6 +462,7 @@ abstract contract BasePool is IBasePool {
                 expiry
             );
         }
+        emit Repay(loanOwner, _deadline, _maxRepayLimit);
     }
 
     function claim(
@@ -1307,6 +1301,25 @@ abstract contract BasePool is IBasePool {
         } else {
             rate = r2;
         }
+    }
+
+    /**
+     * @notice Function which checks and returns loan ccy send amount after fees
+     * @param _sendAmount Amount of loanCcy to be transferred
+     * @param lowerBnd Minimum amount which is expected to be received at least
+     */
+    function checkAndGetSendAmountAfterFees(
+        uint128 _sendAmount,
+        uint128 lowerBnd
+    ) internal view returns (uint128 sendAmountAfterFees) {
+        sendAmountAfterFees = _sendAmount - getLoanCcyTransferFee(_sendAmount);
+        // check range in case of rounding exact lowerBnd amount
+        // cannot be hit; set upper bound to prevent fat finger
+        if (
+            sendAmountAfterFees < lowerBnd ||
+            sendAmountAfterFees > (101 * lowerBnd) / 100
+        ) revert InvalidSendAmount();
+        return sendAmountAfterFees;
     }
 
     /**
