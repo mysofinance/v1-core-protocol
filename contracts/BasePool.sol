@@ -258,21 +258,29 @@ abstract contract BasePool is IBasePool {
             // update pool state
             totalLiquidity = _totalLiquidity - loanAmount;
 
+            uint256 _loanIdx = loanIdx;
+            uint128 _totalLpShares = totalLpShares;
+
             // update loan info
-            loanIdxToBorrower[loanIdx] = _onBehalf;
+            loanIdxToBorrower[_loanIdx] = _onBehalf;
             LoanInfo memory loanInfo;
             loanInfo.repayment = repaymentAmount;
-            loanInfo.totalLpShares = totalLpShares;
+            loanInfo.totalLpShares = _totalLpShares;
             loanInfo.expiry = expiry;
             loanInfo.collateral = pledgeAmount;
-            loanIdxToLoanInfo[loanIdx] = loanInfo;
-        }
-        {
+            loanIdxToLoanInfo[_loanIdx] = loanInfo;
+
             // update aggregations
-            updateAggregations(loanIdx, pledgeAmount, 0, totalLpShares, false);
+            updateAggregations(
+                _loanIdx,
+                pledgeAmount,
+                0,
+                _totalLpShares,
+                false
+            );
 
             // update loan idx counter
-            loanIdx += 1;
+            loanIdx = _loanIdx + 1;
         }
         {
             // transfer _sendAmount (not pledgeAmount) in collateral ccy
@@ -295,8 +303,8 @@ abstract contract BasePool is IBasePool {
             pledgeAmount,
             loanAmount,
             repaymentAmount,
+            totalLpShares,
             expiry,
-            _creatorFee,
             _referralCode
         );
     }
@@ -338,12 +346,13 @@ abstract contract BasePool is IBasePool {
             loanInfo.repayment = repaymentAmountAfterFees;
         }
         uint128 _collateral = loanInfo.collateral;
+        uint128 _totalLpShares = loanInfo.totalLpShares;
         // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             _collateral,
             repaymentAmountAfterFees,
-            loanInfo.totalLpShares,
+            _totalLpShares,
             true
         );
 
@@ -356,7 +365,7 @@ abstract contract BasePool is IBasePool {
         // transfer directly to someone other than payer/sender)
         IERC20Metadata(collCcyToken).safeTransfer(_recipient, _collateral);
         // spawn event
-        emit Repay(_loanOwner, _loanIdx);
+        emit Repay(_loanOwner, _loanIdx, repaymentAmountAfterFees);
     }
 
     function rollOver(
@@ -394,8 +403,9 @@ abstract contract BasePool is IBasePool {
 
         {
             // check roll over cost
-            if (loanAmount >= loanInfo.repayment) revert InvalidRollOver();
-            uint256 rollOverCost = loanInfo.repayment - loanAmount;
+            uint128 tmpRepayment = loanInfo.repayment;
+            if (loanAmount >= tmpRepayment) revert InvalidRollOver();
+            uint256 rollOverCost = tmpRepayment - loanAmount;
             // set range in case of rounding exact rollOverCost
             // cannot be hit; set upper bound to prevent fat finger
             if (
@@ -447,9 +457,18 @@ abstract contract BasePool is IBasePool {
             );
             // transfer creator fee to pool creator in collateral ccy
             IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
+
+            // spawn event
+            emit Rollover(
+                loanOwner,
+                loanIdx - 1,
+                pledgeAmount,
+                loanAmount,
+                repaymentAmount,
+                loanInfoNew.totalLpShares,
+                expiry
+            );
         }
-        // spawn event
-        emit Roll(_loanIdx, loanIdx - 1);
     }
 
     function claim(

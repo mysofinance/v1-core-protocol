@@ -39,12 +39,19 @@ interface IBasePool {
         uint256 collateral,
         uint256 loanAmount,
         uint256 repaymentAmount,
+        uint256 totalLpShares,
         uint256 indexed expiry,
-        uint256 fee,
         uint256 indexed referralCode
     );
-    event Roll(uint256 oldLoanIdx, uint256 newLoanIdx);
-
+    event Rollover(
+        address indexed borrower,
+        uint256 loanIdx,
+        uint256 collateral,
+        uint256 loanAmount,
+        uint256 repaymentAmount,
+        uint256 totalLpShares,
+        uint256 indexed expiry
+    );
     event ClaimFromAggregated(
         address indexed lp,
         uint256 fromLoanIdx,
@@ -58,7 +65,11 @@ interface IBasePool {
         uint256 repayments,
         uint256 collateral
     );
-    event Repay(address indexed borrower, uint256 loanIdx);
+    event Repay(
+        address indexed borrower,
+        uint256 loanIdx,
+        uint256 repaymentAmountAfterFees
+    );
     event Reinvest(
         address indexed lp,
         uint256 repayments,
