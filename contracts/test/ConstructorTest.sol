@@ -36,10 +36,6 @@ contract ConstructorTest is BasePool {
         )
     {}
 
-    function getTotalLiquidity() internal view override returns (uint256) {
-        return totalLiquidity;
-    }
-
     function getCollCcyTransferFee(
         uint128 /*_transferAmount*/
     ) internal pure override returns (uint128 transferFee) {

@@ -200,7 +200,7 @@ abstract contract BasePool is IBasePool {
         ) revert InvalidRemove();
         if (block.timestamp < lpInfo.earliestRemove)
             revert BeforeEarliestRemove();
-        uint256 _totalLiquidity = getTotalLiquidity();
+        uint256 _totalLiquidity = totalLiquidity;
         uint128 _totalLpShares = totalLpShares;
         // update state of pool
         uint256 liquidityRemoved = (numShares *
@@ -258,21 +258,29 @@ abstract contract BasePool is IBasePool {
             // update pool state
             totalLiquidity = _totalLiquidity - loanAmount;
 
+            uint256 _loanIdx = loanIdx;
+            uint128 _totalLpShares = totalLpShares;
+
             // update loan info
-            loanIdxToBorrower[loanIdx] = _onBehalf;
+            loanIdxToBorrower[_loanIdx] = _onBehalf;
             LoanInfo memory loanInfo;
             loanInfo.repayment = repaymentAmount;
-            loanInfo.totalLpShares = totalLpShares;
+            loanInfo.totalLpShares = _totalLpShares;
             loanInfo.expiry = expiry;
             loanInfo.collateral = pledgeAmount;
-            loanIdxToLoanInfo[loanIdx] = loanInfo;
-        }
-        {
+            loanIdxToLoanInfo[_loanIdx] = loanInfo;
+
             // update aggregations
-            updateAggregations(loanIdx, pledgeAmount, 0, totalLpShares, false);
+            updateAggregations(
+                _loanIdx,
+                pledgeAmount,
+                0,
+                _totalLpShares,
+                false
+            );
 
             // update loan idx counter
-            loanIdx += 1;
+            loanIdx = _loanIdx + 1;
         }
         {
             // transfer _sendAmount (not pledgeAmount) in collateral ccy
@@ -295,8 +303,8 @@ abstract contract BasePool is IBasePool {
             pledgeAmount,
             loanAmount,
             repaymentAmount,
+            totalLpShares,
             expiry,
-            _creatorFee,
             _referralCode
         );
     }
@@ -324,26 +332,23 @@ abstract contract BasePool is IBasePool {
         uint128 _repayment = loanInfo.repayment;
 
         // transfer repayment amount
-        uint128 repaymentAmountAfterFees = _sendAmount -
-            getLoanCcyTransferFee(_sendAmount);
-        // set range in case of rounding exact repayment amount
-        // cannot be hit; set upper bound to prevent fat finger
-        if (
-            repaymentAmountAfterFees < _repayment ||
-            repaymentAmountAfterFees > (101 * _repayment) / 100
-        ) revert InvalidSendAmount();
+        uint128 repaymentAmountAfterFees = checkAndGetSendAmountAfterFees(
+            _sendAmount,
+            _repayment
+        );
         // if repaymentAmountAfterFees was larger then update loan info
         // this ensures the extra repayment goes to the LPs
         if (repaymentAmountAfterFees != _repayment) {
             loanInfo.repayment = repaymentAmountAfterFees;
         }
         uint128 _collateral = loanInfo.collateral;
+        uint128 _totalLpShares = loanInfo.totalLpShares;
         // update the aggregation mappings
         updateAggregations(
             _loanIdx,
             _collateral,
             repaymentAmountAfterFees,
-            loanInfo.totalLpShares,
+            _totalLpShares,
             true
         );
 
@@ -356,7 +361,7 @@ abstract contract BasePool is IBasePool {
         // transfer directly to someone other than payer/sender)
         IERC20Metadata(collCcyToken).safeTransfer(_recipient, _collateral);
         // spawn event
-        emit Repay(_loanOwner, _loanIdx);
+        emit Repay(_loanOwner, _loanIdx, repaymentAmountAfterFees);
     }
 
     function rollOver(
@@ -391,25 +396,24 @@ abstract contract BasePool is IBasePool {
             uint256 _creatorFee,
             uint256 _totalLiquidity
         ) = _borrow(_collateral, _minLoanLimit, _maxRepayLimit, _deadline);
-
+        // overwrite _deadline memory variable in order to prevent stack too deep
+        // error when emitting repay event
+        _deadline = _loanIdx;
         {
             // check roll over cost
-            if (loanAmount >= loanInfo.repayment) revert InvalidRollOver();
-            uint256 rollOverCost = loanInfo.repayment - loanAmount;
-            // set range in case of rounding exact rollOverCost
-            // cannot be hit; set upper bound to prevent fat finger
-            if (
-                _sendAmount - getLoanCcyTransferFee(_sendAmount) <
-                rollOverCost ||
-                _sendAmount - getLoanCcyTransferFee(_sendAmount) >
-                (101 * rollOverCost) / 100
-            ) revert InvalidSendAmount();
-            else {
-                loanInfo.repayment =
-                    _sendAmount +
-                    loanAmount -
-                    getLoanCcyTransferFee(_sendAmount);
-            }
+            uint128 tmpRepayment = loanInfo.repayment;
+            if (loanAmount >= tmpRepayment) revert InvalidRollOver();
+            uint128 rollOverCost = tmpRepayment - loanAmount;
+            uint128 repaymentAmountAfterFees = checkAndGetSendAmountAfterFees(
+                _sendAmount,
+                rollOverCost
+            ) + loanAmount;
+            loanInfo.repayment = repaymentAmountAfterFees;
+            // mark previous loan as repaid
+            loanInfo.repaid = true;
+            // overwrite _maxRepayLimit memory variable in order to prevent stack too deep
+            // error when emitting repay event
+            _maxRepayLimit = repaymentAmountAfterFees;
         }
         // update the aggregation mapping for repaid loan
         updateAggregations(
@@ -419,25 +423,24 @@ abstract contract BasePool is IBasePool {
             loanInfo.totalLpShares,
             true
         );
-        // mark previous loan as repaid
-        loanInfo.repaid = true;
         {
+            uint256 currLoanIdx = loanIdx;
             // set new loan info
-            loanIdxToBorrower[loanIdx] = loanOwner;
+            loanIdxToBorrower[currLoanIdx] = loanOwner;
             LoanInfo memory loanInfoNew;
             loanInfoNew.expiry = expiry;
             loanInfoNew.totalLpShares = totalLpShares;
             loanInfoNew.repayment = repaymentAmount;
             loanInfoNew.collateral = pledgeAmount;
-            loanIdxToLoanInfo[loanIdx] = loanInfoNew;
+            loanIdxToLoanInfo[currLoanIdx] = loanInfoNew;
             updateAggregations(
-                loanIdx,
+                currLoanIdx,
                 pledgeAmount,
                 0,
                 loanInfoNew.totalLpShares,
                 false
             );
-            loanIdx += 1;
+            loanIdx = currLoanIdx + 1;
             totalLiquidity = _totalLiquidity - loanAmount;
             // transfer liquidity
             IERC20Metadata(loanCcyToken).safeTransferFrom(
@@ -447,9 +450,19 @@ abstract contract BasePool is IBasePool {
             );
             // transfer creator fee to pool creator in collateral ccy
             IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
+
+            // spawn event
+            emit Rollover(
+                loanOwner,
+                currLoanIdx,
+                pledgeAmount,
+                loanAmount,
+                repaymentAmount,
+                loanInfoNew.totalLpShares,
+                expiry
+            );
         }
-        // spawn event
-        emit Roll(_loanIdx, loanIdx - 1);
+        emit Repay(loanOwner, _deadline, _maxRepayLimit);
     }
 
     function claim(
@@ -707,7 +720,7 @@ abstract contract BasePool is IBasePool {
         // compute terms (as uint256)
         _creatorFee = (_inAmountAfterFees * creatorFee) / BASE;
         uint256 pledge = _inAmountAfterFees - _creatorFee;
-        _totalLiquidity = getTotalLiquidity();
+        _totalLiquidity = totalLiquidity;
         if (_totalLiquidity <= minLiquidity) revert InsufficientLiquidity();
         uint256 loan = (pledge *
             maxLoanPerColl *
@@ -780,8 +793,6 @@ abstract contract BasePool is IBasePool {
         repayments = (aggClaimsInfo.repayments * _shares) / BASE;
         collateral = (aggClaimsInfo.collateral * _shares) / BASE;
     }
-
-    function getTotalLiquidity() internal view virtual returns (uint256);
 
     /**
      * @notice Function which updates the 3 aggegration levels when claiming
@@ -1000,7 +1011,7 @@ abstract contract BasePool is IBasePool {
             uint32 earliestRemove
         )
     {
-        uint256 _totalLiquidity = getTotalLiquidity();
+        uint256 _totalLiquidity = totalLiquidity;
         if (_inAmountAfterFees < minLiquidity / 1000) revert InvalidAddAmount();
         // retrieve lpInfo of sender
         LpInfo storage lpInfo = addrToLpInfo[_onBehalfOf];
@@ -1290,6 +1301,25 @@ abstract contract BasePool is IBasePool {
         } else {
             rate = r2;
         }
+    }
+
+    /**
+     * @notice Function which checks and returns loan ccy send amount after fees
+     * @param _sendAmount Amount of loanCcy to be transferred
+     * @param lowerBnd Minimum amount which is expected to be received at least
+     */
+    function checkAndGetSendAmountAfterFees(
+        uint128 _sendAmount,
+        uint128 lowerBnd
+    ) internal view returns (uint128 sendAmountAfterFees) {
+        sendAmountAfterFees = _sendAmount - getLoanCcyTransferFee(_sendAmount);
+        // check range in case of rounding exact lowerBnd amount
+        // cannot be hit; set upper bound to prevent fat finger
+        if (
+            sendAmountAfterFees < lowerBnd ||
+            sendAmountAfterFees > (101 * lowerBnd) / 100
+        ) revert InvalidSendAmount();
+        return sendAmountAfterFees;
     }
 
     /**

@@ -418,7 +418,7 @@ event ApprovalUpdate(address ownerOrBeneficiary, address sender, uint256 _packed
 ### Borrow
 
 ```solidity
-event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 indexed expiry, uint256 fee, uint256 indexed referralCode)
+event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 totalLpShares, uint256 indexed expiry, uint256 indexed referralCode)
 ```
 
 
@@ -434,8 +434,8 @@ event Borrow(address indexed borrower, uint256 loanIdx, uint256 collateral, uint
 | collateral  | uint256 | undefined |
 | loanAmount  | uint256 | undefined |
 | repaymentAmount  | uint256 | undefined |
+| totalLpShares  | uint256 | undefined |
 | expiry `indexed` | uint256 | undefined |
-| fee  | uint256 | undefined |
 | referralCode `indexed` | uint256 | undefined |
 
 ### Claim
@@ -546,7 +546,7 @@ event RemoveLiquidity(address indexed lp, uint256 amount, uint256 removedLpShare
 ### Repay
 
 ```solidity
-event Repay(address indexed borrower, uint256 loanIdx)
+event Repay(address indexed borrower, uint256 loanIdx, uint256 repaymentAmountAfterFees)
 ```
 
 
@@ -559,11 +559,12 @@ event Repay(address indexed borrower, uint256 loanIdx)
 |---|---|---|
 | borrower `indexed` | address | undefined |
 | loanIdx  | uint256 | undefined |
+| repaymentAmountAfterFees  | uint256 | undefined |
 
-### Roll
+### Rollover
 
 ```solidity
-event Roll(uint256 oldLoanIdx, uint256 newLoanIdx)
+event Rollover(address indexed borrower, uint256 loanIdx, uint256 collateral, uint256 loanAmount, uint256 repaymentAmount, uint256 totalLpShares, uint256 indexed expiry)
 ```
 
 
@@ -574,8 +575,13 @@ event Roll(uint256 oldLoanIdx, uint256 newLoanIdx)
 
 | Name | Type | Description |
 |---|---|---|
-| oldLoanIdx  | uint256 | undefined |
-| newLoanIdx  | uint256 | undefined |
+| borrower `indexed` | address | undefined |
+| loanIdx  | uint256 | undefined |
+| collateral  | uint256 | undefined |
+| loanAmount  | uint256 | undefined |
+| repaymentAmount  | uint256 | undefined |
+| totalLpShares  | uint256 | undefined |
+| expiry `indexed` | uint256 | undefined |
 
 
 
