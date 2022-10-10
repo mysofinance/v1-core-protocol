@@ -50,7 +50,7 @@ abstract contract BasePool is IBasePool {
     uint256 constant MIN_LPING_PERIOD = 120; // in seconds
     uint256 constant BASE = 10**18;
     uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15; // 30bps, denominated in BASE
-    uint256 immutable minLiquidity; // denominated in loanCcy decimals
+    uint256 minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
     address collCcyToken;
@@ -662,6 +662,12 @@ abstract contract BasePool is IBasePool {
         currSharePtr = lpInfo.currSharePtr;
         sharesOverTime = lpInfo.sharesOverTime;
         loanIdxsWhereSharesChanged = lpInfo.loanIdxsWhereSharesChanged;
+    }
+
+    function setFeeRecipient(address newAddr) external {
+        if (msg.sender != poolCreator) revert UnapprovedSender();
+        if (newAddr == address(0)) revert InvalidZeroAddress();
+        poolCreator = newAddr;
     }
 
     function getRateParams()

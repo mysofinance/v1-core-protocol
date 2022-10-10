@@ -370,6 +370,22 @@ Function which sets approval for another to perform a certain function on sender
 | _approvee | address | This address is being given approval for the action(s) by the current sender |
 | _packedApprovals | uint256 | Packed boolean flags to set which actions are approved or not approved, where e.g. &quot;00001&quot; refers to ApprovalTypes.Repay (=0) and &quot;10000&quot; to ApprovalTypes.Claim (=4) |
 
+### setFeeRecipient
+
+```solidity
+function setFeeRecipient(address newAddr) external nonpayable
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| newAddr | address | undefined |
+
 
 
 ## Events
