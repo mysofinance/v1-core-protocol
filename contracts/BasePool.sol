@@ -49,10 +49,11 @@ abstract contract BasePool is IBasePool {
 
     uint256 constant MIN_LPING_PERIOD = 120; // in seconds
     uint256 constant BASE = 10**18;
-    uint256 constant MAX_PROTOCOL_FEE = 30 * 10**15; // 30bps, denominated in BASE
-    uint256 immutable minLiquidity; // denominated in loanCcy decimals
+    uint256 constant MAX_FEE = 30 * 10**14; // 30bps, denominated in BASE
+    uint256 minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
+    address poolCreatorProposal;
     address collCcyToken;
     address loanCcyToken;
 
@@ -107,7 +108,7 @@ abstract contract BasePool is IBasePool {
         if (_minLiquidity < 1000) revert InvalidMinLiquidity();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
             revert InvalidBaseAggrSize();
-        if (_creatorFee > MAX_PROTOCOL_FEE) revert InvalidFee();
+        if (_creatorFee > MAX_FEE) revert InvalidFee();
         poolCreator = msg.sender;
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
@@ -642,6 +643,18 @@ abstract contract BasePool is IBasePool {
         }
         if (((_packedApprovals >> 5) & uint256(1)) == 1) {
             emit ApprovalUpdate(msg.sender, _approvee, _packedApprovals);
+        }
+    }
+
+    function proposeNewCreator(address newAddr) external {
+        if (msg.sender == poolCreator) {
+            poolCreatorProposal = newAddr;
+        }
+    }
+
+    function claimCreator() external {
+        if (msg.sender == poolCreatorProposal) {
+            poolCreator = msg.sender;
         }
     }
 

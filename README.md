@@ -30,8 +30,13 @@ contracts/
 ┃ ┗ weth-usdc/
 ┃   ┗ PoolWethUsdc.sol
 ┣ test/
+┃ ┣ AddLiquidityAndBorrow.sol
+┃ ┣ Borrow.sol
+┃ ┣ ConstructorTest.sol
+┃ ┣ CTokenInterface.sol
 ┃ ┣ IUSDC.sol
-┃ ┗ IWETH.sol
+┃ ┣ IWETH.sol
+┃ ┗ PeripheralTest.sol
 ┗ BasePool.sol
 ```
 
@@ -55,6 +60,7 @@ Documentation can be found in [docs](/docs) and on [Gitbook](https://myso-financ
 ```
 test/
 ┣ constructor-testing.js
+┣ creator-testing.js
 ┣ paxg-usdc-testing.js
 ┣ peripheral-testing.js
 ┣ usdc-weth-testing.js
@@ -69,8 +75,8 @@ test/
 -----------------------------|----------|----------|----------|----------|----------------|
 File                         |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
 -----------------------------|----------|----------|----------|----------|----------------|
- contracts\                  |      100 |    94.44 |      100 |      100 |                |
-  BasePool.sol               |      100 |    94.44 |      100 |      100 |                |
+ contracts\                  |      100 |    94.59 |      100 |      100 |                |
+  BasePool.sol               |      100 |    94.59 |      100 |      100 |                |
  contracts\interfaces\       |      100 |      100 |      100 |      100 |                |
   IBasePool.sol              |      100 |      100 |      100 |      100 |                |
   IPAXG.sol                  |      100 |      100 |      100 |      100 |                |
@@ -93,6 +99,6 @@ File                         |  % Stmts | % Branch |  % Funcs |  % Lines |Uncove
   IWETH.sol                  |      100 |      100 |      100 |      100 |                |
   PeripheralTest.sol         |     61.9 |      100 |      100 |     61.9 |... 3,96,99,100 |
 -----------------------------|----------|----------|----------|----------|----------------|
-All files                    |    94.44 |    90.67 |     96.3 |    94.84 |                |
+All files                    |     94.5 |    90.91 |    96.43 |    94.89 |                |
 -----------------------------|----------|----------|----------|----------|----------------|
 ```
