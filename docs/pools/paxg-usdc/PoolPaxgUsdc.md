@@ -69,6 +69,17 @@ Function which handles individual claiming by LPs
 | _isReinvested | bool | Flag for if LP wants claimed loanCcy to be re-invested |
 | _deadline | uint256 | Deadline if reinvestment occurs. (If no reinvestment, this is ignored) |
 
+### claimCreator
+
+```solidity
+function claimCreator() external nonpayable
+```
+
+
+
+
+
+
 ### claimFromAggregated
 
 ```solidity
@@ -298,6 +309,22 @@ Function will update the share pointer for the LP
 |---|---|---|
 | _newSharePointer | uint256 | New location of the LP&#39;s current share pointer |
 
+### proposeNewCreator
+
+```solidity
+function proposeNewCreator(address newAddr) external nonpayable
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| newAddr | address | undefined |
+
 ### removeLiquidity
 
 ```solidity
@@ -369,22 +396,6 @@ Function which sets approval for another to perform a certain function on sender
 |---|---|---|
 | _approvee | address | This address is being given approval for the action(s) by the current sender |
 | _packedApprovals | uint256 | Packed boolean flags to set which actions are approved or not approved, where e.g. &quot;00001&quot; refers to ApprovalTypes.Repay (=0) and &quot;10000&quot; to ApprovalTypes.Claim (=4) |
-
-### setFeeRecipient
-
-```solidity
-function setFeeRecipient(address newAddr) external nonpayable
-```
-
-
-
-
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| newAddr | address | undefined |
 
 
 

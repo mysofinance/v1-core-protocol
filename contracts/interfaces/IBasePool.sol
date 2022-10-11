@@ -261,6 +261,17 @@ interface IBasePool {
     function setApprovals(address _approvee, uint256 _packedApprovals) external;
 
     /**
+     * @notice Function which proposes a new pool creator address
+     * @param _newAddr Address that is being proposed as new pool creator
+     */
+    function proposeNewCreator(address _newAddr) external;
+
+    /**
+     * @notice Function to claim proposed creator role
+     */
+    function claimCreator() external;
+
+    /**
      * @notice Function which gets all LP info
      * @dev fromLoanIdx = 0 can be utilized for checking if someone had been an LP in the pool
      * @param _lpAddr Address for which LP info is being retrieved
