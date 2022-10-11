@@ -75,7 +75,7 @@ Function which handles individual claiming by LPs
 function claimCreator() external nonpayable
 ```
 
-
+Function to claim proposed creator role
 
 
 

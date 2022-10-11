@@ -49,7 +49,7 @@ abstract contract BasePool is IBasePool {
 
     uint256 constant MIN_LPING_PERIOD = 120; // in seconds
     uint256 constant BASE = 10**18;
-    uint256 constant MAX_PROTOCOL_FEE = 30 * 10**14; // 30bps, denominated in BASE
+    uint256 constant MAX_FEE = 30 * 10**14; // 30bps, denominated in BASE
     uint256 minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
@@ -108,7 +108,7 @@ abstract contract BasePool is IBasePool {
         if (_minLiquidity < 1000) revert InvalidMinLiquidity();
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
             revert InvalidBaseAggrSize();
-        if (_creatorFee > MAX_PROTOCOL_FEE) revert InvalidFee();
+        if (_creatorFee > MAX_FEE) revert InvalidFee();
         poolCreator = msg.sender;
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
