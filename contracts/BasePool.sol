@@ -625,6 +625,7 @@ abstract contract BasePool is IBasePool {
     {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
+        _packedApprovals &= 0x1f;
         for (uint256 index = 0; index < 5; ) {
             bool approvalFlag = ((_packedApprovals >> index) & uint256(1)) == 1;
             if (
@@ -642,7 +643,7 @@ abstract contract BasePool is IBasePool {
             }
         }
         if (((_packedApprovals >> 5) & uint256(1)) == 1) {
-            emit ApprovalUpdate(msg.sender, _approvee, _packedApprovals);
+            emit ApprovalUpdate(msg.sender, _approvee, _packedApprovals & 0x1f);
         }
     }
 

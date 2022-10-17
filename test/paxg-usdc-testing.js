@@ -868,8 +868,16 @@ describe("PAXG-USDC Pool Testing", function () {
     await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("01111", 2));
     await expect(paxgPool.connect(lp2).claim(lp1.address, [1], false, timestamp+9999999)).to.be.revertedWithCustomError(paxgPool, "UnapprovedSender");
 
+    // check only first 5 bits get included in event emission
+    await expect(paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("100001", 2))).to.emit(paxgPool, "ApprovalUpdate")
+    .withArgs(lp1.address, lp2.address, parseInt("00001", 2));
+    
     // set correct approval
-    await paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("10000", 2));
+    await expect(paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("10000", 2))).to.emit(paxgPool, "ApprovalUpdate")
+      .withArgs(lp1.address, lp2.address, parseInt("10000", 2));
+
+    // test redundant setApproval call doesn't trigger event emission
+    expect(paxgPool.connect(lp1).setApprovals(lp2.address, parseInt("10000", 2))).not.to.emit(paxgPool, "ApprovalUpdate");
 
     // check that lp2 can claim on behalf of lp1
     preBalColl = await PAXG.balanceOf(lp2.address); 
