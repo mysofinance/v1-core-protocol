@@ -33,6 +33,7 @@ module.exports = {
       runs: 1000,
     },
   },
+  /*
   networks: {
     hardhat: {
       chainId: 31337,
@@ -41,7 +42,7 @@ module.exports = {
         blockNumber: 15200000
       }
     }
-  },
+  },*/
   mocha: {
     timeout: 100000000
   },
