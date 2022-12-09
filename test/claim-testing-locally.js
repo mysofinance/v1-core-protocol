@@ -64,7 +64,6 @@ describe("Testing Claiming", function () {
     collToken.connect(borrower).approve(pool.address, MAX_UINT128);
   });
 
-  /*
   it("Should handle claiming correctly", async function () {
     // 1st add liquidity
     blocknum = await ethers.provider.getBlockNumber();
@@ -130,7 +129,6 @@ describe("Testing Claiming", function () {
     console.log("claiming: ", loanIdxs);
     await pool.connect(lp1).claimFromAggregated(lp1.address, loanIdxs, false, timestamp+9999999);
   });
-  */
 
   it("Check gas cost for individual claiming", async function () {
     // 1st add liquidity
@@ -176,7 +174,7 @@ describe("Testing Claiming", function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     await pool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
 
-    // do 200 borrows/repays
+    // do 300 borrows/repays
     for (let i = 1; i <= 300; i++) {
       loanTerms = await pool.loanTerms(ONE_ETH);
       minLoanLimit = loanTerms[0];
@@ -202,5 +200,83 @@ describe("Testing Claiming", function () {
     console.log("Gas costs for aggregate claiming:");
     console.log("> perLoopCost: " + perLoopCost);
     console.log("> constCost: " + constCost);
+  })
+
+  it("Check aggregate claiming starting from 1,... (1/3)", async function () {
+    // 1st add liquidity
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await pool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+
+    // do 200 borrows/repays
+    for (let i = 1; i <= 99; i++) {
+      loanTerms = await pool.loanTerms(ONE_ETH);
+      minLoanLimit = loanTerms[0];
+      maxRepayLimit = loanTerms[1];
+      await pool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+      await pool.connect(borrower).repay(i, borrower.address, loanTerms.repaymentAmount);
+    }
+
+    // move forward to loan expiry to allow aggregate claim
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + _loanTenor])
+    await ethers.provider.send("evm_mine");
+
+    // check claiming by aggregate for closed interval [1,99]
+    await pool.connect(lp1).claimFromAggregated(lp1.address, [0,100], false, timestamp+9999999);
+  })
+
+  it("Check aggregate claiming starting from 1,... (2/3)", async function () {
+    // 1st add liquidity
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await pool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+
+    // do 200 borrows/repays
+    for (let i = 1; i <= 300; i++) {
+      loanTerms = await pool.loanTerms(ONE_ETH);
+      minLoanLimit = loanTerms[0];
+      maxRepayLimit = loanTerms[1];
+      await pool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+      await pool.connect(borrower).repay(i, borrower.address, loanTerms.repaymentAmount);
+    }
+
+    // move forward to loan expiry to allow aggregate claim
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + _loanTenor])
+    await ethers.provider.send("evm_mine");
+
+    // check claiming by aggregate for closed interval [1,99]
+    await pool.connect(lp1).claimFromAggregated(lp1.address, [0,100], false, timestamp+9999999);
+
+    // check claiming by aggregate for closed interval [100,199]
+    await pool.connect(lp1).estimateGas.claimFromAggregated(lp1.address, [100,200], false, timestamp+9999999);
+  })
+
+  it("Check aggregate claiming starting from 1,... (3/3)", async function () {
+    // 1st add liquidity
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await pool.connect(lp1).addLiquidity(lp1.address, ONE_USDC.mul(100000000), timestamp+60, 0);
+
+    // do 200 borrows/repays
+    for (let i = 1; i <= 300; i++) {
+      loanTerms = await pool.loanTerms(ONE_ETH);
+      minLoanLimit = loanTerms[0];
+      maxRepayLimit = loanTerms[1];
+      await pool.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+9999999, 0);
+      await pool.connect(borrower).repay(i, borrower.address, loanTerms.repaymentAmount);
+    }
+
+    // move forward to loan expiry to allow aggregate claim
+    blocknum = await ethers.provider.getBlockNumber();
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + _loanTenor])
+    await ethers.provider.send("evm_mine");
+
+    // check claiming by aggregate for closed interval [1,199]
+    await pool.connect(lp1).claimFromAggregated(lp1.address, [0,100,200], false, timestamp+9999999);
   })
 });
