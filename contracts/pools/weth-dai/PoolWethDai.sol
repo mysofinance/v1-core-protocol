@@ -30,7 +30,7 @@ contract PoolWethDai is BasePool {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10 * 10**18
+            10 * 10 ** 18
         )
     {}
 

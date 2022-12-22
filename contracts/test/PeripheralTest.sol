@@ -10,11 +10,7 @@ contract PeripheralTest {
     address loanCcyToken;
     address collCcyToken;
 
-    constructor(
-        address _pool,
-        address _loanCcyToken,
-        address _collCcyToken
-    ) {
+    constructor(address _pool, address _loanCcyToken, address _collCcyToken) {
         pool = _pool;
         IERC20Metadata(_loanCcyToken).approve(_pool, type(uint256).max);
         IERC20Metadata(_collCcyToken).approve(_pool, type(uint256).max);

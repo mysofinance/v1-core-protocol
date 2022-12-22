@@ -48,8 +48,8 @@ abstract contract BasePool is IBasePool {
     error Invalid();
 
     uint256 constant MIN_LPING_PERIOD = 120; // in seconds
-    uint256 constant BASE = 10**18;
-    uint256 constant MAX_FEE = 30 * 10**14; // 30bps, denominated in BASE
+    uint256 constant BASE = 10 ** 18;
+    uint256 constant MAX_FEE = 30 * 10 ** 14; // 30bps, denominated in BASE
     uint256 minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
@@ -182,10 +182,10 @@ abstract contract BasePool is IBasePool {
     }
 
     // put in number of shares to remove, up to all of them
-    function removeLiquidity(address _onBehalfOf, uint128 numShares)
-        external
-        override
-    {
+    function removeLiquidity(
+        address _onBehalfOf,
+        uint128 numShares
+    ) external override {
         delete lastAddOfTxOrigin[_onBehalfOf];
         // verify LP info and eligibility
         checkSenderApproval(
@@ -620,9 +620,10 @@ abstract contract BasePool is IBasePool {
         );
     }
 
-    function setApprovals(address _approvee, uint256 _packedApprovals)
-        external
-    {
+    function setApprovals(
+        address _approvee,
+        uint256 _packedApprovals
+    ) external {
         if (msg.sender == _approvee || _approvee == address(0))
             revert InvalidApprovalAddress();
         _packedApprovals &= 0x1f;
@@ -659,7 +660,9 @@ abstract contract BasePool is IBasePool {
         }
     }
 
-    function getLpInfo(address _lpAddr)
+    function getLpInfo(
+        address _lpAddr
+    )
         external
         view
         returns (
@@ -720,7 +723,9 @@ abstract contract BasePool is IBasePool {
         _loanIdx = loanIdx;
     }
 
-    function loanTerms(uint128 _inAmountAfterFees)
+    function loanTerms(
+        uint128 _inAmountAfterFees
+    )
         public
         view
         returns (
@@ -742,7 +747,7 @@ abstract contract BasePool is IBasePool {
             (pledge *
                 maxLoanPerColl +
                 (_totalLiquidity - minLiquidity) *
-                10**collTokenDecimals);
+                10 ** collTokenDecimals);
         if (loan < minLoan) revert LoanTooSmall();
         uint256 postLiquidity = _totalLiquidity - loan;
         assert(postLiquidity >= minLiquidity);
@@ -1017,13 +1022,12 @@ abstract contract BasePool is IBasePool {
      * @return newLpShares Amount of new LP shares to be credited to LP.
      * @return earliestRemove Earliest timestamp from which LP is allowed to remove liquidity
      */
-    function _addLiquidity(address _onBehalfOf, uint256 _inAmountAfterFees)
+    function _addLiquidity(
+        address _onBehalfOf,
+        uint256 _inAmountAfterFees
+    )
         internal
-        returns (
-            uint256 dust,
-            uint256 newLpShares,
-            uint32 earliestRemove
-        )
+        returns (uint256 dust, uint256 newLpShares, uint32 earliestRemove)
     {
         uint256 _totalLiquidity = totalLiquidity;
         if (_inAmountAfterFees < minLiquidity / 1000) revert InvalidAddAmount();
@@ -1212,11 +1216,9 @@ abstract contract BasePool is IBasePool {
      * @param _deadline Last timestamp after which function will revert
      * @return timestamp Current timestamp passed back to function
      */
-    function checkTimestamp(uint256 _deadline)
-        internal
-        view
-        returns (uint256 timestamp)
-    {
+    function checkTimestamp(
+        uint256 _deadline
+    ) internal view returns (uint256 timestamp) {
         timestamp = block.timestamp;
         if (timestamp > _deadline) revert PastDeadline();
     }
@@ -1227,10 +1229,10 @@ abstract contract BasePool is IBasePool {
      * @param _deadline Last timestamp after which function will revert
      * @param _onBehalfOf Recipient of the reinvested LP shares
      */
-    function claimReinvestmentCheck(uint256 _deadline, address _onBehalfOf)
-        internal
-        view
-    {
+    function claimReinvestmentCheck(
+        uint256 _deadline,
+        address _onBehalfOf
+    ) internal view {
         checkTimestamp(_deadline);
         checkSenderApproval(_onBehalfOf, IBasePool.ApprovalTypes.ADD_LIQUIDITY);
     }
@@ -1340,19 +1342,15 @@ abstract contract BasePool is IBasePool {
      * @notice Function which gets fees (if any) on the collCcy
      * @param _transferAmount Amount of collCcy to be transferred
      */
-    function getCollCcyTransferFee(uint128 _transferAmount)
-        internal
-        view
-        virtual
-        returns (uint128);
+    function getCollCcyTransferFee(
+        uint128 _transferAmount
+    ) internal view virtual returns (uint128);
 
     /**
      * @notice Function which gets fees (if any) on the loanCcy
      * @param _transferAmount Amount of loanCcy to be transferred
      */
-    function getLoanCcyTransferFee(uint128 _transferAmount)
-        internal
-        view
-        virtual
-        returns (uint128);
+    function getLoanCcyTransferFee(
+        uint128 _transferAmount
+    ) internal view virtual returns (uint128);
 }
