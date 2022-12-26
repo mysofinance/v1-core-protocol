@@ -11,7 +11,6 @@ import {DataTypes} from "../interfaces/BalancerDataTypes.sol";
 import {IBalancerAsset} from "../interfaces/IBalancerAsset.sol";
 import {IBalancerVault} from "../interfaces/IBalancerVault.sol";
 import {IBasePool} from "../interfaces/IBasePool.sol";
-import "hardhat/console.sol";
 
 contract HyperStakingBorrow is AaveV2FlashLoanReceiverBase {
     using SafeERC20 for IERC20Metadata;
@@ -24,8 +23,9 @@ contract HyperStakingBorrow is AaveV2FlashLoanReceiverBase {
     struct FlashBorrowPayload {
         address _mysoPoolRethWeth;
         address _onBehalf;
+        uint256 _wethFlashBorrow;
         uint256 _minRethSwapReceive;
-        uint128 _rethPledge;
+        uint128 _rethPledgeTopup;
         uint128 _minWethLoanReceive;
         uint128 _maxRethRepay;
         uint256 _deadline;
@@ -39,21 +39,14 @@ contract HyperStakingBorrow is AaveV2FlashLoanReceiverBase {
         )
     {}
 
-    function borrow(
-        FlashBorrowPayload calldata flashBorrowPayload,
-        uint256 _wethFlashBorrow
-    ) external {
+    function borrow(FlashBorrowPayload calldata flashBorrowPayload) external {
         bytes memory params = abi.encode(flashBorrowPayload);
-        console.log(
-            "pre flashloan weth balance",
-            IERC20Metadata(WETH).balanceOf(address(this))
-        );
 
         address[] memory assets = new address[](1);
         assets[0] = address(WETH);
 
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = _wethFlashBorrow;
+        amounts[0] = flashBorrowPayload._wethFlashBorrow;
 
         // 0 = no debt, 1 = stable, 2 = variable
         uint256[] memory modes = new uint256[](1);
@@ -90,49 +83,37 @@ contract HyperStakingBorrow is AaveV2FlashLoanReceiverBase {
             DataTypes.SwapKind.GIVEN_IN,
             IBalancerAsset(WETH),
             IBalancerAsset(RETH),
-            amounts[0]-premiums[0],
+            amounts[0] - premiums[0],
             "0x"
         );
         IERC20Metadata(WETH).approve(address(BalancerV2), amounts[0]);
-        console.log(
-            "weth out",
-            amounts[0]-premiums[0]
-        );
+
         uint256 amountReceive = IBalancerVault(BalancerV2).swap(
             singleSwap,
             fundManagement,
             flashBorrowPayload._minRethSwapReceive,
             flashBorrowPayload._deadline
         );
-        console.log(
-            "reth in",
-            amountReceive
-        );
+
         IERC20Metadata(RETH).safeTransferFrom(
             flashBorrowPayload._onBehalf,
             address(this),
-            flashBorrowPayload._rethPledge
+            flashBorrowPayload._rethPledgeTopup
         );
         IERC20Metadata(RETH).approve(
             flashBorrowPayload._mysoPoolRethWeth,
-            flashBorrowPayload._rethPledge + uint128(amountReceive)
+            flashBorrowPayload._rethPledgeTopup + uint128(amountReceive)
         );
-        console.log(
-            "reth pledge",
-            flashBorrowPayload._rethPledge + uint128(amountReceive)
-        );
+
         IBasePool(flashBorrowPayload._mysoPoolRethWeth).borrow(
             flashBorrowPayload._onBehalf,
-            flashBorrowPayload._rethPledge + uint128(amountReceive),
+            flashBorrowPayload._rethPledgeTopup + uint128(amountReceive),
             flashBorrowPayload._minWethLoanReceive,
             flashBorrowPayload._maxRethRepay,
             flashBorrowPayload._deadline,
             0
         );
-        console.log(
-            "weth borrow",
-            IERC20Metadata(WETH).balanceOf(address(this))
-        );
+
         IERC20Metadata(WETH).approve(
             address(AaveV2LendingPool),
             amounts[0] + premiums[0]

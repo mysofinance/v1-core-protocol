@@ -47,7 +47,7 @@ function LENDING_POOL() external view returns (contract IAaveV2LendingPool)
 ### borrow
 
 ```solidity
-function borrow(HyperStakingBorrow.FlashBorrowPayload flashBorrowPayload, uint256 _wethFlashBorrow) external nonpayable
+function borrow(HyperStakingBorrow.FlashBorrowPayload flashBorrowPayload) external nonpayable
 ```
 
 
@@ -59,7 +59,6 @@ function borrow(HyperStakingBorrow.FlashBorrowPayload flashBorrowPayload, uint25
 | Name | Type | Description |
 |---|---|---|
 | flashBorrowPayload | HyperStakingBorrow.FlashBorrowPayload | undefined |
-| _wethFlashBorrow | uint256 | undefined |
 
 ### executeOperation
 

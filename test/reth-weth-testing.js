@@ -4,92 +4,186 @@ const { ethers } = require("hardhat");
 describe("RETH-WETH Pool Testing", function () {
 
   const IERC20_SOURCE = "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20";
-  const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
-  const ONE_ETH = MONE;
-  const _collCcyToken = "0xae78736Cd615f374D3085123A210448E74Fc6393";
-  const _loanCcyToken = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
-  const _loanTenor = 86400;
-  const _maxLoanPerColl = MONE;
-  const _r1 = MONE.mul(2).div(10)
-  const _r2 = MONE.mul(2).div(100)
-  const _liquidityBnd1 = ONE_ETH.mul(1);
-  const _liquidityBnd2 = ONE_ETH.mul(1000);
-  const _minLoan = ONE_ETH.div(10);
-  const minLiquidity = ONE_ETH.div(10);
+  const ONE_ETH = ethers.BigNumber.from("1000000000000000000");
+  const ONE_RETH = ONE_ETH
+  const BASE = ONE_ETH
+  const ONE_YEAR = ethers.BigNumber.from("31536000");
+  const ONE_DAY = ethers.BigNumber.from("86400");
+  const COLL_TOKEN_ADDR = "0xae78736Cd615f374D3085123A210448E74Fc6393";
+  const LOAN_TOKEN_ADDR = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
   const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
-  const RETH_HOLDER = "0xba12222222228d8ba445958a75a0704d566bf2c8"
 
-  beforeEach( async () => {
-    [deployer, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
+  async function setupTestingAccounts() {
+    const [ deployer, lp1, lp2, lp3, borrower1, borrower2 ] = await ethers.getSigners()
 
-    // prepare RETH balances
-    RETH = await ethers.getContractAt(IERC20_SOURCE, _collCcyToken);
-    
-    /*
-    await ethers.provider.send("hardhat_setBalance", [
-      RETH_HOLDER,
-      "0x56BC75E2D63100000",
-    ]);
+    // mimic rocket minter contract
+    const RETH_DEPOSIT_CONTRACT_ADDR = "0x2cac916b2A963Bf162f076C0a8a4a8200BCFBfb4"
     await hre.network.provider.request({
       method: "hardhat_impersonateAccount",
-      params: [RETH_HOLDER],
+      params: [RETH_DEPOSIT_CONTRACT_ADDR],
     });
-    rethHolder = await ethers.getSigner(RETH_HOLDER);
-    bal = await RETH.balanceOf(RETH_HOLDER);
+    const minter = await ethers.getSigner(RETH_DEPOSIT_CONTRACT_ADDR);
 
-    // transfer RETH to test account
-    await RETH.connect(rethHolder).transfer(borrower.address, bal);
-    */
-   
-    // prepare WETH balance
-    WETH = await ethers.getContractAt("IWETH", _loanCcyToken);
-    users = [lp1, lp2, lp3, lp4, lp5];
+    // give minter eth to pay for gas
+    await ethers.provider.send("hardhat_setBalance", [
+      minter.address,
+      "0x56BC75E2D63100000",
+    ]);
+
+    // get RETH contract
+    const RETH = await ethers.getContractAt("RocketTokenRETHInterface", COLL_TOKEN_ADDR);
+
+    // mint RETH to borrowers
+    await RETH.connect(minter).mint(ONE_ETH.mul(1000), borrower1.address)
+    await RETH.connect(minter).mint(ONE_ETH.mul(1000), borrower2.address)
+
+    // mint weth to lp accounts
+    WETH = await ethers.getContractAt("IWETH", LOAN_TOKEN_ADDR);
+    users = [lp1, lp2, lp3];
     for (const user of users) {
       await ethers.provider.send("hardhat_setBalance", [
         user.address,
-        MONE.mul(100000).toHexString(),
+        ONE_ETH.mul(100000).toHexString(),
       ]);
       balance = await ethers.provider.getBalance(user.address);
       await WETH.connect(user).deposit({value: balance.sub(ONE_ETH.mul(10))});
     }
 
-    // deploy pool
-    PoolRethWeth = await ethers.getContractFactory("PoolRethWeth");
-    PoolRethWeth = await PoolRethWeth.connect(deployer);
-    poolRethWeth = await PoolRethWeth.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
-    await poolRethWeth.deployed();
+    return [ deployer, lp1, lp2, lp3, borrower1, borrower2 ]
+  }
 
-    // approve WETH and RETH
-    WETH.connect(lp1).approve(poolRethWeth.address, MAX_UINT128);
-    WETH.connect(lp2).approve(poolRethWeth.address, MAX_UINT128);
-    WETH.connect(lp3).approve(poolRethWeth.address, MAX_UINT128);
-    WETH.connect(lp4).approve(poolRethWeth.address, MAX_UINT128);
-    WETH.connect(lp5).approve(poolRethWeth.address, MAX_UINT128);
-    WETH.connect(borrower).approve(poolRethWeth.address, MAX_UINT128);
-    RETH.connect(borrower).approve(poolRethWeth.address, MAX_UINT128);
+  async function setupPublicTestnetPools() {
+    const [ deployer ] = await ethers.getSigners()
 
-    // add some liquidity
-    blocknum = await ethers.provider.getBlockNumber();
-    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await poolRethWeth.connect(lp1).addLiquidity(lp1.address, ONE_ETH.mul(1), timestamp+60, 0);
-    await poolRethWeth.connect(lp2).addLiquidity(lp2.address, ONE_ETH.mul(10), timestamp+60, 0);
-    await poolRethWeth.connect(lp3).addLiquidity(lp3.address, ONE_ETH.mul(10000), timestamp+60, 0);
+    // pool #1 parameters
+    const pool1Tenor = ONE_DAY
+    const pool1DeployConfig = {
+      tenor: pool1Tenor,
+      maxLoanPerColl: ONE_ETH,
+      r1: BASE.mul(4).div(100).mul(pool1Tenor).div(ONE_YEAR),
+      r2: BASE.mul(2).div(100).mul(pool1Tenor).div(ONE_YEAR),
+      liquidityBnd1: ONE_ETH,
+      liquidityBnd2: ONE_ETH.mul(50),
+      minLoan: ONE_ETH.div(10),
+      baseAggrBucketSize: 100,
+      creatorFee: 0
+    }
+
+    // pool #2 parameters
+    const pool2Tenor = ONE_DAY.mul(3).div(2)
+    const pool2DeployConfig = {
+      tenor: pool2Tenor,
+      maxLoanPerColl: ONE_ETH,
+      r1: BASE.mul(4).div(100).mul(pool2Tenor).div(ONE_YEAR),
+      r2: BASE.mul(2).div(100).mul(pool2Tenor).div(ONE_YEAR),
+      liquidityBnd1: ONE_ETH,
+      liquidityBnd2: ONE_ETH.mul(50),
+      minLoan: ONE_ETH.div(10),
+      baseAggrBucketSize: 100,
+      creatorFee: 0
+    }
+    
+    // get contract
+    const PoolRethWeth = await ethers.getContractFactory("PoolRethWeth");
+
+    // deploy 1st pool
+    const pool1RethWeth = await PoolRethWeth.connect(deployer).deploy(
+      pool1DeployConfig.tenor,
+      pool1DeployConfig.maxLoanPerColl,
+      pool1DeployConfig.r1,
+      pool1DeployConfig.r2,
+      pool1DeployConfig.liquidityBnd1,
+      pool1DeployConfig.liquidityBnd2,
+      pool1DeployConfig.minLoan,
+      pool1DeployConfig.baseAggrBucketSize,
+      pool1DeployConfig.creatorFee
+    );
+    await pool1RethWeth.deployed();
+    
+    // deploy 2nd pool
+    const pool2RethWeth = await PoolRethWeth.connect(deployer).deploy(
+      pool2DeployConfig.tenor,
+      pool2DeployConfig.maxLoanPerColl,
+      pool2DeployConfig.r1,
+      pool2DeployConfig.r2,
+      pool2DeployConfig.liquidityBnd1,
+      pool2DeployConfig.liquidityBnd2,
+      pool2DeployConfig.minLoan,
+      pool2DeployConfig.baseAggrBucketSize,
+      pool2DeployConfig.creatorFee
+    );
+    await pool2RethWeth.deployed();
+
+    return [ pool1RethWeth, pool2RethWeth ];
+  }
+
+  async function setupApprovals(token, accs, pool) {
+    for (const acc of accs) {
+      await token.connect(acc).approve(pool.address, MAX_UINT128)
+    }
+  }
+
+  async function setupTokens() {
+    const RETH = await ethers.getContractAt("RocketTokenRETHInterface", COLL_TOKEN_ADDR);
+    const WETH = await ethers.getContractAt(IERC20_SOURCE, LOAN_TOKEN_ADDR);
+    return [ RETH, WETH]
+  }
+
+  async function addLiquidity(pool, acc, amount) {
+    // lp add liquidity
+    const blocknum = await ethers.provider.getBlockNumber();
+    const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+    await pool.connect(acc).addLiquidity(acc.address, amount, timestamp+60, 0);
+  }
+
+  async function setupForTestCase(pool, acc, amount) {
+    // get tokens
+    const [RETH, WETH] = await setupTokens()
+
+    // setup and fund accounts
+    const [deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupTestingAccounts()
+
+    // deploy pools
+    const [pool1, pool2] = await setupPublicTestnetPools()
+
+    // set "standard" approvals
+    await setupApprovals(WETH, [lp1, lp2, lp3], pool1)
+    await setupApprovals(RETH, [borrower1, borrower2], pool1)
+
+    // add liquidity
+    await addLiquidity(pool1, lp1, ONE_ETH.mul(100))
+    
+    return [RETH, WETH, pool1, pool2, lp1, lp2, lp3, borrower1, borrower2]
+  }
+
+  it("Test borrowing", async function () {
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase()
+
+    // get loan terms
+    const loanTerms = await pool1.loanTerms(ONE_RETH);
+    minLoanLimit = loanTerms.loanAmount
+    maxRepayLimit = loanTerms.repaymentAmount
+
+    // check balances pre
+    rethBalPre = await RETH.balanceOf(borrower1.address)
+    wethBalPre = await WETH.balanceOf(borrower1.address)
+    
+    // borrow
+    const currBlock = await ethers.provider.getBlockNumber();
+    const timestamp = (await ethers.provider.getBlock(currBlock)).timestamp;
+    await pool1.connect(borrower1).borrow(borrower1.address, ONE_RETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+
+    // check balances post
+    rethBalPost = await RETH.balanceOf(borrower1.address)
+    wethBalPost = await WETH.balanceOf(borrower1.address)
+
+    expect(rethBalPre.sub(rethBalPost)).to.be.equal(loanTerms.pledgeAmount)
+    expect(wethBalPost.sub(wethBalPre)).to.be.equal(loanTerms.loanAmount)
   });
-
-  it("Should allow borrowing with rETH", async function () {
-    /*
-    loanTerms = await poolRethWeth.loanTerms(ONE_ETH);
-    minLoanLimit = loanTerms[0]
-    maxRepayLimit = loanTerms[1]
-    console.log(loanTerms);
-    console.log(minLoanLimit, maxRepayLimit);
-    currBlock = await ethers.provider.getBlockNumber();
-    await poolRethWeth.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
-    */
-  });
-
 
   it("Simple Balancer Swap Test", async function () {
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase()
+
     const balancerVault = await ethers.getContractAt("IBalancerVault", "0xBA12222222228d8Ba445958a75a0704d566BF2C8");
     await WETH.connect(lp1).approve(balancerVault.address, MAX_UINT128);
     console.log("pre bal weth", await WETH.balanceOf(lp1.address))
@@ -100,7 +194,7 @@ describe("RETH-WETH Pool Testing", function () {
       kind: 0,
       assetIn: WETH.address,
       assetOut: RETH.address,
-      amount: MONE,
+      amount: ONE_ETH,
       userData: "0x"
     }
     const fundManagement = {
@@ -115,39 +209,32 @@ describe("RETH-WETH Pool Testing", function () {
   });
 
   it("Hyperstake Test", async function () {
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase()
+
     // deploy pool
     HyperStakingBorrow = await ethers.getContractFactory("HyperStakingBorrow");
     HyperStakingBorrow = await HyperStakingBorrow.connect(deployer);
     hyperStakingBorrow = await HyperStakingBorrow.deploy();
     await hyperStakingBorrow.deployed();
 
-    // transfer some reth to borrower
-    await ethers.provider.send("hardhat_setBalance", [
-      RETH_HOLDER,
-      "0x56BC75E2D63100000",
-    ]);
-    await hre.network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [RETH_HOLDER],
-    });
-    rethHolder = await ethers.getSigner(RETH_HOLDER);
-    await RETH.connect(rethHolder).transfer(borrower.address, MONE);
+    // approve hyperstaking contract
+    await RETH.connect(borrower1).approve(hyperStakingBorrow.address, MAX_UINT128);
 
-    // approve and hyperstake
-    await RETH.connect(borrower).approve(hyperStakingBorrow.address, MAX_UINT128);
+    // hyperstake
     const flashBorrowPayload = {
-      _mysoPoolRethWeth: poolRethWeth.address,
-      _onBehalf: borrower.address,
+      _mysoPoolRethWeth: pool1.address,
+      _onBehalf: borrower1.address,
+      _wethFlashBorrow: ONE_ETH.mul(2),
       _minRethSwapReceive: 0,
-      _rethPledge: MONE,
+      _rethPledgeTopup: ONE_RETH,
       _minWethLoanReceive: 0,
-      _maxRethRepay: MONE.mul(9),
+      _maxRethRepay: ONE_ETH.mul(9),
       _deadline: ethers.constants.MaxUint256
     }
-    await hyperStakingBorrow.connect(borrower).borrow(flashBorrowPayload, MONE.mul(8))
+    await hyperStakingBorrow.connect(borrower1).borrow(flashBorrowPayload)
 
     // check loan
-    const loan = await poolRethWeth.loanIdxToLoanInfo(1);
+    const loan = await pool1.loanIdxToLoanInfo(1);
     console.log(loan)
   })
 });
