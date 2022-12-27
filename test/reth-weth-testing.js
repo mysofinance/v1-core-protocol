@@ -11,7 +11,8 @@ describe("RETH-WETH Pool Testing", function () {
   const ONE_DAY = ethers.BigNumber.from("86400");
   const COLL_TOKEN_ADDR = "0xae78736Cd615f374D3085123A210448E74Fc6393";
   const LOAN_TOKEN_ADDR = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
-  const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
+  const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1);
+  const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1);
 
   async function setupTestingAccounts() {
     const [ deployer, lp1, lp2, lp3, borrower1, borrower2 ] = await ethers.getSigners()
@@ -43,7 +44,7 @@ describe("RETH-WETH Pool Testing", function () {
     for (const user of users) {
       await ethers.provider.send("hardhat_setBalance", [
         user.address,
-        ONE_ETH.mul(100000).toHexString(),
+        MAX_UINT128.toHexString(),
       ]);
       balance = await ethers.provider.getBalance(user.address);
       await WETH.connect(user).deposit({value: balance.sub(ONE_ETH.mul(10))});
@@ -136,7 +137,7 @@ describe("RETH-WETH Pool Testing", function () {
     await pool.connect(acc).addLiquidity(acc.address, amount, timestamp+60, 0);
   }
 
-  async function setupForTestCase(pool, acc, amount) {
+  async function setupForTestCase(amount) {
     // get tokens
     const [RETH, WETH] = await setupTokens()
 
@@ -151,22 +152,22 @@ describe("RETH-WETH Pool Testing", function () {
     await setupApprovals(RETH, [borrower1, borrower2], pool1)
 
     // add liquidity
-    await addLiquidity(pool1, lp1, ONE_ETH.mul(100))
+    await addLiquidity(pool1, lp1, amount)
     
     return [RETH, WETH, pool1, pool2, lp1, lp2, lp3, borrower1, borrower2]
   }
 
   it("Test borrowing", async function () {
-    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase()
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase(ONE_ETH.mul(50))
 
     // get loan terms
     const loanTerms = await pool1.loanTerms(ONE_RETH);
-    minLoanLimit = loanTerms.loanAmount
-    maxRepayLimit = loanTerms.repaymentAmount
+    const minLoanLimit = loanTerms.loanAmount
+    const maxRepayLimit = loanTerms.repaymentAmount
 
     // check balances pre
-    rethBalPre = await RETH.balanceOf(borrower1.address)
-    wethBalPre = await WETH.balanceOf(borrower1.address)
+    const rethBalPre = await RETH.balanceOf(borrower1.address)
+    const wethBalPre = await WETH.balanceOf(borrower1.address)
     
     // borrow
     const currBlock = await ethers.provider.getBlockNumber();
@@ -174,15 +175,53 @@ describe("RETH-WETH Pool Testing", function () {
     await pool1.connect(borrower1).borrow(borrower1.address, ONE_RETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
 
     // check balances post
-    rethBalPost = await RETH.balanceOf(borrower1.address)
-    wethBalPost = await WETH.balanceOf(borrower1.address)
+    const rethBalPost = await RETH.balanceOf(borrower1.address)
+    const wethBalPost = await WETH.balanceOf(borrower1.address)
 
     expect(rethBalPre.sub(rethBalPost)).to.be.equal(loanTerms.pledgeAmount)
     expect(wethBalPost.sub(wethBalPre)).to.be.equal(loanTerms.loanAmount)
   });
 
+  it("Test for overflow", async function () {
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase(ONE_ETH.mul(50))
+
+    // get loan terms
+    const pledgeAmount = ONE_RETH.mul(1000)
+    const loanTerms = await pool1.loanTerms(pledgeAmount)
+    const minLoanLimit = loanTerms.loanAmount
+    const maxRepayLimit = loanTerms.repaymentAmount
+
+    // check pool balance pre
+    const wethPoolBalPre = await WETH.balanceOf(pool1.address)
+    expect(wethPoolBalPre).to.be.equal(ONE_ETH.mul(50))
+
+    // borrow
+    const currBlock = await ethers.provider.getBlockNumber();
+    const timestamp = (await ethers.provider.getBlock(currBlock)).timestamp;
+    await pool1.connect(borrower1).borrow(borrower1.address, pledgeAmount, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+
+    // check pool balance post
+    const wethPoolBalPost = await WETH.balanceOf(pool1.address)
+    expect(wethPoolBalPre.sub(wethPoolBalPost)).to.be.equal(minLoanLimit)
+
+    // get pool info
+    const poolInfo = await pool1.getPoolInfo()
+    const totalLpShares = poolInfo._totalLpShares
+    const totalLiquidity = poolInfo._totalLiquidity
+
+    // get distance to overflow
+    const addToOverflow = MAX_UINT128.mul(totalLiquidity).div(totalLpShares)
+
+    // check for revert
+    // try adding liquidity
+    //const blocknum2 = await ethers.provider.getBlockNumber();
+    //const timestamp2 = (await ethers.provider.getBlock(blocknum2)).timestamp;
+    //await pool1.connect(lp2).addLiquidity(lp2.address, addToOverflow, timestamp2+60, 0)
+    expect(addToOverflow).to.be.greaterThan(MAX_UINT128)
+  });
+
   it("Simple Balancer Swap Test", async function () {
-    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase()
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase(ONE_ETH.mul(50))
 
     const balancerVault = await ethers.getContractAt("IBalancerVault", "0xBA12222222228d8Ba445958a75a0704d566BF2C8");
     await WETH.connect(lp1).approve(balancerVault.address, MAX_UINT128);
@@ -209,7 +248,7 @@ describe("RETH-WETH Pool Testing", function () {
   });
 
   it("Hyperstake Test", async function () {
-    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase()
+    const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupForTestCase(ONE_ETH.mul(50))
 
     // deploy pool
     HyperStakingBorrow = await ethers.getContractFactory("HyperStakingBorrow");
