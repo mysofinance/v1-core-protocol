@@ -64,7 +64,7 @@ describe("RETH-WETH Pool Testing", function () {
       r1: BASE.mul(4).div(100).mul(pool1Tenor).div(ONE_YEAR),
       r2: BASE.mul(2).div(100).mul(pool1Tenor).div(ONE_YEAR),
       liquidityBnd1: ONE_ETH,
-      liquidityBnd2: ONE_ETH.mul(50),
+      liquidityBnd2: ONE_ETH.mul(1000),
       minLoan: ONE_ETH.div(10),
       baseAggrBucketSize: 100,
       creatorFee: 0
@@ -78,7 +78,7 @@ describe("RETH-WETH Pool Testing", function () {
       r1: BASE.mul(4).div(100).mul(pool2Tenor).div(ONE_YEAR),
       r2: BASE.mul(2).div(100).mul(pool2Tenor).div(ONE_YEAR),
       liquidityBnd1: ONE_ETH,
-      liquidityBnd2: ONE_ETH.mul(50),
+      liquidityBnd2: ONE_ETH.mul(1000),
       minLoan: ONE_ETH.div(10),
       baseAggrBucketSize: 100,
       creatorFee: 0

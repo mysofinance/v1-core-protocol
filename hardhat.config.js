@@ -34,12 +34,8 @@ module.exports = {
     },
   },
   networks: {
-    hardhat: {
-      chainId: 31337,
-      forking: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-        blockNumber: 16227892
-      }
+    goerli: {
+      url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
     }
   },
   mocha: {
