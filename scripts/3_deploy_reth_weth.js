@@ -1,7 +1,3 @@
-require("dotenv").config()
-const { ALCHEMY_API_KEY } = process.env
-const GASPRICE = ethers.utils.parseUnits("10", "gwei")
-
 async function main() {
     // Create a Frame connection
     const ethProvider = require('eth-provider')
@@ -10,14 +6,14 @@ async function main() {
     // pool config
     const BASE = ethers.BigNumber.from("10").pow("18")
     const ONE_YEAR = 60*60*24*365
-    const poolTenor = 60*60*24*30
+    const poolTenor = 60*60*24*90
     const poolDeployConfig = {
       tenor: poolTenor,
       maxLoanPerColl: BASE,
       r1: BASE.mul(4).div(100).mul(poolTenor).div(ONE_YEAR),
       r2: BASE.mul(2).div(100).mul(poolTenor).div(ONE_YEAR),
       liquidityBnd1: BASE,
-      liquidityBnd2: BASE.mul(1000),
+      liquidityBnd2: BASE.mul(50),
       minLoan: BASE.div(10),
       baseAggrBucketSize: 100,
       creatorFee: BASE.div(100).mul(poolTenor).div(ONE_YEAR)
