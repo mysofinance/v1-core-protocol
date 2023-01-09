@@ -46,15 +46,8 @@ The following OpenZeppelin 4.7.0 libraries are used:
 * IERC20Metadata
 * SafeERC20
 
-For the pools we integrate with the following tokens:
-* `PAXG`: `0x45804880De22913dAFE09f4980848ECE6EcbAf78`
-* `DAI`: `0x6B175474E89094C44Da98b954EedeAC495271d0F`
-* `WETH`: `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
-* `USDC`: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`
-* `cUSDC`: `0x39AA39c021dfbaE8faC545936693aC917d5E7563`
-
 ## Documentation
-Documentation can be found in [docs](/docs) and on [Gitbook](https://myso-finance.gitbook.io/docs/).
+Documentation can be found in [docs](/docs) and in the [whitepaper](https://figshare.com/articles/preprint/MYSO_v1_Core_A_Trust-Minimized_Protocol_for_Zero-Liquidation_Loans/21581328).
 
 ## Test Files
 ```
