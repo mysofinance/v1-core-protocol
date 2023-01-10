@@ -9,7 +9,7 @@ async function main() {
     const poolTenor = 60*60*24*90
     const poolDeployConfig = {
       tenor: poolTenor,
-      maxLoanPerColl: BASE,
+      maxLoanPerColl: BASE.mul(1020).div(1000),
       r1: BASE.mul(4).div(100).mul(poolTenor).div(ONE_YEAR),
       r2: BASE.mul(2).div(100).mul(poolTenor).div(ONE_YEAR),
       liquidityBnd1: BASE,
