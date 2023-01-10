@@ -4,10 +4,11 @@ require("solidity-coverage");
 require('@primitivefi/hardhat-dodoc');
 require("@nomiclabs/hardhat-ethers");
 require("@nomicfoundation/hardhat-chai-matchers")
+require("@nomiclabs/hardhat-etherscan")
 require('hardhat-abi-exporter');
 require("dotenv").config();
 
-const { ALCHEMY_API_KEY } = process.env
+const { ALCHEMY_API_KEY, ETHERSCAN_API_KEY } = process.env
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -34,12 +35,8 @@ module.exports = {
     },
   },
   networks: {
-    hardhat: {
-      chainId: 31337,
-      forking: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-        blockNumber: 16227892
-      }
+    mainnet: {
+      url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
     }
   },
   mocha: {
@@ -60,5 +57,8 @@ module.exports = {
     only: [],
     spacing: 2,
     format: "json",
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY
   }
 };
