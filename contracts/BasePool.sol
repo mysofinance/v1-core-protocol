@@ -741,13 +741,21 @@ abstract contract BasePool is IBasePool {
         uint256 pledge = _inAmountAfterFees - _creatorFee;
         _totalLiquidity = totalLiquidity;
         if (_totalLiquidity <= minLiquidity) revert InsufficientLiquidity();
-        uint256 loan = (pledge *
-            maxLoanPerColl *
-            (_totalLiquidity - minLiquidity)) /
-            (pledge *
-                maxLoanPerColl +
-                (_totalLiquidity - minLiquidity) *
-                10 ** collTokenDecimals);
+        uint256 loan = (pledge * maxLoanPerColl) / 10 ** collTokenDecimals;
+        uint256 L_k = (_totalLiquidity * BASE * 9) / (BASE * 10);
+        if (loan > L_k) {
+            uint256 x_k = (L_k * 10 ** collTokenDecimals) / maxLoanPerColl;
+            loan =
+                ((pledge - x_k) *
+                    maxLoanPerColl *
+                    (_totalLiquidity - minLiquidity - L_k)) /
+                ((pledge - x_k) *
+                    maxLoanPerColl +
+                    (_totalLiquidity - minLiquidity - L_k) *
+                    10 ** collTokenDecimals) +
+                L_k;
+        }
+
         if (loan < minLoan) revert LoanTooSmall();
         uint256 postLiquidity = _totalLiquidity - loan;
         assert(postLiquidity >= minLiquidity);

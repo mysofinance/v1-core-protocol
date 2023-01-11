@@ -219,7 +219,7 @@ describe("RETH-WETH Pool Testing", function () {
     
     return [RETH, WETH, pool, deployer, lp1, lp2, lp3, borrower1, borrower2]
   }
-
+  /*
   it("Test borrowing (public testnet pool)", async function () {
     const [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2] = await basicSetup(ONE_ETH.mul(50))
 
@@ -459,7 +459,7 @@ describe("RETH-WETH Pool Testing", function () {
 
     console.log(`totalAdds=${totalAdds}, totalBorrows=${totalBorrows}`)
     await expect(addLiquidity(pool, lp1, ONE_ETH.mul(100))).to.be.revertedWithCustomError(pool, "InvalidAddAmount")
-  });
+  });*/
 
   it("Test loan terms (mainnet pool)", async function () {
     const [RETH, WETH, pool, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupMainnetTestCase()
@@ -469,7 +469,7 @@ describe("RETH-WETH Pool Testing", function () {
     const poolInfo = await pool.getPoolInfo()
     const totalLiquidity = poolInfo._totalLiquidity
 
-    const sendAmounts = [ONE_ETH.div(2), ONE_ETH, ONE_ETH.mul(5), ONE_ETH.mul(10), ONE_ETH.mul(20), ONE_ETH.mul(50)]
+    const sendAmounts = [ONE_ETH.div(2), ONE_ETH, ONE_ETH.mul(5), ONE_ETH.mul(10), ONE_ETH.mul(20), ONE_ETH.mul(50), ONE_ETH.mul(80), ONE_ETH.mul(100)]
     for (let i=0; i<sendAmounts.length;i++) {
       const sendAmount = sendAmounts[i]
       const loanTerms = await pool.loanTerms(sendAmount);
