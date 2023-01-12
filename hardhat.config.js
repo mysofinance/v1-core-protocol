@@ -34,7 +34,6 @@ module.exports = {
       runs: 1000,
     },
   },
-  defaultNetwork: "goerli",
   networks: {
     hardhat: {
       chainId: 31337,

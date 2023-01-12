@@ -458,10 +458,10 @@ event ClaimFromAggregated(address indexed lp, uint256 fromLoanIdx, uint256 toLoa
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
 
-### LpWhiteListUpdate
+### LpWhitelistUpdate
 
 ```solidity
-event LpWhiteListUpdate(address indexed maxLoanPerColl, bool isApproved)
+event LpWhitelistUpdate(address indexed maxLoanPerColl, bool isApproved)
 ```
 
 

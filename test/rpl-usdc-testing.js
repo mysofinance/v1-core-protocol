@@ -116,23 +116,46 @@ describe("RPL-USDC Pool Testing", function () {
   }
 
   it("Test core functions", async function () {
-    const [USDC, RPL, pool, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setup()
+    const [USDC, RPL, pool, deployer, lp1, lp2, lp3, borrower1, newCreator] = await setup()
 
     // check balances pre
     const lp1UsdcPreAddCheck = await USDC.balanceOf(lp1.address)
+    const lp2UsdcPreAddCheck = await USDC.balanceOf(lp2.address)
     const poolUsdcPreCheck = await USDC.balanceOf(pool.address)
 
-    // add liquidity
+    // lpwhitelist checks and add liquidity
     const addAmount = ONE_USDC.mul(100000)
-    const blocknum = await ethers.provider.getBlockNumber();
-    const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await pool.connect(lp1).addLiquidity(lp1.address, addAmount, timestamp+60, 0);
-    
+    const blocknum = await ethers.provider.getBlockNumber()
+    const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    // check adding only possible if on lpwhitelist
+    await expect(pool.connect(lp1).addLiquidity(lp1.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await expect(pool.connect(lp1).toggleLpWhitelist(lp1.address)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await expect(pool.connect(lp2).toggleLpWhitelist(lp1.address)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await pool.connect(deployer).toggleLpWhitelist(lp1.address)
+    await pool.connect(lp1).addLiquidity(lp1.address, addAmount, timestamp+60, 0)
+
+    // check proposing and claiming pool creator role
+    await expect(pool.connect(lp1).proposeNewCreator(newCreator.address)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await expect(pool.connect(lp1).claimCreator()).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await pool.connect(deployer).proposeNewCreator(newCreator.address)
+    await expect(pool.connect(lp2).claimCreator()).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await pool.connect(newCreator).claimCreator()
+
+    // check lpwhitelisting only possible for new creator
+    await expect(pool.connect(deployer).toggleLpWhitelist(lp2.address)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await expect(pool.connect(lp2).addLiquidity(lp2.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await pool.connect(newCreator).toggleLpWhitelist(lp2.address)
+    await pool.connect(lp2).addLiquidity(lp2.address, addAmount, timestamp+60, 0)
+    await pool.connect(newCreator).toggleLpWhitelist(lp2.address)
+    await expect(pool.connect(lp2).addLiquidity(lp2.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+
     // check balances pre
     const lp1UsdcPostAddCheck = await USDC.balanceOf(lp1.address)
+    const lp2UsdcPostAddCheck = await USDC.balanceOf(lp2.address)
     const poolUsdcPostCheck = await USDC.balanceOf(pool.address)
-    expect(lp1UsdcPreAddCheck.sub(lp1UsdcPostAddCheck)).to.be.equal(poolUsdcPostCheck.sub(poolUsdcPreCheck))
+    expect(lp1UsdcPreAddCheck.sub(lp1UsdcPostAddCheck).add(lp2UsdcPreAddCheck.sub(lp2UsdcPostAddCheck))).to.be.equal(poolUsdcPostCheck.sub(poolUsdcPreCheck))
     expect(lp1UsdcPreAddCheck.sub(lp1UsdcPostAddCheck)).to.be.equal(addAmount)
+    expect(lp2UsdcPreAddCheck.sub(lp2UsdcPostAddCheck)).to.be.equal(addAmount)
 
     // check various loan terms
     const sendAmount = ONE_RPL.mul(1000)
@@ -171,7 +194,8 @@ describe("RPL-USDC Pool Testing", function () {
     await expect(pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd2, newTerms.liquidityBnd1)).to.be.reverted;
 
     // check pool creator can update terms
-    await pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2);
+    await expect(pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await pool.connect(newCreator).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2)
 
     // check new terms set
     const poolInfoPost = await pool.getPoolInfo()
@@ -194,7 +218,7 @@ describe("RPL-USDC Pool Testing", function () {
     const borrower1RplPreBorrowCheck = await RPL.balanceOf(borrower1.address)
     const poolUsdcPreBorrowCheck = await USDC.balanceOf(pool.address)
     const poolRplPreBorrowCheck = await RPL.balanceOf(pool.address)
-    const creatorRplPreBorrow = await RPL.balanceOf(deployer.address)
+    const creatorRplPreBorrow = await RPL.balanceOf(newCreator.address)
 
     const minLoanLimit = loanTermsPost.loanAmount
     const maxRepayLimit = loanTermsPost.repaymentAmount
@@ -204,7 +228,7 @@ describe("RPL-USDC Pool Testing", function () {
     const borrower1RplPostBorrowCheck = await RPL.balanceOf(borrower1.address)
     const poolUsdcPostBorrowCheck = await USDC.balanceOf(pool.address)
     const poolRplPostBorrowCheck = await RPL.balanceOf(pool.address)
-    const creatorRplPostBorrow = await RPL.balanceOf(deployer.address)
+    const creatorRplPostBorrow = await RPL.balanceOf(newCreator.address)
     expect(borrower1UsdcPostBorrowCheck.sub(borrower1UsdcPreBorrowCheck)).to.be.equal(poolUsdcPreBorrowCheck.sub(poolUsdcPostBorrowCheck))
     expect(borrower1UsdcPostBorrowCheck.sub(borrower1UsdcPreBorrowCheck)).to.be.equal(loanTermsPost.loanAmount)
     expect(borrower1RplPreBorrowCheck.sub(borrower1RplPostBorrowCheck).sub(loanTermsPost._creatorFee)).to.be.equal(poolRplPostBorrowCheck.sub(poolRplPreBorrowCheck))
@@ -227,20 +251,20 @@ describe("RPL-USDC Pool Testing", function () {
     expect(borrower1RplPostRepayCheck.sub(borrower1RplPreRepayCheck)).to.be.equal(poolRplPreRepayCheck.sub(poolRplPostRepayCheck))
     expect(borrower1RplPostRepayCheck.sub(borrower1RplPreRepayCheck)).to.be.equal(loanTermsPost.pledgeAmount)
 
-    // check claim
+    // check lp1 claim
     const lp1UsdcPreClaimCheck = await USDC.balanceOf(lp1.address)
     const poolUsdcPreClaimCheck = await USDC.balanceOf(pool.address)
     await pool.connect(lp1).claim(lp1.address, [1], false, timestamp+9999999)
     const lp1UsdcPostClaimCheck = await USDC.balanceOf(lp1.address)
     const poolUsdcPostClaimCheck = await USDC.balanceOf(pool.address)
     expect(lp1UsdcPostClaimCheck.sub(lp1UsdcPreClaimCheck)).to.be.equal(poolUsdcPreClaimCheck.sub(poolUsdcPostClaimCheck))
-    expect(lp1UsdcPostClaimCheck.sub(lp1UsdcPreClaimCheck)).to.be.equal(loanTermsPost.repaymentAmount)
+    expect(lp1UsdcPostClaimCheck.sub(lp1UsdcPreClaimCheck)).to.be.equal(loanTermsPost.repaymentAmount.div(2))
     
     // move forward after earliest remove
     await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
     await ethers.provider.send("evm_mine");
 
-    // remove check
+    // check lp1 remove 
     const lp1UsdcPreRemoveCheck = await USDC.balanceOf(lp1.address)
     const poolUsdcPreRemoveCheck = await USDC.balanceOf(pool.address)
     const lpInfo = await pool.getLpInfo(lp1.address)
@@ -249,6 +273,26 @@ describe("RPL-USDC Pool Testing", function () {
     const lp1UsdcPostRemoveCheck = await USDC.balanceOf(lp1.address)
     const poolUsdcPostRemoveCheck = await USDC.balanceOf(pool.address)
     expect(lp1UsdcPostRemoveCheck.sub(lp1UsdcPreRemoveCheck)).to.be.equal(poolUsdcPreRemoveCheck.sub(poolUsdcPostRemoveCheck))
-    expect(lp1UsdcPostRemoveCheck.sub(lp1UsdcPreRemoveCheck)).to.be.equal(poolInfo._totalLiquidity.sub("10000000")) // sub minLiquidity
+    expect(lp1UsdcPostRemoveCheck.sub(lp1UsdcPreRemoveCheck)).to.be.equal(poolInfo._totalLiquidity.sub("10000000").div(2)) // sub minLiquidity
+
+    // check lp2 claim
+    const lp2UsdcPreClaimCheck = await USDC.balanceOf(lp2.address)
+    const poolUsdcPreClaimCheck_ = await USDC.balanceOf(pool.address)
+    await pool.connect(lp2).claim(lp2.address, [1], false, timestamp+9999999)
+    const lp2UsdcPostClaimCheck = await USDC.balanceOf(lp2.address)
+    const poolUsdcPostClaimCheck_ = await USDC.balanceOf(pool.address)
+    expect(lp2UsdcPostClaimCheck.sub(lp2UsdcPreClaimCheck)).to.be.equal(poolUsdcPreClaimCheck_.sub(poolUsdcPostClaimCheck_))
+    expect(lp2UsdcPostClaimCheck.sub(lp2UsdcPreClaimCheck)).to.be.equal(loanTermsPost.repaymentAmount.div(2))
+
+    // check lp2 remove 
+    const lp2UsdcPreRemoveCheck = await USDC.balanceOf(lp2.address)
+    const poolUsdcPreRemoveCheck_ = await USDC.balanceOf(pool.address)
+    const lpInfo_ = await pool.getLpInfo(lp2.address)
+    const poolInfo_ = await pool.getPoolInfo()
+    await pool.connect(lp2).removeLiquidity(lp2.address, lpInfo_.sharesOverTime[0])
+    const lp2UsdcPostRemoveCheck = await USDC.balanceOf(lp2.address)
+    const poolUsdcPostRemoveCheck_ = await USDC.balanceOf(pool.address)
+    expect(lp2UsdcPostRemoveCheck.sub(lp2UsdcPreRemoveCheck)).to.be.equal(poolUsdcPreRemoveCheck_.sub(poolUsdcPostRemoveCheck_))
+    expect(lp2UsdcPostRemoveCheck.sub(lp2UsdcPreRemoveCheck)).to.be.equal(poolInfo_._totalLiquidity.sub("10000000")) // sub minLiquidity
   });
 });

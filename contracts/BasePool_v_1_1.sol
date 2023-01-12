@@ -52,7 +52,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     uint256 constant MAX_FEE = 500 * 10 ** 14; // 5%, denominated in BASE
     uint256 minLiquidity; // denominated in loanCcy decimals
 
-    address poolCreator;
+    address public poolCreator;
     address poolCreatorProposal;
     address collCcyToken;
     address loanCcyToken;
@@ -147,7 +147,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     ) external override {
         // verify LP info and eligibility
         if (msg.sender != _onBehalfOf || !lpWhitelist[msg.sender]) {
-            revert();
+            revert UnapprovedSender();
         }
         checkTimestamp(_deadline);
 
@@ -551,27 +551,31 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     }
 
     function proposeNewCreator(address newAddr) external {
-        if (msg.sender == poolCreator) {
-            poolCreatorProposal = newAddr;
+        if (msg.sender != poolCreator) {
+            revert UnapprovedSender();
         }
+        poolCreatorProposal = newAddr;
     }
 
     function claimCreator() external {
-        if (msg.sender == poolCreatorProposal) {
-            lpWhitelist[poolCreator] = false;
-            lpWhitelist[msg.sender] = true;
-            poolCreator = msg.sender;
-            emit LpWhitelistUpdate(poolCreator, false);
-            emit LpWhitelistUpdate(msg.sender, true);
+        if (msg.sender != poolCreatorProposal) {
+            revert UnapprovedSender();
         }
+        address prevPoolCreator = poolCreator;
+        lpWhitelist[prevPoolCreator] = false;
+        lpWhitelist[msg.sender] = true;
+        poolCreator = msg.sender;
+        emit LpWhitelistUpdate(prevPoolCreator, false);
+        emit LpWhitelistUpdate(msg.sender, true);
     }
 
     function toggleLpWhitelist(address newAddr) external {
-        if (msg.sender == poolCreator) {
-            bool newIsApproved = !lpWhitelist[newAddr];
-            lpWhitelist[newAddr] = newIsApproved;
-            emit LpWhitelistUpdate(newAddr, newIsApproved);
+        if (msg.sender != poolCreator) {
+            revert UnapprovedSender();
         }
+        bool newIsApproved = !lpWhitelist[newAddr];
+        lpWhitelist[newAddr] = newIsApproved;
+        emit LpWhitelistUpdate(newAddr, newIsApproved);
     }
 
     function getLpInfo(

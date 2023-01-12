@@ -348,6 +348,23 @@ Function will update the share pointer for the LP
 |---|---|---|
 | _newSharePointer | uint256 | New location of the LP&#39;s current share pointer |
 
+### poolCreator
+
+```solidity
+function poolCreator() external view returns (address)
+```
+
+
+
+
+
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | address | undefined |
+
 ### proposeNewCreator
 
 ```solidity
@@ -539,10 +556,10 @@ event ClaimFromAggregated(address indexed lp, uint256 fromLoanIdx, uint256 toLoa
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
 
-### LpWhiteListUpdate
+### LpWhitelistUpdate
 
 ```solidity
-event LpWhiteListUpdate(address indexed maxLoanPerColl, bool isApproved)
+event LpWhitelistUpdate(address indexed maxLoanPerColl, bool isApproved)
 ```
 
 
