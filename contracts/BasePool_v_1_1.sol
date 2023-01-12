@@ -5,6 +5,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBasePool_v_1_1} from "./interfaces/IBasePool_v_1_1.sol";
+import {IAddLiquidityChecker} from "./interfaces/IAddLiquidityChecker.sol";
 
 abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     using SafeERC20 for IERC20Metadata;
@@ -46,16 +47,19 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     error InvalidApprovalAddress();
     error ZeroShareClaim();
     error Invalid();
+    error InvalidAddCheckAddr();
+    error CannotAddLiquidity();
 
     uint256 constant MIN_LPING_PERIOD = 120; // in seconds
     uint256 constant BASE = 10 ** 18;
-    uint256 constant MAX_FEE = 500 * 10 ** 14; // 3%, denominated in BASE
+    uint256 constant MAX_FEE = 500 * 10 ** 14; // 5%, denominated in BASE
     uint256 minLiquidity; // denominated in loanCcy decimals
 
     address poolCreator;
     address poolCreatorProposal;
     address collCcyToken;
     address loanCcyToken;
+    address liquidityCheckAddr;
 
     uint128 totalLpShares; // LP shares are denominated and discretized in 1/1000th of minLiquidity
     uint256 loanTenor; // in seconds
@@ -94,7 +98,8 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
         uint256 _creatorFee,
-        uint256 _minLiquidity
+        uint256 _minLiquidity,
+        address _liquidityCheckAddr
     ) {
         if (_collCcyToken == _loanCcyToken) revert IdenticalLoanAndCollCcy();
         if (_loanCcyToken == address(0) || _collCcyToken == address(0))
@@ -109,6 +114,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
             revert InvalidBaseAggrSize();
         if (_creatorFee > MAX_FEE) revert InvalidFee();
+        if (_liquidityCheckAddr == address(0)) revert InvalidAddCheckAddr();
         poolCreator = msg.sender;
         loanCcyToken = _loanCcyToken;
         collCcyToken = _collCcyToken;
@@ -124,6 +130,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         baseAggrBucketSize = _baseAggrBucketSize;
         creatorFee = _creatorFee;
         minLiquidity = _minLiquidity;
+        liquidityCheckAddr = _liquidityCheckAddr;
         emit NewSubPool(
             _loanCcyToken,
             _collCcyToken,
@@ -145,6 +152,8 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         uint256 _referralCode
     ) external override {
         // verify LP info and eligibility
+        if (!IAddLiquidityChecker(liquidityCheckAddr).allowedToAdd(msg.sender))
+            revert CannotAddLiquidity();
         checkTimestamp(_deadline);
         checkSenderApproval(
             _onBehalfOf,

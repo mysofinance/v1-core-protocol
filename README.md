@@ -1,18 +1,22 @@
 # MYSO
+
 This repository contains the smart contracts source code for the MYSO V1 protocol. The repository uses Hardhat as development environment for compilation, testing and deployment tasks.
 
 ## What is MYSO?
-MYSO is a protocol for Zero-Liquidation Loans, where users can borrow or lend with one another on a peer-to-pool basis. A Zero-Liquidation Loan is a crypto-collateralized loan with a fixed tenor (e.g., 30 days) in which borrowers aren't exposed to liquidation risk. 
+
+MYSO is a protocol for Zero-Liquidation Loans, where users can borrow or lend with one another on a peer-to-pool basis. A Zero-Liquidation Loan is a crypto-collateralized loan with a fixed tenor (e.g., 30 days) in which borrowers aren't exposed to liquidation risk.
 
 After pledging some collateral users can take out a loan and later reclaim their collateral by repaying prior to expiry. Liquidity Providers (LPs) bear the risk that during the loan lifetime the collateral can be worth less the loan amount, in which case borrowers might not repay and LPs will be left with the collateral. However, LPs earn a yield in exchange for bearing this risk (similar to a covered call strategy).
 
 ## Quick Start
+
 ```
 npm i
 npm hardhat test
 ```
 
 ## Contract Files
+
 ```
 contracts/
 ┣ interfaces/
@@ -43,13 +47,16 @@ contracts/
 ## Libraries & Dependencies
 
 The following OpenZeppelin 4.7.0 libraries are used:
-* IERC20Metadata
-* SafeERC20
+
+- IERC20Metadata
+- SafeERC20
 
 ## Documentation
+
 Documentation can be found in [docs](/docs) and in the [whitepaper](https://figshare.com/articles/preprint/MYSO_v1_Core_A_Trust-Minimized_Protocol_for_Zero-Liquidation_Loans/21581328).
 
 ## Test Files
+
 ```
 test/
 ┣ constructor-testing.js
