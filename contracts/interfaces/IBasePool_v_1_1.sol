@@ -81,7 +81,7 @@ interface IBasePool_v_1_1 {
         uint256 liquidityBnd1,
         uint256 liquidityBnd2
     );
-
+    event LpWhitelistUpdate(address indexed maxLoanPerColl, bool isApproved);
     enum ApprovalTypes {
         REPAY,
         REMOVE_LIQUIDITY,

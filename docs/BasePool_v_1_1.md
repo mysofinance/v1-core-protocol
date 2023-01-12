@@ -310,6 +310,28 @@ Function which calculates loan terms
 | _creatorFee | uint256 | Amount of collateral currency to be transferred to treasury |
 | _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
+### lpWhitelist
+
+```solidity
+function lpWhitelist(address) external view returns (bool)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | address | undefined |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | bool | undefined |
+
 ### overrideSharePointer
 
 ```solidity
@@ -516,6 +538,23 @@ event ClaimFromAggregated(address indexed lp, uint256 fromLoanIdx, uint256 toLoa
 | toLoanIdx  | uint256 | undefined |
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
+
+### LpWhiteListUpdate
+
+```solidity
+event LpWhiteListUpdate(address indexed maxLoanPerColl, bool isApproved)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| maxLoanPerColl `indexed` | address | undefined |
+| isApproved  | bool | undefined |
 
 ### NewSubPool
 

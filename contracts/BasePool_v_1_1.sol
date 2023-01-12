@@ -74,7 +74,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     mapping(address => uint256) lastAddOfTxOrigin;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
-    mapping(address => bool) lpWhitelist;
+    mapping(address => bool) public lpWhitelist;
 
     mapping(address => mapping(address => mapping(IBasePool_v_1_1.ApprovalTypes => bool)))
         public isApproved;
@@ -561,12 +561,16 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
             lpWhitelist[poolCreator] = false;
             lpWhitelist[msg.sender] = true;
             poolCreator = msg.sender;
+            emit LpWhitelistUpdate(poolCreator, false);
+            emit LpWhitelistUpdate(msg.sender, true);
         }
     }
 
     function toggleLpWhitelist(address newAddr) external {
         if (msg.sender == poolCreator) {
-            lpWhitelist[newAddr] = !lpWhitelist[newAddr];
+            bool newIsApproved = !lpWhitelist[newAddr];
+            lpWhitelist[newAddr] = newIsApproved;
+            emit LpWhitelistUpdate(newAddr, newIsApproved);
         }
     }
 
