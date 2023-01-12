@@ -74,6 +74,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     mapping(address => uint256) lastAddOfTxOrigin;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
     mapping(uint256 => address) public loanIdxToBorrower;
+    mapping(address => bool) lpWhitelist;
 
     mapping(address => mapping(address => mapping(IBasePool_v_1_1.ApprovalTypes => bool)))
         public isApproved;
@@ -145,11 +146,10 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         uint256 _referralCode
     ) external override {
         // verify LP info and eligibility
+        if (msg.sender != _onBehalfOf || !lpWhitelist[msg.sender]) {
+            revert();
+        }
         checkTimestamp(_deadline);
-        checkSenderApproval(
-            _onBehalfOf,
-            IBasePool_v_1_1.ApprovalTypes.ADD_LIQUIDITY
-        );
 
         uint128 _inAmountAfterFees = _sendAmount -
             getLoanCcyTransferFee(_sendAmount);
@@ -558,7 +558,15 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
 
     function claimCreator() external {
         if (msg.sender == poolCreatorProposal) {
+            lpWhitelist[poolCreator] = false;
+            lpWhitelist[msg.sender] = true;
             poolCreator = msg.sender;
+        }
+    }
+
+    function toggleLpWhitelist(address newAddr) external {
+        if (msg.sender == poolCreator) {
+            lpWhitelist[newAddr] = !lpWhitelist[newAddr];
         }
     }
 
@@ -1138,25 +1146,20 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
      * @notice Helper function called whenever reinvestment is possible
      * @dev This function is called by claim and claimFromAggregated if reinvestment is desired
      * @param _deadline Last timestamp after which function will revert
-     * @param _onBehalfOf Recipient of the reinvested LP shares
      */
     function claimReinvestmentCheck(
         uint256 _deadline,
-        address _onBehalfOf
+        address /*_onBehalfOf*/
     ) internal view {
         checkTimestamp(_deadline);
-        checkSenderApproval(
-            _onBehalfOf,
-            IBasePool_v_1_1.ApprovalTypes.ADD_LIQUIDITY
-        );
     }
 
     /**
      * @notice Helper function checks if function caller is a valid sender
      * @dev This function is called by addLiquidity, removeLiquidity, repay,
-     * rollOver, claim, claimFromAggregated, claimReinvestmentCheck (ADD_LIQUIDITY)
+     * rollOver, claim, claimFromAggregated, claimReinvestmentCheck
      * @param _ownerOrBeneficiary Address which will be owner or beneficiary of transaction if approved
-     * @param _approvalType Type of approval requested { REPAY, ROLLOVER, ADD_LIQUIDITY, REMOVE_LIQUIDITY, CLAIM }
+     * @param _approvalType Type of approval requested { REPAY, ROLLOVER, REMOVE_LIQUIDITY, CLAIM }
      */
     function checkSenderApproval(
         address _ownerOrBeneficiary,
