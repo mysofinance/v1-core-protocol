@@ -151,9 +151,13 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         uint256 _deadline,
         uint256 _referralCode
     ) external override {
+        // verify sender is either creator or allowed to add
+        if (
+            !IAddLiquidityChecker(liquidityCheckAddr).allowedToAdd(
+                msg.sender
+            ) && msg.sender != poolCreator
+        ) revert CannotAddLiquidity();
         // verify LP info and eligibility
-        if (!IAddLiquidityChecker(liquidityCheckAddr).allowedToAdd(msg.sender))
-            revert CannotAddLiquidity();
         checkTimestamp(_deadline);
         checkSenderApproval(
             _onBehalfOf,
