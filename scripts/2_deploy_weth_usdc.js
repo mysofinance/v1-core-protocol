@@ -1,6 +1,3 @@
-// verfied using hardhat verify:
-// npx hardhat verify --constructor-args "scripts/3_deploy_reth_weth_arguments.js" 0x9e29ce780ea28ba83053b78473c19544f75c1113 --contract "contracts/pools/reth-weth/PoolRethWeth.sol:PoolRethWeth" --network mainnet
-
 async function main() {
     //get env variables
     const { DEPLOYER_PRIVATE_KEY } = process.env;

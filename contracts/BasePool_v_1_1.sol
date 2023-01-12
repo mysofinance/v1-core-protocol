@@ -99,7 +99,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         if (_collCcyToken == _loanCcyToken) revert IdenticalLoanAndCollCcy();
         if (_loanCcyToken == address(0) || _collCcyToken == address(0))
             revert InvalidZeroAddress();
-        if (_loanTenor < 86400) revert InvalidLoanTenor();
+        if (_loanTenor < 60 * 60) revert InvalidLoanTenor();
         if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)

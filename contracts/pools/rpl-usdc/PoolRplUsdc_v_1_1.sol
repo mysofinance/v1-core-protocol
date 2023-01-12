@@ -34,18 +34,6 @@ contract PoolRplUsdc_v_1_1 is BasePool_v_1_1 {
         )
     {}
 
-    function getCollCcyTransferFee(
-        uint128 /*_transferAmount*/
-    ) internal pure override returns (uint128 transferFee) {
-        transferFee = 0;
-    }
-
-    function getLoanCcyTransferFee(
-        uint128 /*_transferAmount*/
-    ) internal pure override returns (uint128 transferFee) {
-        transferFee = 0;
-    }
-
     function updateTerms(
         uint256 _maxLoanPerColl,
         uint256 _creatorFee,
@@ -76,5 +64,17 @@ contract PoolRplUsdc_v_1_1 is BasePool_v_1_1 {
             liquidityBnd1,
             liquidityBnd2
         );
+    }
+
+    function getCollCcyTransferFee(
+        uint128 /*_transferAmount*/
+    ) internal pure override returns (uint128 transferFee) {
+        transferFee = 0;
+    }
+
+    function getLoanCcyTransferFee(
+        uint128 /*_transferAmount*/
+    ) internal pure override returns (uint128 transferFee) {
+        transferFee = 0;
     }
 }

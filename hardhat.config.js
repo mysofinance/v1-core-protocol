@@ -8,7 +8,7 @@ require("@nomiclabs/hardhat-etherscan")
 require('hardhat-abi-exporter');
 require("dotenv").config();
 
-const { ALCHEMY_API_KEY, ETHERSCAN_API_KEY } = process.env
+const { ALCHEMY_API_KEY_GOERLI, ALCHEMY_API_KEY_MAINNET, ETHERSCAN_API_KEY, TEST_DEPLOYER_PRIVATE_KEY } = process.env
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -34,16 +34,22 @@ module.exports = {
       runs: 1000,
     },
   },
+  defaultNetwork: "goerli",
   networks: {
     hardhat: {
       chainId: 31337,
       forking: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY_MAINNET}`,
         blockNumber: 16382000
       }
     },
     mainnet: {
-      url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY_MAINNET}`,
+    },
+    goerli: {
+      url: `https://eth-goerli.g.alchemy.com/v2/-76GDj41dJcWIiIyZeu1bTYZXtDOIxrI`,
+      accounts: [TEST_DEPLOYER_PRIVATE_KEY],
+      chainId: 5
     }
   },
   mocha: {
