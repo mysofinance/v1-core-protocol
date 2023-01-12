@@ -16,7 +16,8 @@ contract PoolRplUsdc_v_1_1 is BasePool_v_1_1 {
         uint256 _liquidityBnd2,
         uint256 _minLoan,
         uint256 _baseAggrBucketSize,
-        uint128 _creatorFee
+        uint128 _creatorFee,
+        address _liquidityCheckAddr
     )
         BasePool_v_1_1(
             0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
@@ -30,7 +31,8 @@ contract PoolRplUsdc_v_1_1 is BasePool_v_1_1 {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10 * 10 ** 6
+            10 * 10 ** 6,
+            _liquidityCheckAddr
         )
     {}
 

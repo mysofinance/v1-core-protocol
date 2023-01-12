@@ -553,6 +553,12 @@ error AlreadyRepaid()
 error BeforeEarliestRemove()
 ```
 
+### CannotAddLiquidity
+
+```solidity
+error CannotAddLiquidity()
+```
+
 ### CannotClaimWithUnsettledLoan
 
 ```solidity
@@ -599,6 +605,12 @@ error Invalid()
 
 ```solidity
 error InvalidAddAmount()
+```
+
+### InvalidAddCheckAddr
+
+```solidity
+error InvalidAddCheckAddr()
 ```
 
 ### InvalidApprovalAddress
