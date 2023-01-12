@@ -4,9 +4,9 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {BasePool_v_1_1} from "../../BasePool_v_1_1.sol";
+import {BasePool_v_1_1} from "../BasePool_v_1_1.sol";
 
-contract PoolRplUsdc is BasePool_v_1_1 {
+contract PoolRethWeth_v_1_1 is BasePool_v_1_1 {
     constructor(
         uint24 _loanTenor,
         uint128 _maxLoanPerColl,
@@ -19,8 +19,8 @@ contract PoolRplUsdc is BasePool_v_1_1 {
         uint128 _creatorFee
     )
         BasePool_v_1_1(
-            0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            0xD33526068D116cE69F19A9ee46F0bd304F21A51f,
+            0xAd8A44ABa5B476b26169Db0927d2a2061cB52344,
+            0x1bf071eFa5D35776B149605dE477AaFE4B0cA282,
             _loanTenor,
             _maxLoanPerColl,
             _r1,

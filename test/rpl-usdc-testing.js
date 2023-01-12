@@ -76,7 +76,7 @@ describe("RPL-USDC Pool Testing", function () {
       creatorFee: 0
     }
     // get contract
-    const PoolRplUsdc = await ethers.getContractFactory("PoolRplUsdc");
+    const PoolRplUsdc = await ethers.getContractFactory("PoolRplUsdc_v_1_1");
 
     // deploy 1st pool
     const pool = await PoolRplUsdc.connect(deployer).deploy(
@@ -166,7 +166,7 @@ describe("RPL-USDC Pool Testing", function () {
     await expect(pool.connect(borrower1).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2)).to.be.reverted;
     // check revert on invalid new terms
     await expect(pool.connect(deployer).updateTerms(0, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2)).to.be.reverted;
-    await expect(pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, BASE.mul(31).div(10000), newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2)).to.be.reverted;
+    await expect(pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, BASE.mul(51).div(1000), newTerms.r1, newTerms.r2, newTerms.liquidityBnd1, newTerms.liquidityBnd2)).to.be.reverted;
     await expect(pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r2, newTerms.r1, newTerms.liquidityBnd1, newTerms.liquidityBnd2)).to.be.reverted;
     await expect(pool.connect(deployer).updateTerms(newTerms.maxLoanPerColl, newTerms.creatorFee, newTerms.r1, newTerms.r2, newTerms.liquidityBnd2, newTerms.liquidityBnd1)).to.be.reverted;
 
