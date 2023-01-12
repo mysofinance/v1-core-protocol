@@ -67,10 +67,10 @@ describe("RPL-USDC Pool Testing", function () {
     const poolConfig = {
       tenor: tenor,
       maxLoanPerColl: ONE_USDC.mul(15),
-      r1: BASE.mul(4).div(100).mul(tenor).div(ONE_YEAR),
-      r2: BASE.mul(2).div(100).mul(tenor).div(ONE_YEAR),
-      liquidityBnd1: ONE_USDC.mul(1000),
-      liquidityBnd2: ONE_USDC.mul(1000000),
+      r1: BASE.mul(10).div(100).mul(tenor).div(ONE_YEAR),
+      r2: BASE.mul(4).div(100).mul(tenor).div(ONE_YEAR),
+      liquidityBnd1: ONE_USDC.mul(50000),
+      liquidityBnd2: ONE_USDC.mul(100000),
       minLoan: ONE_USDC.mul(100),
       baseAggrBucketSize: 100,
       creatorFee: 0
