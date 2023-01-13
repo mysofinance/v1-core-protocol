@@ -461,7 +461,7 @@ event ClaimFromAggregated(address indexed lp, uint256 fromLoanIdx, uint256 toLoa
 ### LpWhitelistUpdate
 
 ```solidity
-event LpWhitelistUpdate(address indexed maxLoanPerColl, bool isApproved)
+event LpWhitelistUpdate(address indexed lpAddr, bool isApproved)
 ```
 
 
@@ -472,7 +472,7 @@ event LpWhitelistUpdate(address indexed maxLoanPerColl, bool isApproved)
 
 | Name | Type | Description |
 |---|---|---|
-| maxLoanPerColl `indexed` | address | undefined |
+| lpAddr `indexed` | address | undefined |
 | isApproved  | bool | undefined |
 
 ### NewSubPool
