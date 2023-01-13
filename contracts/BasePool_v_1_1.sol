@@ -146,7 +146,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
         uint256 _referralCode
     ) external override {
         // verify LP info and eligibility
-        if (msg.sender != _onBehalfOf || !lpWhitelist[msg.sender]) {
+        if (!(msg.sender == _onBehalfOf && lpWhitelist[msg.sender])) {
             revert UnapprovedSender();
         }
         checkTimestamp(_deadline);

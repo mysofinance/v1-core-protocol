@@ -63,17 +63,17 @@ describe("RPL-USDC Pool Testing", function () {
     const [ deployer ] = await ethers.getSigners()
 
     // pool parameters
-    const tenor = ONE_DAY.mul(30)
+    const tenor = ONE_DAY.mul(180)
     const poolConfig = {
       tenor: tenor,
-      maxLoanPerColl: ONE_USDC.mul(15),
-      r1: BASE.mul(10).div(100).mul(tenor).div(ONE_YEAR),
-      r2: BASE.mul(4).div(100).mul(tenor).div(ONE_YEAR),
-      liquidityBnd1: ONE_USDC.mul(50000),
-      liquidityBnd2: ONE_USDC.mul(100000),
+      maxLoanPerColl: ONE_USDC.mul(56).div(10),
+      r1: BASE.mul(20).div(100).mul(tenor).div(ONE_YEAR),
+      r2: BASE.mul(17).div(100).mul(tenor).div(ONE_YEAR),
+      liquidityBnd1: ONE_USDC.mul(1000),
+      liquidityBnd2: ONE_USDC.mul(10000),
       minLoan: ONE_USDC.mul(100),
       baseAggrBucketSize: 100,
-      creatorFee: 0
+      creatorFee: BASE.mul(10).div(10000)
     }
     // get contract
     const PoolRplUsdc = await ethers.getContractFactory("PoolRplUsdc_v_1_1");
@@ -145,6 +145,8 @@ describe("RPL-USDC Pool Testing", function () {
     await expect(pool.connect(deployer).toggleLpWhitelist(lp2.address)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
     await expect(pool.connect(lp2).addLiquidity(lp2.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
     await pool.connect(newCreator).toggleLpWhitelist(lp2.address)
+    await expect(pool.connect(lp1).addLiquidity(lp2.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
+    await expect(pool.connect(lp2).addLiquidity(lp1.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
     await pool.connect(lp2).addLiquidity(lp2.address, addAmount, timestamp+60, 0)
     await pool.connect(newCreator).toggleLpWhitelist(lp2.address)
     await expect(pool.connect(lp2).addLiquidity(lp2.address, addAmount, timestamp+60, 0)).to.be.revertedWithCustomError(pool, "UnapprovedSender")
