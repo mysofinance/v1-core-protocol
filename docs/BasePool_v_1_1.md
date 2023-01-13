@@ -310,6 +310,28 @@ Function which calculates loan terms
 | _creatorFee | uint256 | Amount of collateral currency to be transferred to treasury |
 | _totalLiquidity | uint256 | The total liquidity of the pool (pre-borrow) that is available for new loans |
 
+### lpWhitelist
+
+```solidity
+function lpWhitelist(address) external view returns (bool)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | address | undefined |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | bool | undefined |
+
 ### overrideSharePointer
 
 ```solidity
@@ -325,6 +347,23 @@ Function will update the share pointer for the LP
 | Name | Type | Description |
 |---|---|---|
 | _newSharePointer | uint256 | New location of the LP&#39;s current share pointer |
+
+### poolCreator
+
+```solidity
+function poolCreator() external view returns (address)
+```
+
+
+
+
+
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | address | undefined |
 
 ### proposeNewCreator
 
@@ -393,6 +432,22 @@ Function which sets approval for another to perform a certain function on sender
 |---|---|---|
 | _approvee | address | This address is being given approval for the action(s) by the current sender |
 | _packedApprovals | uint256 | Packed boolean flags to set which actions are approved or not approved, where e.g. &quot;00001&quot; refers to ApprovalTypes.Repay (=0) and &quot;10000&quot; to ApprovalTypes.Claim (=4) |
+
+### toggleLpWhitelist
+
+```solidity
+function toggleLpWhitelist(address newAddr) external nonpayable
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| newAddr | address | undefined |
 
 
 
@@ -500,6 +555,23 @@ event ClaimFromAggregated(address indexed lp, uint256 fromLoanIdx, uint256 toLoa
 | toLoanIdx  | uint256 | undefined |
 | repayments  | uint256 | undefined |
 | collateral  | uint256 | undefined |
+
+### LpWhitelistUpdate
+
+```solidity
+event LpWhitelistUpdate(address indexed lpAddr, bool isApproved)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| lpAddr `indexed` | address | undefined |
+| isApproved  | bool | undefined |
 
 ### NewSubPool
 

@@ -43,7 +43,7 @@ contract PoolRplUsdc_v_1_1 is BasePool_v_1_1 {
         uint256 _liquidityBnd2
     ) external {
         if (msg.sender != poolCreator) {
-            revert();
+            revert UnapprovedSender();
         }
         if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
         if (_r1 <= _r2 || _r2 == 0) revert InvalidRateParams();
