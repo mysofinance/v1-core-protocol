@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("WETH-cUSDC Pool Testing", function () {
-
   const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
   const ONE_USDC = ethers.BigNumber.from("1000000");
   const ONE_ETH = MONE;
@@ -10,18 +9,21 @@ describe("WETH-cUSDC Pool Testing", function () {
   const _loanCcyToken = "0x39AA39c021dfbaE8faC545936693aC917d5E7563";
   const _collCcyToken = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
   const _loanTenor = 86400;
-  let _maxLoanPerColl; 
-  const _r1 = MONE.mul(2).div(100)
-  const _r2 = MONE.mul(2).div(1000)
+  let _maxLoanPerColl;
+  const _r1 = MONE.mul(2).div(100);
+  const _r2 = MONE.mul(2).div(1000);
   let _liquidityBnd1;
   let _liquidityBnd2;
   let _minLoan;
   let _minLiquidity;
   const USDC_MASTER_MINTER = "0xe982615d461dd5cd06575bbea87624fda4e3de17";
-  const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
+  const MAX_UINT128 = ethers.BigNumber.from(
+    "340282366920938463463374607431768211455"
+  );
 
-  beforeEach( async () => {
-    [deployer, _, _, _, _, _, _, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] = await ethers.getSigners();
+  beforeEach(async () => {
+    [deployer, _, _, _, _, _, _, lp1, lp2, lp3, lp4, lp5, borrower, ...addrs] =
+      await ethers.getSigners();
 
     // get USDC contract and mock master minter
     USDC = await ethers.getContractAt("IUSDC", USDC_ADDRESS);
@@ -39,7 +41,10 @@ describe("WETH-cUSDC Pool Testing", function () {
     cUSDC = await ethers.getContractAt("CTokenInterface", _loanCcyToken);
     users = [lp1, lp2, lp3, lp4, lp5, borrower];
     for (const user of users) {
-      await USDC.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
+      await USDC.connect(masterMinter).configureMinter(
+        masterMinter.address,
+        MAX_UINT128
+      );
       await USDC.connect(masterMinter).mint(user.address, MAX_UINT128);
     }
 
@@ -57,7 +62,9 @@ describe("WETH-cUSDC Pool Testing", function () {
       "0x204FCE5E3E25026110000000",
     ]);
     amount = ethers.BigNumber.from("0x204FCE5E3E25026110000000");
-    await WETH.connect(borrower).deposit({value: amount.sub(ONE_ETH.mul(10))});
+    await WETH.connect(borrower).deposit({
+      value: amount.sub(ONE_ETH.mul(10)),
+    });
 
     // get cUSDC exchange rate to calculate _maxLoanPerColl and liquidity bound pool params
     await cUSDC.connect(lp1).exchangeRateCurrent();
@@ -67,11 +74,21 @@ describe("WETH-cUSDC Pool Testing", function () {
     _liquidityBnd2 = ONE_USDC.mul(1000000).mul(MONE).div(exchangeRateCurrent);
     _minLoan = ONE_USDC.mul(100).mul(MONE).div(exchangeRateCurrent);
     _minLiquidity = ethers.BigNumber.from("44199813427"); //ONE_USDC.mul(10).mul(MONE).div(exchangeRateCurrent);
-  
+
     // deploy pool
     PoolWethCusdc = await ethers.getContractFactory("PoolWethCusdc");
     PoolWethCusdc = await PoolWethCusdc.connect(deployer);
-    poolWethCusdc = await PoolWethCusdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
+    poolWethCusdc = await PoolWethCusdc.deploy(
+      _loanTenor,
+      _maxLoanPerColl,
+      _r1,
+      _r2,
+      _liquidityBnd1,
+      _liquidityBnd2,
+      _minLoan,
+      100,
+      0
+    );
     await poolWethCusdc.deployed();
 
     // have all test accounts approve pool
@@ -93,7 +110,9 @@ describe("WETH-cUSDC Pool Testing", function () {
     exchangeRateCurrent = await cUSDC.connect(borrower).exchangeRateStored();
 
     // calculate expected cUSDC amount when depositing 1000 USDC
-    expectedCusdcBalAfterMint = ONE_USDC.mul(1000).mul(MONE).div(exchangeRateCurrent);
+    expectedCusdcBalAfterMint = ONE_USDC.mul(1000)
+      .mul(MONE)
+      .div(exchangeRateCurrent);
 
     // approve cUSDC contract to withdraw USDC
     await USDC.connect(borrower).approve(cUSDC.address, MAX_UINT128);
@@ -108,7 +127,9 @@ describe("WETH-cUSDC Pool Testing", function () {
     // calculate expected redemption amount when redeeming cUSDC
     await cUSDC.connect(borrower).exchangeRateCurrent();
     exchangeRateCurrent = await cUSDC.connect(borrower).exchangeRateStored();
-    expectedUsdcBalDiffAfterRedeem = cusdcBalAfterMint.mul(exchangeRateCurrent).div(MONE);
+    expectedUsdcBalDiffAfterRedeem = cusdcBalAfterMint
+      .mul(exchangeRateCurrent)
+      .div(MONE);
 
     // cUSDC -> USDC: i.e., redeem cUSDC for USDC
     usdcBalBeforeRedeem = await USDC.balanceOf(borrower.address);
@@ -119,7 +140,10 @@ describe("WETH-cUSDC Pool Testing", function () {
     usdcBalDiffAfterRedeem = usdcBalAfterRedeem.sub(usdcBalBeforeRedeem);
     expect(cusdcBalAfterRedeem).to.be.equal(0);
     console.log("usdcBalDiffAfterRedeem", usdcBalDiffAfterRedeem);
-    console.log("expectedUsdcBalDiffAfterRedeem", expectedUsdcBalDiffAfterRedeem);
+    console.log(
+      "expectedUsdcBalDiffAfterRedeem",
+      expectedUsdcBalDiffAfterRedeem
+    );
     expect(usdcBalDiffAfterRedeem).to.be.equal(expectedUsdcBalDiffAfterRedeem);
   });
 
@@ -136,7 +160,9 @@ describe("WETH-cUSDC Pool Testing", function () {
   });
 
   it("Should fail on loan terms without LPs", async function () {
-    await expect(poolWethCusdc.loanTerms(ONE_ETH)).to.be.revertedWithCustomError(poolWethCusdc, "InsufficientLiquidity");
+    await expect(
+      poolWethCusdc.loanTerms(ONE_ETH)
+    ).to.be.revertedWithCustomError(poolWethCusdc, "InsufficientLiquidity");
   });
 
   it("Should allow LPs to add liquidity", async function () {
@@ -149,20 +175,34 @@ describe("WETH-cUSDC Pool Testing", function () {
     // add liquidity
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await poolWethCusdc.connect(lp1).addLiquidity(lp1.address, lpContribution1, timestamp+60, 0);
-    await poolWethCusdc.connect(lp2).addLiquidity(lp2.address, lpContribution2, timestamp+60, 0);
-    await poolWethCusdc.connect(lp3).addLiquidity(lp3.address, lpContribution3, timestamp+60, 0);
+    await poolWethCusdc
+      .connect(lp1)
+      .addLiquidity(lp1.address, lpContribution1, timestamp + 60, 0);
+    await poolWethCusdc
+      .connect(lp2)
+      .addLiquidity(lp2.address, lpContribution2, timestamp + 60, 0);
+    await poolWethCusdc
+      .connect(lp3)
+      .addLiquidity(lp3.address, lpContribution3, timestamp + 60, 0);
     poolInfo = await poolWethCusdc.getPoolInfo();
 
     // check total liquidity
-    expectedTotalLiquidity = lpContribution1.add(lpContribution2).add(lpContribution3);
+    expectedTotalLiquidity = lpContribution1
+      .add(lpContribution2)
+      .add(lpContribution3);
     expect(poolInfo._totalLiquidity).to.be.equal(expectedTotalLiquidity);
 
     // check total lp shares
     newLpSharesFromContr1 = lpContribution1.mul(1000).div(_minLiquidity);
-    newLpSharesFromContr2 = lpContribution2.mul(newLpSharesFromContr1).div(lpContribution1);
-    newLpSharesFromContr3 = lpContribution3.mul(newLpSharesFromContr1.add(newLpSharesFromContr2)).div(lpContribution1.add(lpContribution2));
-    expectedTotalLpShares = newLpSharesFromContr1.add(newLpSharesFromContr2).add(newLpSharesFromContr3);
+    newLpSharesFromContr2 = lpContribution2
+      .mul(newLpSharesFromContr1)
+      .div(lpContribution1);
+    newLpSharesFromContr3 = lpContribution3
+      .mul(newLpSharesFromContr1.add(newLpSharesFromContr2))
+      .div(lpContribution1.add(lpContribution2));
+    expectedTotalLpShares = newLpSharesFromContr1
+      .add(newLpSharesFromContr2)
+      .add(newLpSharesFromContr3);
     expect(poolInfo._totalLpShares).to.be.equal(expectedTotalLpShares);
   });
 
@@ -176,9 +216,15 @@ describe("WETH-cUSDC Pool Testing", function () {
     // add liquidity
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await poolWethCusdc.connect(lp1).addLiquidity(lp1.address, lpContribution1, timestamp+60, 0);
-    await poolWethCusdc.connect(lp2).addLiquidity(lp2.address, lpContribution2, timestamp+60, 0);
-    await poolWethCusdc.connect(lp3).addLiquidity(lp3.address, lpContribution3, timestamp+60, 0);
+    await poolWethCusdc
+      .connect(lp1)
+      .addLiquidity(lp1.address, lpContribution1, timestamp + 60, 0);
+    await poolWethCusdc
+      .connect(lp2)
+      .addLiquidity(lp2.address, lpContribution2, timestamp + 60, 0);
+    await poolWethCusdc
+      .connect(lp3)
+      .addLiquidity(lp3.address, lpContribution3, timestamp + 60, 0);
 
     // get loan terms
     loanTerms = await poolWethCusdc.loanTerms(ONE_ETH);
@@ -189,7 +235,16 @@ describe("WETH-cUSDC Pool Testing", function () {
     // borrow
     currBlock = await ethers.provider.getBlockNumber();
     cusdcBalBeforeBorrow = await cUSDC.balanceOf(borrower.address);
-    await poolWethCusdc.connect(borrower).borrow(borrower.address, ONE_ETH, minLoanLimit, maxRepayLimit, timestamp+60, 0);
+    await poolWethCusdc
+      .connect(borrower)
+      .borrow(
+        borrower.address,
+        ONE_ETH,
+        minLoanLimit,
+        maxRepayLimit,
+        timestamp + 60,
+        0
+      );
     cusdcBalAfterBorrow = await cUSDC.balanceOf(borrower.address);
 
     // check cUSDC balance diff
@@ -199,7 +254,9 @@ describe("WETH-cUSDC Pool Testing", function () {
 
     // check USDC equivalent
     exchangeRateCurrent = await cUSDC.connect(lp1).exchangeRateStored();
-    expectedUsdcAmountFromRedeem = cusdcBalDiff.mul(exchangeRateCurrent).div(MONE);
+    expectedUsdcAmountFromRedeem = cusdcBalDiff
+      .mul(exchangeRateCurrent)
+      .div(MONE);
 
     // redeem cUSDC for cUSDC
     cusdcRedeemAmount = cusdcBalDiff;
@@ -217,7 +274,9 @@ describe("WETH-cUSDC Pool Testing", function () {
 
     // calculate required USDC amount to repay in cUSDC
     exchangeRateCurrent = await cUSDC.connect(lp1).exchangeRateStored();
-    requiredUsdcMintAmount = loanTerms.repaymentAmount.mul(MONE).div(exchangeRateCurrent);
+    requiredUsdcMintAmount = loanTerms.repaymentAmount
+      .mul(MONE)
+      .div(exchangeRateCurrent);
 
     // mint cUSDC
     await cUSDC.connect(borrower).mint(requiredUsdcMintAmount);
@@ -225,7 +284,9 @@ describe("WETH-cUSDC Pool Testing", function () {
     // repay loan
     cusdcBalBeforeRepay = await cUSDC.balanceOf(borrower.address);
     wethBalBeforeRepay = await WETH.balanceOf(borrower.address);
-    await poolWethCusdc.connect(borrower).repay(1, borrower.address, loanTerms.repaymentAmount);
+    await poolWethCusdc
+      .connect(borrower)
+      .repay(1, borrower.address, loanTerms.repaymentAmount);
     cusdcBalAfterRepay = await cUSDC.balanceOf(borrower.address);
     wethBalAfterRepay = await WETH.balanceOf(borrower.address);
 
@@ -236,7 +297,9 @@ describe("WETH-cUSDC Pool Testing", function () {
     expect(wethBalDiff).to.be.equal(loanTerms.pledgeAmount);
 
     // move forward past min lping time
-    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 60*60*24*365])
+    await ethers.provider.send("evm_setNextBlockTimestamp", [
+      timestamp + 60 * 60 * 24 * 365,
+    ]);
     await ethers.provider.send("evm_mine");
 
     // claim and remove liquidity across all lps
@@ -244,18 +307,31 @@ describe("WETH-cUSDC Pool Testing", function () {
     poolInfo = await poolWethCusdc.getPoolInfo();
     for (const lp of lps) {
       cusdcBalBeforeClaimAndRemove = await cUSDC.balanceOf(lp.address);
-      await poolWethCusdc.connect(lp).claim(lp.address, [1], false, timestamp+9999999);
+      await poolWethCusdc
+        .connect(lp)
+        .claim(lp.address, [1], false, timestamp + 9999999);
       lpInfo = await poolWethCusdc.getLpInfo(lp.address);
-      await poolWethCusdc.connect(lp).removeLiquidity(lp.address, lpInfo.sharesOverTime[0]);
+      await poolWethCusdc
+        .connect(lp)
+        .removeLiquidity(lp.address, lpInfo.sharesOverTime[0]);
       cusdcBalAfterClaimAndRemove = await cUSDC.balanceOf(lp.address);
 
       // check bal diff
-      cusdcBalDiff = cusdcBalAfterClaimAndRemove.sub(cusdcBalBeforeClaimAndRemove);
-      expectedRemoveAmount = poolInfo._totalLiquidity.sub(_minLiquidity).mul(lpInfo.sharesOverTime[0]).div(poolInfo._totalLpShares);
-      expectedClaimAmount = loanTerms.repaymentAmount.mul(lpInfo.sharesOverTime[0]).div(poolInfo._totalLpShares);
+      cusdcBalDiff = cusdcBalAfterClaimAndRemove.sub(
+        cusdcBalBeforeClaimAndRemove
+      );
+      expectedRemoveAmount = poolInfo._totalLiquidity
+        .sub(_minLiquidity)
+        .mul(lpInfo.sharesOverTime[0])
+        .div(poolInfo._totalLpShares);
+      expectedClaimAmount = loanTerms.repaymentAmount
+        .mul(lpInfo.sharesOverTime[0])
+        .div(poolInfo._totalLpShares);
       expectedCusdcBalDiff = expectedRemoveAmount.add(expectedClaimAmount);
-      expect(cusdcBalDiff).to.be.within(expectedCusdcBalDiff.mul(999).div(1000), expectedCusdcBalDiff.mul(1001).div(1000));
+      expect(cusdcBalDiff).to.be.within(
+        expectedCusdcBalDiff.mul(999).div(1000),
+        expectedCusdcBalDiff.mul(1001).div(1000)
+      );
     }
   });
-
 });

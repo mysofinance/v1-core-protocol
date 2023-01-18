@@ -2,11 +2,10 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("RETH-WETH Pool Testing", function () {
-
   const IERC20_SOURCE = "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20";
   const ONE_ETH = ethers.BigNumber.from("1000000000000000000");
-  const ONE_RETH = ONE_ETH
-  const BASE = ONE_ETH
+  const ONE_RETH = ONE_ETH;
+  const BASE = ONE_ETH;
   const ONE_YEAR = ethers.BigNumber.from("31536000");
   const ONE_DAY = ethers.BigNumber.from("86400");
   const COLL_TOKEN_ADDR = "0xae78736Cd615f374D3085123A210448E74Fc6393";
@@ -15,10 +14,12 @@ describe("RETH-WETH Pool Testing", function () {
   const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1);
 
   async function setupTestingAccounts() {
-    const [ deployer, lp1, lp2, lp3, borrower1, borrower2 ] = await ethers.getSigners()
+    const [deployer, lp1, lp2, lp3, borrower1, borrower2] =
+      await ethers.getSigners();
 
     // mimic rocket minter contract
-    const RETH_DEPOSIT_CONTRACT_ADDR = "0x2cac916b2A963Bf162f076C0a8a4a8200BCFBfb4"
+    const RETH_DEPOSIT_CONTRACT_ADDR =
+      "0x2cac916b2A963Bf162f076C0a8a4a8200BCFBfb4";
     await hre.network.provider.request({
       method: "hardhat_impersonateAccount",
       params: [RETH_DEPOSIT_CONTRACT_ADDR],
@@ -32,11 +33,14 @@ describe("RETH-WETH Pool Testing", function () {
     ]);
 
     // get RETH contract
-    const RETH = await ethers.getContractAt("RocketTokenRETHInterface", COLL_TOKEN_ADDR);
+    const RETH = await ethers.getContractAt(
+      "RocketTokenRETHInterface",
+      COLL_TOKEN_ADDR
+    );
 
     // mint RETH to borrowers
-    await RETH.connect(minter).mint(ONE_ETH.mul(100000), borrower1.address)
-    await RETH.connect(minter).mint(ONE_ETH.mul(100000), borrower2.address)
+    await RETH.connect(minter).mint(ONE_ETH.mul(100000), borrower1.address);
+    await RETH.connect(minter).mint(ONE_ETH.mul(100000), borrower2.address);
 
     // mint weth to lp accounts
     WETH = await ethers.getContractAt("IWETH", LOAN_TOKEN_ADDR);
@@ -47,17 +51,17 @@ describe("RETH-WETH Pool Testing", function () {
         MAX_UINT128.toHexString(),
       ]);
       balance = await ethers.provider.getBalance(user.address);
-      await WETH.connect(user).deposit({value: balance.sub(ONE_ETH.mul(10))});
+      await WETH.connect(user).deposit({ value: balance.sub(ONE_ETH.mul(10)) });
     }
 
-    return [ deployer, lp1, lp2, lp3, borrower1, borrower2 ]
+    return [deployer, lp1, lp2, lp3, borrower1, borrower2];
   }
 
   async function setupPublicTestnetPools() {
-    const [ deployer ] = await ethers.getSigners()
+    const [deployer] = await ethers.getSigners();
 
     // pool #1 parameters
-    const pool1Tenor = ONE_DAY
+    const pool1Tenor = ONE_DAY;
     const pool1DeployConfig = {
       tenor: pool1Tenor,
       maxLoanPerColl: ONE_ETH,
@@ -67,11 +71,11 @@ describe("RETH-WETH Pool Testing", function () {
       liquidityBnd2: ONE_ETH.mul(1000),
       minLoan: ONE_ETH.div(10),
       baseAggrBucketSize: 100,
-      creatorFee: 0
-    }
+      creatorFee: 0,
+    };
 
     // pool #2 parameters
-    const pool2Tenor = ONE_DAY.mul(3).div(2)
+    const pool2Tenor = ONE_DAY.mul(3).div(2);
     const pool2DeployConfig = {
       tenor: pool2Tenor,
       maxLoanPerColl: ONE_ETH,
@@ -81,9 +85,9 @@ describe("RETH-WETH Pool Testing", function () {
       liquidityBnd2: ONE_ETH.mul(1000),
       minLoan: ONE_ETH.div(10),
       baseAggrBucketSize: 100,
-      creatorFee: 0
-    }
-    
+      creatorFee: 0,
+    };
+
     // get contract
     const PoolRethWeth = await ethers.getContractFactory("PoolRethWeth");
 
@@ -100,7 +104,7 @@ describe("RETH-WETH Pool Testing", function () {
       pool1DeployConfig.creatorFee
     );
     await pool1RethWeth.deployed();
-    
+
     // deploy 2nd pool
     const pool2RethWeth = await PoolRethWeth.connect(deployer).deploy(
       pool2DeployConfig.tenor,
@@ -115,16 +119,16 @@ describe("RETH-WETH Pool Testing", function () {
     );
     await pool2RethWeth.deployed();
 
-    return [ pool1RethWeth, pool2RethWeth ];
+    return [pool1RethWeth, pool2RethWeth];
   }
 
   async function setupMainnetPool() {
-    const [ deployer ] = await ethers.getSigners()
+    const [deployer] = await ethers.getSigners();
 
     // pool parameters
-    const BASE = ethers.BigNumber.from("10").pow("18")
-    const ONE_YEAR = 60*60*24*365
-    const poolTenor = 60*60*24*90
+    const BASE = ethers.BigNumber.from("10").pow("18");
+    const ONE_YEAR = 60 * 60 * 24 * 365;
+    const poolTenor = 60 * 60 * 24 * 90;
     const poolDeployConfig = {
       tenor: poolTenor,
       maxLoanPerColl: BASE.mul(1010).div(1000),
@@ -134,8 +138,8 @@ describe("RETH-WETH Pool Testing", function () {
       liquidityBnd2: BASE.mul(50),
       minLoan: BASE.div(10),
       baseAggrBucketSize: 100,
-      creatorFee: BASE.div(100).mul(poolTenor).div(ONE_YEAR)
-    }
+      creatorFee: BASE.div(100).mul(poolTenor).div(ONE_YEAR),
+    };
 
     // get contract
     const PoolRethWeth = await ethers.getContractFactory("PoolRethWeth");
@@ -154,70 +158,88 @@ describe("RETH-WETH Pool Testing", function () {
     );
     await poolRethWeth.deployed();
 
-    return [poolRethWeth]
+    return [poolRethWeth];
   }
 
   async function setupApprovals(token, accs, pool) {
     for (const acc of accs) {
-      await token.connect(acc).approve(pool.address, MAX_UINT128)
+      await token.connect(acc).approve(pool.address, MAX_UINT128);
     }
   }
 
   async function setupTokens() {
-    const RETH = await ethers.getContractAt("RocketTokenRETHInterface", COLL_TOKEN_ADDR);
+    const RETH = await ethers.getContractAt(
+      "RocketTokenRETHInterface",
+      COLL_TOKEN_ADDR
+    );
     const WETH = await ethers.getContractAt(IERC20_SOURCE, LOAN_TOKEN_ADDR);
-    return [ RETH, WETH]
+    return [RETH, WETH];
   }
 
   async function addLiquidity(pool, acc, amount) {
     // lp add liquidity
     const blocknum = await ethers.provider.getBlockNumber();
     const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
-    await pool.connect(acc).addLiquidity(acc.address, amount, timestamp+60, 0);
+    await pool
+      .connect(acc)
+      .addLiquidity(acc.address, amount, timestamp + 60, 0);
   }
 
   async function basicSetup(amount) {
     // get tokens
-    const [RETH, WETH] = await setupTokens()
+    const [RETH, WETH] = await setupTokens();
 
     // setup and fund accounts
-    const [deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupTestingAccounts()
+    const [deployer, lp1, lp2, lp3, borrower1, borrower2] =
+      await setupTestingAccounts();
 
     // deploy pools
-    const [pool1, pool2] = await setupPublicTestnetPools()
+    const [pool1, pool2] = await setupPublicTestnetPools();
 
     // set "standard" approvals
-    await setupApprovals(WETH, [lp1, lp2, lp3], pool1)
-    await setupApprovals(RETH, [borrower1, borrower2], pool1)
+    await setupApprovals(WETH, [lp1, lp2, lp3], pool1);
+    await setupApprovals(RETH, [borrower1, borrower2], pool1);
 
     // add liquidity
     if (amount !== undefined && amount.gt("0")) {
-      await addLiquidity(pool1, lp1, amount)
+      await addLiquidity(pool1, lp1, amount);
     }
-    
-    return [RETH, WETH, pool1, pool2, deployer, lp1, lp2, lp3, borrower1, borrower2]
+
+    return [
+      RETH,
+      WETH,
+      pool1,
+      pool2,
+      deployer,
+      lp1,
+      lp2,
+      lp3,
+      borrower1,
+      borrower2,
+    ];
   }
 
   async function setupMainnetTestCase(amount) {
     // get tokens
-    const [RETH, WETH] = await setupTokens()
+    const [RETH, WETH] = await setupTokens();
 
     // setup and fund accounts
-    const [deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupTestingAccounts()
+    const [deployer, lp1, lp2, lp3, borrower1, borrower2] =
+      await setupTestingAccounts();
 
     // deploy pools
-    const [pool] = await setupMainnetPool()
+    const [pool] = await setupMainnetPool();
 
     // set "standard" approvals
-    await setupApprovals(WETH, [lp1, lp2, lp3], pool)
-    await setupApprovals(RETH, [borrower1, borrower2], pool)
+    await setupApprovals(WETH, [lp1, lp2, lp3], pool);
+    await setupApprovals(RETH, [borrower1, borrower2], pool);
 
     // add liquidity
     if (amount !== undefined && amount.gt("0")) {
-      await addLiquidity(pool, lp1, amount)
+      await addLiquidity(pool, lp1, amount);
     }
-    
-    return [RETH, WETH, pool, deployer, lp1, lp2, lp3, borrower1, borrower2]
+
+    return [RETH, WETH, pool, deployer, lp1, lp2, lp3, borrower1, borrower2];
   }
   /*
   it("Test borrowing (public testnet pool)", async function () {
@@ -462,21 +484,48 @@ describe("RETH-WETH Pool Testing", function () {
   });*/
 
   it("Test loan terms (mainnet pool)", async function () {
-    const [RETH, WETH, pool, deployer, lp1, lp2, lp3, borrower1, borrower2] = await setupMainnetTestCase()
+    const [RETH, WETH, pool, deployer, lp1, lp2, lp3, borrower1, borrower2] =
+      await setupMainnetTestCase();
 
     // add some liquidity
-    await addLiquidity(pool, lp1, ONE_ETH.mul(100))
-    const poolInfo = await pool.getPoolInfo()
-    const totalLiquidity = poolInfo._totalLiquidity
+    await addLiquidity(pool, lp1, ONE_ETH.mul(100));
+    const poolInfo = await pool.getPoolInfo();
+    const totalLiquidity = poolInfo._totalLiquidity;
 
-    const sendAmounts = [ONE_ETH.div(2), ONE_ETH, ONE_ETH.mul(5), ONE_ETH.mul(10), ONE_ETH.mul(20), ONE_ETH.mul(50), ONE_ETH.mul(80), ONE_ETH.mul(100)]
-    for (let i=0; i<sendAmounts.length;i++) {
-      const sendAmount = sendAmounts[i]
+    const sendAmounts = [
+      ONE_ETH.div(2),
+      ONE_ETH,
+      ONE_ETH.mul(5),
+      ONE_ETH.mul(10),
+      ONE_ETH.mul(20),
+      ONE_ETH.mul(50),
+      ONE_ETH.mul(80),
+      ONE_ETH.mul(100),
+    ];
+    for (let i = 0; i < sendAmounts.length; i++) {
+      const sendAmount = sendAmounts[i];
       const loanTerms = await pool.loanTerms(sendAmount);
-      const utilization = loanTerms.loanAmount.mul(10000).div(totalLiquidity)
-      const apr = loanTerms.repaymentAmount.sub(loanTerms.loanAmount).mul(60*60*24*365).mul(10000).div(poolInfo._loanTenor).div(loanTerms.loanAmount)
-      const ltv = loanTerms.loanAmount.mul(10000).mul(1338).div(sendAmount).div(1427)
-      console.log(`pledgeAmount=${Number(sendAmount.div(BASE.div(100).toString()))/100}rETH, loanAmount=${loanTerms.loanAmount.div(BASE.div(100).toString())/100}wETH, utilization=${Number(utilization)/100}%, apr=${Number(apr)/100}%, ltv=${Number(ltv)/100}%`)
+      const utilization = loanTerms.loanAmount.mul(10000).div(totalLiquidity);
+      const apr = loanTerms.repaymentAmount
+        .sub(loanTerms.loanAmount)
+        .mul(60 * 60 * 24 * 365)
+        .mul(10000)
+        .div(poolInfo._loanTenor)
+        .div(loanTerms.loanAmount);
+      const ltv = loanTerms.loanAmount
+        .mul(10000)
+        .mul(1338)
+        .div(sendAmount)
+        .div(1427);
+      console.log(
+        `pledgeAmount=${
+          Number(sendAmount.div(BASE.div(100).toString())) / 100
+        }rETH, loanAmount=${
+          loanTerms.loanAmount.div(BASE.div(100).toString()) / 100
+        }wETH, utilization=${Number(utilization) / 100}%, apr=${
+          Number(apr) / 100
+        }%, ltv=${Number(ltv) / 100}%`
+      );
     }
-  })
+  });
 });

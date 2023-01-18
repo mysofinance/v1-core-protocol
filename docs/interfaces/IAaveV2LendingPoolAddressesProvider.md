@@ -1,13 +1,5 @@
 # IAaveV2LendingPoolAddressesProvider
 
-
-
-
-
-
-
-
-
 ## Methods
 
 ### getAddress
@@ -16,21 +8,17 @@
 function getAddress(bytes32 id) external view returns (address)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| id | bytes32 | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| id   | bytes32 | undefined   |
 
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getEmergencyAdmin
 
@@ -38,16 +26,11 @@ function getAddress(bytes32 id) external view returns (address)
 function getEmergencyAdmin() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getLendingPool
 
@@ -55,16 +38,11 @@ function getEmergencyAdmin() external view returns (address)
 function getLendingPool() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getLendingPoolCollateralManager
 
@@ -72,16 +50,11 @@ function getLendingPool() external view returns (address)
 function getLendingPoolCollateralManager() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getLendingPoolConfigurator
 
@@ -89,16 +62,11 @@ function getLendingPoolCollateralManager() external view returns (address)
 function getLendingPoolConfigurator() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getLendingRateOracle
 
@@ -106,16 +74,11 @@ function getLendingPoolConfigurator() external view returns (address)
 function getLendingRateOracle() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getMarketId
 
@@ -123,16 +86,11 @@ function getLendingRateOracle() external view returns (address)
 function getMarketId() external view returns (string)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | string | undefined |
+| Name | Type   | Description |
+| ---- | ------ | ----------- |
+| \_0  | string | undefined   |
 
 ### getPoolAdmin
 
@@ -140,16 +98,11 @@ function getMarketId() external view returns (string)
 function getPoolAdmin() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### getPriceOracle
 
@@ -157,16 +110,11 @@ function getPoolAdmin() external view returns (address)
 function getPriceOracle() external view returns (address)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| \_0  | address | undefined   |
 
 ### setAddress
 
@@ -174,16 +122,12 @@ function getPriceOracle() external view returns (address)
 function setAddress(bytes32 id, address newAddress) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| id | bytes32 | undefined |
-| newAddress | address | undefined |
+| Name       | Type    | Description |
+| ---------- | ------- | ----------- |
+| id         | bytes32 | undefined   |
+| newAddress | address | undefined   |
 
 ### setAddressAsProxy
 
@@ -191,16 +135,12 @@ function setAddress(bytes32 id, address newAddress) external nonpayable
 function setAddressAsProxy(bytes32 id, address impl) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| id | bytes32 | undefined |
-| impl | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| id   | bytes32 | undefined   |
+| impl | address | undefined   |
 
 ### setEmergencyAdmin
 
@@ -208,15 +148,11 @@ function setAddressAsProxy(bytes32 id, address impl) external nonpayable
 function setEmergencyAdmin(address admin) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| admin | address | undefined |
+| Name  | Type    | Description |
+| ----- | ------- | ----------- |
+| admin | address | undefined   |
 
 ### setLendingPoolCollateralManager
 
@@ -224,15 +160,11 @@ function setEmergencyAdmin(address admin) external nonpayable
 function setLendingPoolCollateralManager(address manager) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| manager | address | undefined |
+| Name    | Type    | Description |
+| ------- | ------- | ----------- |
+| manager | address | undefined   |
 
 ### setLendingPoolConfiguratorImpl
 
@@ -240,15 +172,11 @@ function setLendingPoolCollateralManager(address manager) external nonpayable
 function setLendingPoolConfiguratorImpl(address configurator) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| configurator | address | undefined |
+| Name         | Type    | Description |
+| ------------ | ------- | ----------- |
+| configurator | address | undefined   |
 
 ### setLendingPoolImpl
 
@@ -256,15 +184,11 @@ function setLendingPoolConfiguratorImpl(address configurator) external nonpayabl
 function setLendingPoolImpl(address pool) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| pool | address | undefined |
+| Name | Type    | Description |
+| ---- | ------- | ----------- |
+| pool | address | undefined   |
 
 ### setLendingRateOracle
 
@@ -272,15 +196,11 @@ function setLendingPoolImpl(address pool) external nonpayable
 function setLendingRateOracle(address lendingRateOracle) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| lendingRateOracle | address | undefined |
+| Name              | Type    | Description |
+| ----------------- | ------- | ----------- |
+| lendingRateOracle | address | undefined   |
 
 ### setMarketId
 
@@ -288,15 +208,11 @@ function setLendingRateOracle(address lendingRateOracle) external nonpayable
 function setMarketId(string marketId) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| marketId | string | undefined |
+| Name     | Type   | Description |
+| -------- | ------ | ----------- |
+| marketId | string | undefined   |
 
 ### setPoolAdmin
 
@@ -304,15 +220,11 @@ function setMarketId(string marketId) external nonpayable
 function setPoolAdmin(address admin) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| admin | address | undefined |
+| Name  | Type    | Description |
+| ----- | ------- | ----------- |
+| admin | address | undefined   |
 
 ### setPriceOracle
 
@@ -320,17 +232,11 @@ function setPoolAdmin(address admin) external nonpayable
 function setPriceOracle(address priceOracle) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| priceOracle | address | undefined |
-
-
+| Name        | Type    | Description |
+| ----------- | ------- | ----------- |
+| priceOracle | address | undefined   |
 
 ## Events
 
@@ -340,17 +246,13 @@ function setPriceOracle(address priceOracle) external nonpayable
 event AddressSet(bytes32 id, address indexed newAddress, bool hasProxy)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| id  | bytes32 | undefined |
-| newAddress `indexed` | address | undefined |
-| hasProxy  | bool | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| id                   | bytes32 | undefined   |
+| newAddress `indexed` | address | undefined   |
+| hasProxy             | bool    | undefined   |
 
 ### ConfigurationAdminUpdated
 
@@ -358,15 +260,11 @@ event AddressSet(bytes32 id, address indexed newAddress, bool hasProxy)
 event ConfigurationAdminUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### EmergencyAdminUpdated
 
@@ -374,15 +272,11 @@ event ConfigurationAdminUpdated(address indexed newAddress)
 event EmergencyAdminUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### LendingPoolCollateralManagerUpdated
 
@@ -390,15 +284,11 @@ event EmergencyAdminUpdated(address indexed newAddress)
 event LendingPoolCollateralManagerUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### LendingPoolConfiguratorUpdated
 
@@ -406,15 +296,11 @@ event LendingPoolCollateralManagerUpdated(address indexed newAddress)
 event LendingPoolConfiguratorUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### LendingPoolUpdated
 
@@ -422,15 +308,11 @@ event LendingPoolConfiguratorUpdated(address indexed newAddress)
 event LendingPoolUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### LendingRateOracleUpdated
 
@@ -438,15 +320,11 @@ event LendingPoolUpdated(address indexed newAddress)
 event LendingRateOracleUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### MarketIdSet
 
@@ -454,15 +332,11 @@ event LendingRateOracleUpdated(address indexed newAddress)
 event MarketIdSet(string newMarketId)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newMarketId  | string | undefined |
+| Name        | Type   | Description |
+| ----------- | ------ | ----------- |
+| newMarketId | string | undefined   |
 
 ### PriceOracleUpdated
 
@@ -470,15 +344,11 @@ event MarketIdSet(string newMarketId)
 event PriceOracleUpdated(address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| newAddress `indexed` | address | undefined |
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| newAddress `indexed` | address | undefined   |
 
 ### ProxyCreated
 
@@ -486,16 +356,9 @@ event PriceOracleUpdated(address indexed newAddress)
 event ProxyCreated(bytes32 id, address indexed newAddress)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| id  | bytes32 | undefined |
-| newAddress `indexed` | address | undefined |
-
-
-
+| Name                 | Type    | Description |
+| -------------------- | ------- | ----------- |
+| id                   | bytes32 | undefined   |
+| newAddress `indexed` | address | undefined   |

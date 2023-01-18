@@ -1,13 +1,5 @@
 # HyperStakingBorrow
 
-
-
-
-
-
-
-
-
 ## Methods
 
 ### ADDRESSES_PROVIDER
@@ -16,16 +8,11 @@
 function ADDRESSES_PROVIDER() external view returns (contract IAaveV2LendingPoolAddressesProvider)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | contract IAaveV2LendingPoolAddressesProvider | undefined |
+| Name | Type                                         | Description |
+| ---- | -------------------------------------------- | ----------- |
+| \_0  | contract IAaveV2LendingPoolAddressesProvider | undefined   |
 
 ### LENDING_POOL
 
@@ -33,16 +20,11 @@ function ADDRESSES_PROVIDER() external view returns (contract IAaveV2LendingPool
 function LENDING_POOL() external view returns (contract IAaveV2LendingPool)
 ```
 
-
-
-
-
-
 #### Returns
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | contract IAaveV2LendingPool | undefined |
+| Name | Type                        | Description |
+| ---- | --------------------------- | ----------- |
+| \_0  | contract IAaveV2LendingPool | undefined   |
 
 ### borrow
 
@@ -50,15 +32,11 @@ function LENDING_POOL() external view returns (contract IAaveV2LendingPool)
 function borrow(HyperStakingBorrow.FlashBorrowPayload flashBorrowPayload) external nonpayable
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| flashBorrowPayload | HyperStakingBorrow.FlashBorrowPayload | undefined |
+| Name               | Type                                  | Description |
+| ------------------ | ------------------------------------- | ----------- |
+| flashBorrowPayload | HyperStakingBorrow.FlashBorrowPayload | undefined   |
 
 ### executeOperation
 
@@ -66,26 +44,18 @@ function borrow(HyperStakingBorrow.FlashBorrowPayload flashBorrowPayload) extern
 function executeOperation(address[], uint256[] amounts, uint256[] premiums, address, bytes params) external nonpayable returns (bool)
 ```
 
-
-
-
-
 #### Parameters
 
-| Name | Type | Description |
-|---|---|---|
-| _0 | address[] | undefined |
-| amounts | uint256[] | undefined |
-| premiums | uint256[] | undefined |
-| _3 | address | undefined |
-| params | bytes | undefined |
+| Name     | Type      | Description |
+| -------- | --------- | ----------- |
+| \_0      | address[] | undefined   |
+| amounts  | uint256[] | undefined   |
+| premiums | uint256[] | undefined   |
+| \_3      | address   | undefined   |
+| params   | bytes     | undefined   |
 
 #### Returns
 
 | Name | Type | Description |
-|---|---|---|
-| _0 | bool | undefined |
-
-
-
-
+| ---- | ---- | ----------- |
+| \_0  | bool | undefined   |

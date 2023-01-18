@@ -1,14 +1,19 @@
 require("hardhat-contract-sizer");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
-require('@primitivefi/hardhat-dodoc');
+require("@primitivefi/hardhat-dodoc");
 require("@nomiclabs/hardhat-ethers");
-require("@nomicfoundation/hardhat-chai-matchers")
-require("@nomiclabs/hardhat-etherscan")
-require('hardhat-abi-exporter');
+require("@nomicfoundation/hardhat-chai-matchers");
+require("@nomiclabs/hardhat-etherscan");
+require("hardhat-abi-exporter");
 require("dotenv").config();
 
-const { ALCHEMY_API_KEY_GOERLI, ALCHEMY_API_KEY_MAINNET, ETHERSCAN_API_KEY, TEST_DEPLOYER_PRIVATE_KEY } = process.env
+const {
+  ALCHEMY_API_KEY_GOERLI,
+  ALCHEMY_API_KEY_MAINNET,
+  ETHERSCAN_API_KEY,
+  TEST_DEPLOYER_PRIVATE_KEY,
+} = process.env;
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -39,8 +44,8 @@ module.exports = {
       chainId: 31337,
       forking: {
         url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY_MAINNET}`,
-        blockNumber: 16382000
-      }
+        blockNumber: 16382000,
+      },
     },
     mainnet: {
       url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY_MAINNET}`,
@@ -48,11 +53,11 @@ module.exports = {
     goerli: {
       url: `https://eth-goerli.g.alchemy.com/v2/-76GDj41dJcWIiIyZeu1bTYZXtDOIxrI`,
       accounts: [TEST_DEPLOYER_PRIVATE_KEY],
-      chainId: 5
-    }
+      chainId: 5,
+    },
   },
   mocha: {
-    timeout: 100000000
+    timeout: 100000000,
   },
   contractSizer: {
     alphaSort: true,
@@ -62,7 +67,7 @@ module.exports = {
     only: [],
   },
   abiExporter: {
-    path: './data/abi',
+    path: "./data/abi",
     runOnCompile: true,
     clear: true,
     flat: false,
@@ -71,6 +76,6 @@ module.exports = {
     format: "json",
   },
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY
-  }
+    apiKey: ETHERSCAN_API_KEY,
+  },
 };
