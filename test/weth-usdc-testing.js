@@ -58,7 +58,7 @@ describe("WETH-USDC Pool Testing", function () {
     // deploy pool
     PoolWethUsdc = await ethers.getContractFactory("PoolWethUsdc");
     PoolWethUsdc = await PoolWethUsdc.connect(deployer);
-    poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 100, 0);
+    poolWethUsdc = await PoolWethUsdc.deploy(_loanTenor, _maxLoanPerColl, _r1, _r2, _liquidityBnd1, _liquidityBnd2, _minLoan, 10, 0);
     await poolWethUsdc.deployed();
 
     // approve DAI and WETH balances
@@ -279,7 +279,7 @@ describe("WETH-USDC Pool Testing", function () {
     // lp2 claims via aggregate
     benchmarkDiff = postClaimBal.sub(preClaimBal)
     preClaimBal = await USDC.balanceOf(lp2.address);
-    await poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [0, 100], false, timestamp+9999999);
+    await poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], false, timestamp+9999999);
     postClaimBal = await USDC.balanceOf(lp2.address);
     diff = postClaimBal.sub(preClaimBal)
     await expect(benchmarkDiff).to.be.equal(diff);
@@ -441,7 +441,7 @@ describe("WETH-USDC Pool Testing", function () {
     timestamp = timestamp + 60*60*24*365;
 
     // lp1 claims and reinvest
-    await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 1000, 2000], true, timestamp + 60*60*24*365 + 1);
+    await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 1000, 1010, 1020, 1030, 1040, 1050, 1060, 1070, 1080, 1090, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000], true, timestamp + 60*60*24*365 + 1);
     // await poolWethUsdc.connect(lp2).claimFromAggregated([0, 99,199, 299, 399, 499, 599, 699, 799, 899, 999], false, timestamp+9999999);
     // lp2 and lp3 claim without reinvest
     await poolWethUsdc.connect(lp2).claimFromAggregated(lp2.address, [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000], false, timestamp+9999999);
