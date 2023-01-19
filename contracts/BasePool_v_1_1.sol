@@ -69,7 +69,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
     uint256 liquidityBnd1; // denominated in loanCcy decimals
     uint256 liquidityBnd2; // denominated in loanCcy decimals
     uint256 minLoan; // denominated in loanCcy decimals
-    uint256 baseAggrBucketSize; // must be a multiple of 100
+    uint256 baseAggrBucketSize; // must be a multiple of 10
     mapping(address => LpInfo) addrToLpInfo;
     mapping(address => uint256) lastAddOfTxOrigin;
     mapping(uint256 => LoanInfo) public loanIdxToLoanInfo;
@@ -107,7 +107,7 @@ abstract contract BasePool_v_1_1 is IBasePool_v_1_1 {
             revert InvalidLiquidityBnds();
         // ensure LP shares can be minted based on 1/1000th of minLp discretization
         if (_minLiquidity < 1000) revert InvalidMinLiquidity();
-        if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
+        if (_baseAggrBucketSize < 10 || _baseAggrBucketSize % 10 != 0)
             revert InvalidBaseAggrSize();
         if (_creatorFee > MAX_FEE) revert InvalidFee();
         poolCreator = msg.sender;

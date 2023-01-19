@@ -106,7 +106,7 @@ abstract contract BasePool is IBasePool {
             revert InvalidLiquidityBnds();
         // ensure LP shares can be minted based on 1/1000th of minLp discretization
         if (_minLiquidity < 1000) revert InvalidMinLiquidity();
-        if (_baseAggrBucketSize < 100 || _baseAggrBucketSize % 100 != 0)
+        if (_baseAggrBucketSize < 10 || _baseAggrBucketSize % 10 != 0)
             revert InvalidBaseAggrSize();
         if (_creatorFee > MAX_FEE) revert InvalidFee();
         poolCreator = msg.sender;

@@ -1158,7 +1158,7 @@ describe("WETH-USDC Pool Testing", function () {
     // check claim amounts
     preClaimBalLoanCcy = await USDC.balanceOf(lp1.address);
     preClaimBalCollCcy = await WETH.balanceOf(lp1.address);
-    await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 10000], false, timestamp+1000000000);
+    await poolWethUsdc.connect(lp1).claimFromAggregated(lp1.address, [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000], false, timestamp+1000000000);
     postClaimBalLoanCcy = await USDC.balanceOf(lp1.address);
     postClaimBalCollCcy = await WETH.balanceOf(lp1.address);
     const firstLpShares = ONE_USDC.mul(1000000000000).mul(1000).div(minLiquidity);
