@@ -8,7 +8,7 @@ require("@nomiclabs/hardhat-etherscan")
 require('hardhat-abi-exporter');
 require("dotenv").config();
 
-const { ALCHEMY_API_KEY_GOERLI, ALCHEMY_API_KEY_MAINNET, ETHERSCAN_API_KEY, TEST_DEPLOYER_PRIVATE_KEY, INFURA_API_KEY_MAINNET } = process.env
+const { INFURA_API_KEY_GOERLI, ALCHEMY_API_KEY_MAINNET, ETHERSCAN_API_KEY, TEST_DEPLOYER_PRIVATE_KEY, INFURA_API_KEY_MAINNET } = process.env
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -46,9 +46,7 @@ module.exports = {
       url: `https://mainnet.infura.io/v3/${INFURA_API_KEY_MAINNET}`,
     },
     goerli: {
-      url: `https://eth-goerli.g.alchemy.com/v2/-76GDj41dJcWIiIyZeu1bTYZXtDOIxrI`,
-      accounts: [TEST_DEPLOYER_PRIVATE_KEY],
-      chainId: 5
+      url: `https://goerli.infura.io/v3/${INFURA_API_KEY_GOERLI}`,
     }
   },
   mocha: {
