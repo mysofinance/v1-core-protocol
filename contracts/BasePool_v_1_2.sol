@@ -28,6 +28,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
     error AlreadyRepaid();
     error InvalidSendAmount();
     error Invalid();
+    error TooLargePledge();
 
     uint256 constant BASE = 10 ** 18;
     uint256 constant MAX_FEE = 500 * 10 ** 14; // 5%, denominated in BASE
@@ -41,7 +42,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
     uint256 immutable collTokenDecimals;
     uint256 maxLoanPerColl; // denominated in loanCcy decimals
     uint256 public creatorFee; // denominated in BASE
-    uint256 public lockedCollateral; // collateral which is reserved for outstanding loans 
+    uint256 public lockedCollateral; // collateral which is reserved for outstanding loans
     uint256 loanIdx;
     uint256 r1; // denominated in BASE and w.r.t. tenor (i.e., not annualized)
     uint256 r2; // denominated in BASE and w.r.t. tenor (i.e., not annualized)
@@ -69,7 +70,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
             revert InvalidZeroAddress();
         if (_loanTenor < 60 * 60) revert InvalidLoanTenor();
         if (_maxLoanPerColl == 0) revert InvalidMaxLoanPerColl();
-        if (_r1 < _r2 ) revert InvalidRateParams();
+        if (_r1 < _r2) revert InvalidRateParams();
         if (_liquidityBnd2 <= _liquidityBnd1 || _liquidityBnd1 == 0)
             revert InvalidLiquidityBnds();
         if (_creatorFee > MAX_FEE) revert InvalidFee();
@@ -100,31 +101,26 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         );
     }
 
-
     // put in number of shares to remove, up to all of them
-    function removeLiquidity(
-        uint256 amount
-    ) external override {
+    function removeLiquidity(uint256 amount) external override {
         if (msg.sender != poolCreator) revert UnapprovedSender();
         // transfer liquidity
         IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, amount);
         // spawn event
-        emit RemoveLiquidity(
-            amount,
-            loanIdx
-        );
+        emit RemoveLiquidity(amount, loanIdx);
     }
 
+    // _minLoanLimit - index 0
+    // _maxRepayLimit - index 1
+    // _sendAmount - index 2
     function borrow(
-        uint128 _sendAmount,
-        uint128 _minLoanLimit,
-        uint128 _maxRepayLimit,
+        uint128[3] calldata limitsAndAmount,
         uint256 _deadline,
         uint256 _referralCode
     ) external override {
         uint256 _timestamp = checkTimestamp(_deadline);
-        uint128 _inAmountAfterFees = _sendAmount -
-            getCollCcyTransferFee(_sendAmount);
+        uint128 _inAmountAfterFees = limitsAndAmount[2] -
+            getCollCcyTransferFee(limitsAndAmount[2]);
         // get borrow terms and do checks
         (
             uint128 loanAmount,
@@ -134,37 +130,37 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
             uint256 _creatorFee
         ) = _borrow(
                 _inAmountAfterFees,
-                _minLoanLimit,
-                _maxRepayLimit,
+                limitsAndAmount[0],
+                limitsAndAmount[1],
                 _timestamp
             );
-        
-            uint256 _loanIdx = loanIdx;
 
-            // update loan info
-            loanIdxToBorrower[_loanIdx] = msg.sender;
-            LoanInfo memory loanInfo;
-            loanInfo.repayment = repaymentAmount;
-            loanInfo.expiry = expiry;
-            loanInfo.collateral = pledgeAmount;
-            loanIdxToLoanInfo[_loanIdx] = loanInfo;
+        uint256 _loanIdx = loanIdx;
 
-            // update loan idx counter
-            loanIdx = _loanIdx + 1;
-            lockedCollateral += pledgeAmount;
+        // update loan info
+        loanIdxToBorrower[_loanIdx] = msg.sender;
+        LoanInfo memory loanInfo;
+        loanInfo.repayment = repaymentAmount;
+        loanInfo.expiry = expiry;
+        loanInfo.collateral = pledgeAmount;
+        loanIdxToLoanInfo[_loanIdx] = loanInfo;
 
-            // transfer _sendAmount (not pledgeAmount) in collateral ccy
-            IERC20Metadata(collCcyToken).safeTransferFrom(
-                msg.sender,
-                address(this),
-                _sendAmount
-            );
+        // update loan idx counter
+        loanIdx = _loanIdx + 1;
+        lockedCollateral += pledgeAmount;
 
-            // transfer creator fee to creator in collateral ccy
-            IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
+        // transfer _sendAmount (not pledgeAmount) in collateral ccy
+        IERC20Metadata(collCcyToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            limitsAndAmount[2]
+        );
 
-            // transfer loanAmount in loan ccy
-            IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
+        // transfer creator fee to creator in collateral ccy
+        IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
+
+        // transfer loanAmount in loan ccy
+        IERC20Metadata(loanCcyToken).safeTransfer(msg.sender, loanAmount);
 
         // spawn event
         emit Borrow(
@@ -187,8 +183,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
         address _loanOwner = loanIdxToBorrower[_loanIdx];
 
-        if (_loanOwner != msg.sender)
-            revert UnapprovedSender();
+        if (_loanOwner != msg.sender) revert UnapprovedSender();
         LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
         uint256 timestamp = block.timestamp;
         if (timestamp > loanInfo.expiry) revert CannotRepayAfterExpiry();
@@ -208,7 +203,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
             loanInfo.repayment = repaymentAmountAfterFees;
         }
         uint128 _collateral = loanInfo.collateral;
-        lockedCollateral -= _collateral;       
+        lockedCollateral -= _collateral;
 
         IERC20Metadata(loanCcyToken).safeTransferFrom(
             msg.sender,
@@ -220,6 +215,98 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         IERC20Metadata(collCcyToken).safeTransfer(_recipient, _collateral);
         // spawn event
         emit Repay(_loanOwner, _loanIdx, repaymentAmountAfterFees);
+    }
+
+    // _minLoanLimit - index 0
+    // _maxRepayLimit - index 1
+    // _sendAmount - index 2
+    function rollOver(
+        uint256 _loanIdx,
+        uint128[3] calldata limitsAndAmount,
+        uint256 _deadline
+    ) external override {
+        checkTimestamp(_deadline);
+        // verify loan info and eligibility
+        if (_loanIdx == 0 || _loanIdx >= loanIdx) revert InvalidLoanIdx();
+        address loanOwner = loanIdxToBorrower[_loanIdx];
+        if (loanOwner != msg.sender) revert UnapprovedSender();
+        LoanInfo storage loanInfo = loanIdxToLoanInfo[_loanIdx];
+        {
+            if (block.timestamp > loanInfo.expiry)
+                revert CannotRepayAfterExpiry();
+            if (loanInfo.repaid) revert AlreadyRepaid();
+        }
+
+        // get terms for new borrow
+        (
+            uint128 loanAmount,
+            uint128 repaymentAmount,
+            uint128 pledgeAmount,
+            uint32 expiry,
+            uint256 _creatorFee
+        ) = _borrow(
+                loanInfo.collateral,
+                limitsAndAmount[0],
+                limitsAndAmount[1],
+                _deadline
+            );
+
+        // check roll over cost
+        uint128 tmpRepayment = loanInfo.repayment;
+        uint128 repaymentAmountAfterFees;
+        if (loanAmount >= tmpRepayment) {
+            repaymentAmountAfterFees = tmpRepayment;
+        } else {
+            repaymentAmountAfterFees =
+                checkAndGetSendAmountAfterFees(
+                    limitsAndAmount[2],
+                    tmpRepayment - loanAmount
+                ) +
+                loanAmount;
+            loanInfo.repayment = repaymentAmountAfterFees;
+        }
+
+        // mark previous loan as repaid
+        loanInfo.repaid = true;
+        {
+            uint256 currLoanIdx = loanIdx;
+            // set new loan info
+            loanIdxToBorrower[currLoanIdx] = loanOwner;
+            LoanInfo memory loanInfoNew;
+            loanInfoNew.expiry = expiry;
+            loanInfoNew.repayment = repaymentAmount;
+            loanInfoNew.collateral = pledgeAmount;
+            loanIdxToLoanInfo[currLoanIdx] = loanInfoNew;
+
+            lockedCollateral -= _creatorFee;
+
+            // transfer liquidity
+            if (loanAmount < tmpRepayment) {
+                IERC20Metadata(loanCcyToken).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    limitsAndAmount[2]
+                );
+            } else if (loanAmount > tmpRepayment) {
+                IERC20Metadata(loanCcyToken).safeTransfer(
+                    msg.sender,
+                    loanAmount - tmpRepayment
+                );
+            }
+            // transfer creator fee to pool creator in collateral ccy
+            IERC20Metadata(collCcyToken).safeTransfer(poolCreator, _creatorFee);
+
+            // spawn event
+            emit Rollover(
+                loanOwner,
+                currLoanIdx,
+                pledgeAmount,
+                loanAmount,
+                repaymentAmount,
+                expiry
+            );
+        }
+        emit Repay(loanOwner, _loanIdx, repaymentAmountAfterFees);
     }
 
     function proposeNewCreator(address newAddr) external {
@@ -284,7 +371,9 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         _maxLoanPerColl = maxLoanPerColl;
         _minLoan = minLoan;
         _loanTenor = loanTenor;
-        _totalLiquidity = IERC20Metadata(_loanCcyToken).balanceOf(address(this));
+        _totalLiquidity = IERC20Metadata(_loanCcyToken).balanceOf(
+            address(this)
+        );
         _loanIdx = loanIdx;
     }
 
@@ -303,22 +392,14 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         // compute terms (as uint256)
         _creatorFee = (_inAmountAfterFees * creatorFee) / BASE;
         uint256 pledge = _inAmountAfterFees - _creatorFee;
-        uint256 _totalLiquidity = IERC20Metadata(loanCcyToken).balanceOf(address(this));
+        uint256 _totalLiquidity = IERC20Metadata(loanCcyToken).balanceOf(
+            address(this)
+        );
         uint256 loan = (pledge * maxLoanPerColl) / 10 ** collTokenDecimals;
-        uint256 L_k = ((_totalLiquidity) * BASE * 9) /
-            (BASE * 10);
-        if (loan > L_k) {
-            uint256 x_k = (L_k * 10 ** collTokenDecimals) / maxLoanPerColl;
-            loan =
-                ((pledge - x_k) *
-                    maxLoanPerColl *
-                    (_totalLiquidity - L_k)) /
-                ((pledge - x_k) *
-                    maxLoanPerColl +
-                    (_totalLiquidity - L_k) *
-                    10 ** collTokenDecimals) +
-                L_k;
-        }
+        //uint256 x_k = (_totalLiquidity * 10 ** collTokenDecimals) / maxLoanPerColl;
+        //loan = _totalLiquidity;
+        //could re-imburse...for now, just revert
+        if (loan > _totalLiquidity) revert TooLargePledge();
 
         if (loan < minLoan) revert LoanTooSmall();
         uint256 postLiquidity = _totalLiquidity - loan;
@@ -370,12 +451,9 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         )
     {
         // get and verify loan terms
-        (
-            loanAmount,
-            repaymentAmount,
-            pledgeAmount,
-            _creatorFee
-        ) = loanTerms(_inAmountAfterFees);
+        (loanAmount, repaymentAmount, pledgeAmount, _creatorFee) = loanTerms(
+            _inAmountAfterFees
+        );
         assert(_inAmountAfterFees != 0); // if 0 must have failed in loanTerms(...)
         if (loanAmount < _minLoanLimit) revert LoanBelowLimit();
         if (repaymentAmount > _maxRepayLimit) revert RepaymentAboveLimit();
@@ -454,9 +532,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         uint128 _transferAmount
     ) internal view virtual returns (uint128);
 
-    function unlockCollateral(
-        uint256[] calldata _loanIds
-    ) external {
+    function unlockCollateral(uint256[] calldata _loanIds) external {
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < _loanIds.length; ) {
             LoanInfo storage loan = loanIdxToLoanInfo[_loanIds[i]];
@@ -469,9 +545,8 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
             }
         }
         lockedCollateral -= totalUnlockableColl;
-        uint256 currentCollTokenBalance = IERC20Metadata(collCcyToken).balanceOf(
-            address(this)
-        );
+        uint256 currentCollTokenBalance = IERC20Metadata(collCcyToken)
+            .balanceOf(address(this));
         IERC20Metadata(collCcyToken).safeTransfer(
             poolCreator,
             currentCollTokenBalance - lockedCollateral

@@ -15,11 +15,8 @@ interface IBasePool_v_1_2 {
         uint256 minLoan,
         uint256 creatorFee
     );
-    
-    event RemoveLiquidity(
-        uint256 amount,
-        uint256 indexed loanIdx
-    );
+
+    event RemoveLiquidity(uint256 amount, uint256 indexed loanIdx);
     event Borrow(
         address indexed borrower,
         uint256 loanIdx,
@@ -33,6 +30,14 @@ interface IBasePool_v_1_2 {
         address indexed borrower,
         uint256 loanIdx,
         uint256 repaymentAmountAfterFees
+    );
+    event Rollover(
+        address indexed borrower,
+        uint256 loanIdx,
+        uint256 collateral,
+        uint256 loanAmount,
+        uint256 repaymentAmount,
+        uint256 indexed expiry
     );
     event UpdatedTerms(
         uint256 maxLoanPerColl,
@@ -59,29 +64,23 @@ interface IBasePool_v_1_2 {
         bool collUnlocked;
     }
 
-    
-
     /**
      * @notice Function which removes shares from an LPs
      * @dev This function will remove loan currency
      * @param amount Amount of loan Coll to remove
      */
-    function removeLiquidity(
-        uint256 amount
-    ) external;
+    function removeLiquidity(uint256 amount) external;
 
     /**
      * @notice Function which allows borrowing from the pool
-     * @param _sendAmount Amount of collateral currency sent by borrower
-     * @param _minLoan Minimum loan currency amount acceptable to borrower
-     * @param _maxRepay Maximum allowable loan currency amount borrower is willing to repay
+     * _sendAmount Amount of collateral currency sent by borrower
+     * _minLoan Minimum loan currency amount acceptable to borrower
+     * _maxRepay Maximum allowable loan currency amount borrower is willing to repay
      * @param _deadline Timestamp after which transaction will be void
      * @param _referralCode Code for later possible rewards in referral program
      */
     function borrow(
-        uint128 _sendAmount,
-        uint128 _minLoan,
-        uint128 _maxRepay,
+        uint128[3] calldata limitsAndAmount,
         uint256 _deadline,
         uint256 _referralCode
     ) external;
@@ -98,6 +97,12 @@ interface IBasePool_v_1_2 {
         uint256 _loanIdx,
         address _recipient,
         uint128 _sendAmount
+    ) external;
+
+    function rollOver(
+        uint256 _loanIdx,
+        uint128[3] calldata limitsAndAmount,
+        uint256 _deadline
     ) external;
 
     /**
