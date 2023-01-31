@@ -1,10 +1,17 @@
 {
-  "name": "orderbook-style-prototyping",
+  "name": "mysofinance-core-protocol",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clean": "hardhat clean && rm -rf abi/ && rm -rf artifacts/ && rm -rf dist/ && rm -rf typechain/",
+    "compile": "hardhat compile",
+    "lint": "solhint \"contracts/**/*.sol\"",
+    "prettier": "prettier --config .prettierrc --check \"{contracts,test}/**/*.{js,json,sol,ts}\"",
+    "prettier:write": "prettier --config .prettierrc --write \"{contracts,test}/**/*.{js,json,sol,ts}\"",
+    "prettier:list-different": "prettier --config .prettierrc --list-different \"**/*.{js,json,sol,ts}\"",
+    "prettier:contracts": "prettier --config .prettierrc --list-different \"{contracts,src}/**/*.sol\"",
+    "test": "hardhat test"
   },
   "repository": {
     "type": "git",
@@ -20,8 +27,10 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "hardhat": "^2.9.9",
-    "prettier": "^2.7.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "prettier": "^2.8.3",
+    "prettier-plugin-solidity": "^1.1.1",
+    "solhint": "^3.3.8",
+    "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.21"
   },
   "dependencies": {

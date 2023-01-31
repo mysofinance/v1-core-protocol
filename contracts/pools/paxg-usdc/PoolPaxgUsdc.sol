@@ -4,8 +4,8 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {BasePool} from "../../BasePool.sol";
-import {IPAXG} from "../../interfaces/IPAXG.sol";
+import { BasePool } from "../../BasePool.sol";
+import { IPAXG } from "../../interfaces/IPAXG.sol";
 
 contract PoolPaxgUsdc is BasePool {
     constructor(
@@ -31,16 +31,13 @@ contract PoolPaxgUsdc is BasePool {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10 * 10**6
+            10 * 10 ** 6
         )
     {}
 
-    function getCollCcyTransferFee(uint128 _transferAmount)
-        internal
-        view
-        override
-        returns (uint128 transferFee)
-    {
+    function getCollCcyTransferFee(
+        uint128 _transferAmount
+    ) internal view override returns (uint128 transferFee) {
         uint256 _transferFee = IPAXG(collCcyToken).getFeeFor(_transferAmount);
         transferFee = uint128(_transferFee);
         assert(transferFee == _transferFee);
