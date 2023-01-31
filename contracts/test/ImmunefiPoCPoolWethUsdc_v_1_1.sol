@@ -30,7 +30,7 @@ contract ImmunefiPoCPoolWethUsdc_v_1_1 is BasePool_v_1_1 {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10 * 10 ** 6
+            100000
         )
     {}
 
@@ -46,7 +46,7 @@ contract ImmunefiPoCPoolWethUsdc_v_1_1 is BasePool_v_1_1 {
         transferFee = 0;
     }
 
-    function getMinLiquidity() external pure returns (uint256 minLiquidity) {
+    function getMinLiquidity() external view returns (uint256) {
         return minLiquidity;
     }
 }

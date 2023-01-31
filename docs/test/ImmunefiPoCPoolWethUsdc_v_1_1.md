@@ -170,7 +170,7 @@ Function which gets all LP info
 ### getMinLiquidity
 
 ```solidity
-function getMinLiquidity() external pure returns (uint256 minLiquidity)
+function getMinLiquidity() external view returns (uint256)
 ```
 
 
@@ -182,7 +182,7 @@ function getMinLiquidity() external pure returns (uint256 minLiquidity)
 
 | Name | Type | Description |
 |---|---|---|
-| minLiquidity | uint256 | undefined |
+| _0 | uint256 | undefined |
 
 ### getPoolInfo
 

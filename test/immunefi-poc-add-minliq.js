@@ -1,3 +1,4 @@
+const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("ImmunefiPoCPoolWethUsdc_v_1_1", function () {
@@ -54,13 +55,15 @@ describe("ImmunefiPoCPoolWethUsdc_v_1_1", function () {
     WETH.connect(borrower).approve(poolWethUsdc.address, MAX_UINT128);
   });
 
-  it("Should allow LPs to add liquidity", async function () {
+  it("Should not allow adding less than min. liquidity / 1000", async function () {
     blocknum = await ethers.provider.getBlockNumber();
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
     minLiquidity = await poolWethUsdc.getMinLiquidity()
     console.log("minLiquidity:", minLiquidity)
-    await poolWethUsdc.connect(lp).addLiquidity(lp.address, minLiquidity, timestamp+60, 0);
-    poolInfo = await poolWethUsdc.getPoolInfo();
+    for (let i=0; i<Number(minLiquidity.toString())/1000; i++) {
+      console.log("testing i:", i)
+      await expect(poolWethUsdc.connect(lp).addLiquidity(lp.address, i, timestamp+MAX_UINT128, 0)).to.be.revertedWithCustomError(poolWethUsdc, "InvalidAddAmount");
+    }
   });
 
 });
