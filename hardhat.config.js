@@ -38,7 +38,7 @@ module.exports = {
     hardhat: {
       chainId: 31337,
       forking: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY_MAINNET}`,
+        url: `https://mainnet.infura.io/v3/${INFURA_API_KEY_MAINNET}`,
         blockNumber: 16382000
       }
     },
