@@ -15,11 +15,8 @@ interface IBasePool_v_1_2 {
         uint256 minLoan,
         uint256 creatorFee
     );
-    
-    event RemoveLiquidity(
-        uint256 amount,
-        uint256 indexed loanIdx
-    );
+
+    event RemoveLiquidity(uint256 amount, uint256 indexed loanIdx);
     event Borrow(
         address indexed borrower,
         uint256 loanIdx,
@@ -59,16 +56,12 @@ interface IBasePool_v_1_2 {
         bool collUnlocked;
     }
 
-    
-
     /**
      * @notice Function which removes shares from an LPs
      * @dev This function will remove loan currency
      * @param amount Amount of loan Coll to remove
      */
-    function removeLiquidity(
-        uint256 amount
-    ) external;
+    function removeLiquidity(uint256 amount) external;
 
     /**
      * @notice Function which allows borrowing from the pool

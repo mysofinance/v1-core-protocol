@@ -28,6 +28,7 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
     error AlreadyRepaid();
     error InvalidSendAmount();
     error Invalid();
+    error TooLargePledge();
 
     uint256 constant BASE = 10 ** 18;
     uint256 constant MAX_FEE = 500 * 10 ** 14; // 5%, denominated in BASE
@@ -305,21 +306,11 @@ abstract contract BasePool_v_1_2 is IBasePool_v_1_2 {
         uint256 pledge = _inAmountAfterFees - _creatorFee;
         uint256 _totalLiquidity = IERC20Metadata(loanCcyToken).balanceOf(address(this));
         uint256 loan = (pledge * maxLoanPerColl) / 10 ** collTokenDecimals;
-        uint256 L_k = ((_totalLiquidity) * BASE * 9) /
-            (BASE * 10);
-        if (loan > L_k) {
-            uint256 x_k = (L_k * 10 ** collTokenDecimals) / maxLoanPerColl;
-            loan =
-                ((pledge - x_k) *
-                    maxLoanPerColl *
-                    (_totalLiquidity - L_k)) /
-                ((pledge - x_k) *
-                    maxLoanPerColl +
-                    (_totalLiquidity - L_k) *
-                    10 ** collTokenDecimals) +
-                L_k;
-        }
-
+        //uint256 x_k = (_totalLiquidity * 10 ** collTokenDecimals) / maxLoanPerColl;
+        //loan = _totalLiquidity;
+        //could re-imburse...for now, just revert
+        if (loan > _totalLiquidity) revert TooLargePledge();
+        
         if (loan < minLoan) revert LoanTooSmall();
         uint256 postLiquidity = _totalLiquidity - loan;
         // we use the average rate to calculate the repayment amount
