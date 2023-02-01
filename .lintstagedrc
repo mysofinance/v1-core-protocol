@@ -1,0 +1,4 @@
+{
+  "*.sol": ["solhint", "prettier --config .prettierrc --write"],
+  "*.{js, ts}": ["prettier --config .prettierrc --write"]
+}

@@ -1,0 +1,21 @@
+name: Workflow | Lint
+
+on: workflow_call
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup | install node
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Setup | install deps
+        run: |
+          npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
