@@ -20,4 +20,4 @@ jobs:
       - name: Test
         run: npm run test
         env:
-          ALCHEMY_API_KEY: ${{ inputs.alchemy_api_key }}
+          ALCHEMY_API_KEY: ${{ secrets.alchemy_api_key }}
