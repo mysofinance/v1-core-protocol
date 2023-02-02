@@ -1,9 +1,9 @@
-name: Workflow | Lint
+name: Workflow | Test
 
 on: workflow_call
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -14,4 +14,4 @@ jobs:
         uses: ./.github/actions/npm-install
 
       - name: Lint
-        run: npm run lint
+        run: npm run test

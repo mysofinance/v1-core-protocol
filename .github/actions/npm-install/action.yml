@@ -1,0 +1,24 @@
+name: Install npm dependencies
+description: Installs all npm dependencies
+
+runs:
+  using: composite
+  steps:
+    - name: Setup | cache for node modules
+      uses: actions/cache@v2
+      id: cache
+      with:
+        path: '**/node_modules'
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Setup | install node
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Setup | install node modules
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci
