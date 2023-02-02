@@ -1,6 +1,11 @@
 name: Workflow | Test
 
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      alchemy_api_key:
+        required: true
+        type: string
 
 jobs:
   test:
@@ -13,5 +18,7 @@ jobs:
       - name: Setup | Install npm dependencies
         uses: ./.github/actions/npm-install
 
-      - name: Lint
+      - name: Test
         run: npm run test
+        with:
+          ALCHEMY_API_KEY: ${{ inputs.alchemy_api_key }}
