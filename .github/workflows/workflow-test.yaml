@@ -20,5 +20,5 @@ jobs:
 
       - name: Test
         run: npm run test
-        with:
+        env:
           ALCHEMY_API_KEY: ${{ inputs.alchemy_api_key }}
