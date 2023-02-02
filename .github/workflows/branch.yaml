@@ -3,7 +3,6 @@ name: Branch
 on:
   push:
     branches:
-      - main
       - v_1_1
   pull_request:
     branches:
