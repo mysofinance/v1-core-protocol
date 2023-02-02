@@ -2,10 +2,9 @@ name: Workflow | Test
 
 on:
   workflow_call:
-    inputs:
+    secrets:
       alchemy_api_key:
         required: true
-        type: string
 
 jobs:
   test:
