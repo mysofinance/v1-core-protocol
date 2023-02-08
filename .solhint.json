@@ -1,0 +1,34 @@
+{
+  "extends": "solhint:recommended",
+  "plugins": ["prettier"],
+  "rules": {
+    "imports-on-top": "error",
+    "no-unused-vars": "error",
+    "code-complexity": ["error", 10],
+    "compiler-version": ["error", "^0.8.0"],
+    "const-name-snakecase": "error",
+    "event-name-camelcase": "error",
+    "constructor-syntax": "error",
+    "func-name-mixedcase": "off",
+    "func-param-name-mixedcase": "error",
+    "modifier-name-mixedcase": "error",
+    "private-vars-leading-underscore": "off",
+    "var-name-mixedcase": "error",
+    "func-visibility": ["error", { "ignoreConstructors": true }],
+    "not-rely-on-time": "off",
+    "prettier/prettier": [
+      "error",
+      {
+        "arrowParens": "avoid",
+        "bracketSpacing": true,
+        "endOfLine": "auto",
+        "printWidth": 80,
+        "useTabs": false,
+        "singleQuote": false,
+        "tabWidth": 4,
+        "trailingComma": "all"
+      }
+    ],
+    "reason-string": ["warn", { "maxLength": 64 }]
+  }
+}

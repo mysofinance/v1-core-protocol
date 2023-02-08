@@ -1,27 +1,38 @@
 {
-  "name": "orderbook-style-prototyping",
+  "name": "mysofinance-core-protocol",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clean": "hardhat clean && rm -rf abi/ && rm -rf artifacts/ && rm -rf dist/ && rm -rf typechain/",
+    "compile": "hardhat compile",
+    "prettier": "prettier --config .prettierrc --check \"{contracts,test}/**/*.{js,json,sol,ts}\"",
+    "prettier:write": "prettier --config .prettierrc --write \"{contracts,test}/**/*.{js,json,sol,ts}\"",
+    "test": "hardhat test",
+    "lint": "solhint \"contracts/**/*.sol\"",
+    "slither": "slither . --checklist",
+    "prepare": "husky install"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mysofinance/orderbook-style-prototyping.git"
+    "url": "git+https://github.com/mysofinance/v1-core-protocol.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "MYSO Finance",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/mysofinance/orderbook-style-prototyping/issues"
+    "url": "https://github.com/mysofinance/v1-core-protocol/issues"
   },
-  "homepage": "https://github.com/mysofinance/orderbook-style-prototyping#readme",
+  "homepage": "https://github.com/mysofinance/v1-core-protocol#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "hardhat": "^2.9.9",
-    "prettier": "^2.7.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.1.0",
+    "prettier": "^2.8.3",
+    "prettier-plugin-solidity": "^1.1.1",
+    "solhint": "^3.3.8",
+    "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.21"
   },
   "dependencies": {

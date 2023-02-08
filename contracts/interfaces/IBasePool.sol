@@ -150,8 +150,10 @@ interface IBasePool {
      * @param _onBehalfOf Owner of the LP shares
      * @param numSharesRemove Amount of LP shares to remove
      */
-    function removeLiquidity(address _onBehalfOf, uint128 numSharesRemove)
-        external;
+    function removeLiquidity(
+        address _onBehalfOf,
+        uint128 numSharesRemove
+    ) external;
 
     /**
      * @notice Function which allows borrowing from the pool
@@ -281,7 +283,9 @@ interface IBasePool {
      * @return sharesOverTime Array with elements representing number of LP shares for their past and current positions
      * @return loanIdxsWhereSharesChanged Array with elements representing upper loan idx bounds (excl.), where LP can claim
      */
-    function getLpInfo(address _lpAddr)
+    function getLpInfo(
+        address _lpAddr
+    )
         external
         view
         returns (
@@ -348,7 +352,9 @@ interface IBasePool {
      * @return _creatorFee Amount of collateral currency to be transferred to treasury
      * @return _totalLiquidity The total liquidity of the pool (pre-borrow) that is available for new loans
      */
-    function loanTerms(uint128 _inAmountAfterFees)
+    function loanTerms(
+        uint128 _inAmountAfterFees
+    )
         external
         view
         returns (

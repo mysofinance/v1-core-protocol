@@ -1,0 +1,41 @@
+name: Branch
+
+on:
+  push:
+    branches:
+      - v_1_1
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  consecutiveness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: mktcode/consecutive-workflow-action@aed79535a759e4f5c43557f1f50b099758fd99df
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  run_lint:
+    name: Run | Lint
+    needs: [consecutiveness]
+    uses: ./.github/workflows/workflow-lint.yaml
+
+  run_slither:
+    name: Run | Slither
+    needs: [consecutiveness]
+    uses: ./.github/workflows/workflow-slither.yaml
+
+  run_test:
+    name: Run | Test
+    needs: [consecutiveness]
+    uses: ./.github/workflows/workflow-test.yaml
+    secrets:
+      alchemy_api_key: ${{ secrets.ALCHEMY_API_KEY }}

@@ -1,0 +1,17 @@
+name: Workflow | Lint
+
+on: workflow_call
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup | Install npm dependencies
+        uses: ./.github/actions/npm-install
+
+      - name: Lint
+        run: npm run lint

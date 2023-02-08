@@ -30,7 +30,7 @@ contract PoolUsdcWeth is BasePool {
             _minLoan,
             _baseAggrBucketSize,
             _creatorFee,
-            10**16
+            10 ** 16
         )
     {}
 
