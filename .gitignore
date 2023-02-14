@@ -5,6 +5,8 @@ coverage.json
 typechain
 orderbook-venv
 data
+artifacts-zk
+cache-zk
 
 #Hardhat files
 cache
