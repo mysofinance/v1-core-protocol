@@ -1,5 +1,7 @@
 require("@matterlabs/hardhat-zksync-deploy");
 require("@matterlabs/hardhat-zksync-solc");
+require("@matterlabs/hardhat-zksync-verify");
+require("@nomiclabs/hardhat-etherscan");
 require("dotenv").config();
 
 const { PRIVATE_KEY } = process.env;

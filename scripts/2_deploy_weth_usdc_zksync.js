@@ -12,47 +12,36 @@ async function main() {
 
   // Create deployer object and load the artifact of the contract you want to deploy.
   const deployer = new Deployer(hre, wallet);
-  const artifact = await deployer.loadArtifact("PoolWethUsdc");
+  const artifact = await deployer.loadArtifact("TestPoolWethUsdc_v_1_1");
 
-  // Estimate contract deployment fee
-  const MONE = ethers.BigNumber.from("1000000000000000000"); //10**18
-  const ONE_USDC = ethers.BigNumber.from("1000000");
-  const _loanTenor = 86400;
-  const _maxLoanPerColl = ONE_USDC.mul(1000);
-  const _r1 = MONE.mul(2).div(10);
-  const _r2 = MONE.mul(2).div(100);
-  const _liquidityBnd1 = ONE_USDC.mul(10000);
-  const _liquidityBnd2 = ONE_USDC.mul(100000);
-  const _minLoan = ONE_USDC.mul(100);
-
-  const deploymentFee = await deployer.estimateDeployFee(artifact, [
-    _loanTenor,
-    _maxLoanPerColl,
-    _r1,
-    _r2,
-    _liquidityBnd1,
-    _liquidityBnd2,
-    _minLoan,
-    100,
-    0,
-  ]);
-
-  // Deploy this contract. The returned object will be of a `Contract` type, similarly to ones in `ethers`.
-  // `greeting` is an argument for contract constructor.
-  const parsedFee = ethers.utils.formatEther(deploymentFee.toString());
-
-  console.log(`The deployment is estimated to cost ${parsedFee} ETH`);
+  // pool parameters
+  const BASE = ethers.BigNumber.from("10").pow("18");
+  const ONE_USDC = ethers.BigNumber.from("10").pow("6");
+  const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24);
+  const tenor = ONE_DAY.mul(30);
+  const poolConfig = {
+    tenor: 86400,
+    maxLoanPerColl: 1200000000,
+    r1: 547945205479452,
+    r2: 273972602739726,
+    liquidityBnd1: 1000000000,
+    liquidityBnd2: 1000000000000,
+    minLoan: 100000000,
+    baseAggrBucketSize: 10,
+    creatorFee: 1000000000000000,
+  };
+  console.log("poolConfig", poolConfig);
 
   const contract = await deployer.deploy(artifact, [
-    _loanTenor,
-    _maxLoanPerColl,
-    _r1,
-    _r2,
-    _liquidityBnd1,
-    _liquidityBnd2,
-    _minLoan,
-    100,
-    0,
+    poolConfig.tenor,
+    poolConfig.maxLoanPerColl,
+    poolConfig.r1,
+    poolConfig.r2,
+    poolConfig.liquidityBnd1,
+    poolConfig.liquidityBnd2,
+    poolConfig.minLoan,
+    poolConfig.baseAggrBucketSize,
+    poolConfig.creatorFee,
   ]);
 
   // Show the contract info.
@@ -66,4 +55,4 @@ main()
     process.exit(1);
   });
 
-// Pool address - 0x6911F48A228969d4d54DE6b1739882e2f735f237
+// Pool address - 0x69c46d1Ea267643e39a449c75186B7Da107bc160
