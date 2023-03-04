@@ -52,7 +52,7 @@ describe('Olympus DAO Examples', function () {
     return { pool, olympusMultisig, gohmHolder }
   }
 
-  it('Example: claim pool admin role, add liquidity, emulate borrowing/repaying, remove liquidty', async function () {
+  it('Example: claim pool admin role, add liquidity, emulate borrowing/repaying, update loan terms, remove liquidty', async function () {
     const { pool, olympusMultisig, gohmHolder } = await setup()
 
     // claim pool admin role
@@ -71,11 +71,35 @@ describe('Olympus DAO Examples', function () {
     await gohm.connect(gohmHolder).approve(pool.address, MAX_UINT128)
     await pool.connect(gohmHolder).borrow(gohmHolder.address, ONE_GOHM, 0, MAX_UINT128, timestamp+1000000000, 0)
     const loanInfo = await pool.loanIdxToLoanInfo(1)
-    console.log(loanInfo.repayment)
     await dai.connect(gohmHolder).approve(pool.address, MAX_UINT128)
     await pool.connect(gohmHolder).repay(1, gohmHolder.address, loanInfo.repayment)
 
-    // claim
+    // update loan terms
+    const BASE = ethers.BigNumber.from("10").pow("18")
+    const poolInfo = await pool.getPoolInfo()
+    const TENOR = poolInfo._loanTenor
+    const oneYear = ethers.BigNumber.from(60*60*24*365)
+    const newGohmPrice = ONE_DAI.mul(3000)
+    const targetLtv = BASE.mul(75).div(100)
+    const maxLoanPerColl = newGohmPrice.mul(targetLtv).div(BASE)
+    const newTerms = {
+      maxLoanPerColl: maxLoanPerColl,
+      r1: BASE.mul(1).div(1000000).mul(TENOR).div(oneYear), // approx. 0% p.a.
+      r2: BASE.mul(1).div(10000000).mul(TENOR).div(oneYear), // approx. 0% p.a.
+      liquidityBnd1: ONE_DAI,
+      liquidityBnd2: ONE_DAI.mul(100),
+      creatorFee: BASE.mul(15).div(1000)
+    }
+    await pool.connect(olympusMultisig).updateTerms(
+      newTerms.maxLoanPerColl, 
+      newTerms.creatorFee,
+      newTerms.r1,
+      newTerms.r2,
+      newTerms.liquidityBnd1,
+      newTerms.liquidityBnd2
+    )
+    
+    // claim loan proceeds
     await pool.connect(olympusMultisig).claim(olympusMultisig.address, [1], false, timestamp+120)
 
     // move forward in time
