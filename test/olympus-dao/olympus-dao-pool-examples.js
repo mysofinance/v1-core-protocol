@@ -110,4 +110,45 @@ describe('Olympus DAO Examples', function () {
     const lpInfo = await pool.getLpInfo(olympusMultisig.address)
     await pool.connect(olympusMultisig).removeLiquidity(olympusMultisig.address, lpInfo.sharesOverTime[0])
   })
+
+  it('Example: update loan terms', async function () {
+    const { pool, olympusMultisig } = await setup()
+
+    // claim pool admin role
+    await pool.connect(olympusMultisig).claimCreator()
+
+    // helper constants
+    const BASE = ethers.BigNumber.from("10").pow("18")
+    const poolInfo = await pool.getPoolInfo()
+    const TENOR = poolInfo._loanTenor
+    const oneYear = ethers.BigNumber.from(60*60*24*365)
+
+    // get current gOHM price
+    const newGohmPrice = ONE_DAI.mul(2705)
+
+    // define new terms
+    const targetLtv = BASE.mul(75).div(100) // 75%
+    const newMaxLoanPerColl = newGohmPrice.mul(targetLtv).div(BASE)
+    const newApr = BASE.mul(32).div(1000) // 3.2% p.a.
+    const newR1 = newApr.mul(TENOR).div(oneYear).add(1) // r1 has to be slightly larger than r2
+    const newR2 = newApr.mul(TENOR).div(oneYear)
+    const newUpfrontFee = BASE.mul(2).div(1000) // 20bps
+    const newTerms = {
+      maxLoanPerColl: newMaxLoanPerColl,
+      r1: newR1, 
+      r2: newR2,
+      liquidityBnd1: ONE_DAI, // unchanged
+      liquidityBnd2: ONE_DAI.mul(100), // unchanged
+      creatorFee: newUpfrontFee
+    }
+    console.log('new loan terms:', newTerms)
+    await pool.connect(olympusMultisig).updateTerms(
+      newTerms.maxLoanPerColl, 
+      newTerms.creatorFee,
+      newTerms.r1,
+      newTerms.r2,
+      newTerms.liquidityBnd1,
+      newTerms.liquidityBnd2
+    )
+  })
 })
