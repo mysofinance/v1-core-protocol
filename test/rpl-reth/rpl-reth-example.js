@@ -90,7 +90,7 @@ describe('PoC', function () {
     const newBalanceHex = ONE_ETH.mul(1000).toHexString().replace('0x0', '0x');
     await ethers.provider.send('hardhat_setBalance', [attacker.address, newBalanceHex])
     
-    // set some coll token (=rETH)
+    // set some loan token (=rETH)
     const loanTokenBal = ONE_ETH.mul(1000)
     const balanceSlotLoanToken = getSlot(attacker.address, loanTokenBalanceSlot)
     const storageValueLoanToken = ethers.utils.hexlify(ethers.utils.zeroPad(loanTokenBal, 32))
